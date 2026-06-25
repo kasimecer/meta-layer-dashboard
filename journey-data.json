@@ -14,54 +14,90 @@
       "baslik": "Senin yanıtın",
       "tip": "baris",
       "durum": "tamam",
-      "kisa": "Seçmedin, kararı araştırmaya bıraktın + kısıtlarını verdin.",
+      "kisa": "Bir seçenek seçmedin; kararı araştırmaya bıraktın, kısıtlarını verdin.",
       "baris_aynen": "oncelikle benim arzum isin tutmasi, yani verilen seceneklerin hepsi de bana uyar, en guclu yol veya yollardan gitmek istiyorum. hepsi de olur, kucuk kucuk baslamak mantikli geliyor bana. sosyal medya paylasimlari ile de insanlara ulasmayi deneriz. uygun fiyat ile gireriz, makine uygun fiyata kovalariz veya kiralariz baslarda. test sureci yapariz, is nasil goruruz. her firsata bakariz. zanaat mobilya yenileme icin eli yatkin bir arkadasim var, ona danisabilir, bana baslangicta yardimci olmaini teklif ederim. dediigim gibi, burda benim zevkim bakimindan pek fark yok, rasyonel arastirmalara gore karar vermek istiyorum. kabiliyetim acisindan da zanaat konusu tam emin degilim, denem lazim, ya da destek ile olabilir",
-      "detay": "Kısıtların filtre olarak alındı (küçük başla · uygun fiyat · ucuz makine al/kirala · sosyal medya · test-önce · zanaat koşullu-destek). Buna göre mobilya-mağaza B2B seçeneği elendi (resmi giriş aylar sürebilir → \"küçük başla\"ya ters). Geniş tekstil temizliği aktif kaldı; abonelik ve zanaat koşullu. İki soru soruldu:"
+      "detay": "Verdiğin kısıtlar filtre olarak alındı: küçük başla · uygun fiyat · ucuz makine al/kirala · sosyal medya · test-önce · zanaat koşullu-destek."
     },
     {
       "n": 3,
-      "baslik": "Senin yanıtın",
-      "tip": "baris",
+      "baslik": "Değerlendirme & sorular",
+      "tip": "sistem",
       "durum": "tamam",
-      "kisa": "Önce kanıt istedin; iki sorun gerçeklerle yanıtlandı.",
-      "baris_aynen": "diger seceneklerin arastirmasini en ozet halinde, avantaj ve dezavantajlarini az da olsa gormek isterdim. icten ikna olmak, kafama oturmasi icin. mobilya doseme yenileme icin plan, sartlar, firsatlar hesaplandi ve cok iyi ise varim. fakat, kumas cesitliligi, bunlarin logistigi, plani, gereken vakit, ozelllikle cok fazla cesit renk kumas gerekir diye aklima geliyor, yoksa plan farkli mi? mesela el aletleri isin kolay kismi, yardim alma durumum mumkun. dedigim gibi arastirma ve plan guclu ise varim. degilse bunu ek portfoy e dahil, ufak ufak baslanabilir. duzenli ve kurumsal musteriler baslangicta cok iyimser duruyor. bireysel ile baslamak mantikli. mesela kurumsal secenek senin arastirmalarinda cok mu mumkun cikiyor, bakmak lazim. zaman acisindan cok acelem yok, dogru adimi atmak zamandan daha onemli.",
-      "detay": "- Kumaş stoku endişen → temelsiz. Made-to-order: müşteri tedarikçinin numune-kitabından seçer, sen o iş için sipariş edersin; stok tutmana gerek yok. Asıl konu ekipman: yeni endüstriyel makine ~40.000 SEK (bütçeyi zorlar), ikinci-el 5.000–20.000 SEK (sığar, garanti riski). Süre: usta ~2-3 gün, ilk projeler ~4-6 gün."
+      "kisa": "Kısıtlarına göre seçenekler süzüldü; sana iki soru soruldu.",
+      "baris_aynen": null,
+      "detay": "Mobilya-mağaza B2B seçeneği elendi (resmi giriş aylar sürebilir → \"küçük başla\"ya ters). Geniş tekstil temizliği aktif kaldı; abonelik ve zanaat koşullu. İki soru:"
     },
     {
       "n": 4,
+      "baslik": "Senin yanıtın",
+      "tip": "baris",
+      "durum": "tamam",
+      "kisa": "Önce kanıt istedin; kumaş ve kurumsal hakkında soru sordun.",
+      "baris_aynen": "diger seceneklerin arastirmasini en ozet halinde, avantaj ve dezavantajlarini az da olsa gormek isterdim. icten ikna olmak, kafama oturmasi icin. mobilya doseme yenileme icin plan, sartlar, firsatlar hesaplandi ve cok iyi ise varim. fakat, kumas cesitliligi, bunlarin logistigi, plani, gereken vakit, ozelllikle cok fazla cesit renk kumas gerekir diye aklima geliyor, yoksa plan farkli mi? mesela el aletleri isin kolay kismi, yardim alma durumum mumkun. dedigim gibi arastirma ve plan guclu ise varim. degilse bunu ek portfoy e dahil, ufak ufak baslanabilir. duzenli ve kurumsal musteriler baslangicta cok iyimser duruyor. bireysel ile baslamak mantikli. mesela kurumsal secenek senin arastirmalarinda cok mu mumkun cikiyor, bakmak lazim. zaman acisindan cok acelem yok, dogru adimi atmak zamandan daha onemli.",
+      "detay": "Sorduğun iki şey: kumaş çeşitliliği/lojistiği engel mi, ve kurumsal müşteri gerçekçi mi."
+    },
+    {
+      "n": 5,
+      "baslik": "Kanıt sunuldu",
+      "tip": "sistem",
+      "durum": "tamam",
+      "kisa": "İki sorun gerçeklerle yanıtlandı.",
+      "baris_aynen": null,
+      "detay": "- Kumaş stoku endişen → temelsiz. Made-to-order: müşteri tedarikçinin numune-kitabından seçer, sen o iş için sipariş edersin; stok tutmana gerek yok. Asıl konu ekipman: yeni endüstriyel makine ~40.000 SEK (bütçeyi zorlar), ikinci-el 5.000–20.000 SEK (sığar, garanti riski)."
+    },
+    {
+      "n": 6,
       "baslik": "Senin kararın",
       "tip": "baris",
       "durum": "tamam",
       "kisa": "Aday 1 ile başla; 2 ve 4 portföyde, sonra.",
       "baris_aynen": "en kolay gelen secenek 1. fakat bir sirket kuruyoruz, secenek 1 ile baslariz. oncelik. fakt portfoy olrak 1,2 ve 4 te olsun. farkli makine gerektiginde ve butcemiz oldugunda aliriz. secenek 1 ile baslanip tekerlek doner 3-5 ay sonra belki zanaat-yatkin arkadasim da ise dahil olur, zanaat tarafini o goturur. sonra. kararim bu sekilde.",
-      "detay": "Karar uygulandı: tek şirket. Geniş Tekstil Temizliği = aktif başlangıç (öncelik). Abonelik + zanaat = portföyde; makine + bütçe olunca ve zanaat-yatkın arkadaş katılınca (~3-5 ay) sıraya alınacak — elenmedi, sıralandı."
+      "detay": "Tek şirket: Geniş Tekstil Temizliği = aktif başlangıç (öncelik). Abonelik + zanaat = portföyde; makine + bütçe olunca ve zanaat-yatkın arkadaş katılınca (~3-5 ay) sıraya alınacak."
     },
     {
-      "n": 5,
-      "baslik": "Sağlamlık kontrolü",
+      "n": 7,
+      "baslik": "Şirket + sağlamlık",
       "tip": "sistem",
       "durum": "tamam",
-      "kisa": "Geniş Tekstil Temizliği sağlamlık kapısından geçti.",
+      "kisa": "Karar uygulandı; iş fikri sağlamlık kapısından geçti.",
       "baris_aynen": null,
-      "detay": "Dört açıdan kontrol edildi (konu net · fark: premium + before/after içerik + yerel/hızlı · müşteri vaadi: temiz/yenilenmiş döşeme, kapıda kolaylık). Hepsi geçti; tek geliştirme: hedef-kitleyi keskinleştir → pazar araştırmasına geçildi."
+      "detay": "Geniş Tekstil Temizliği = aktif hat. Dört açıdan kontrol edildi (konu net · fark: premium + before/after içerik + yerel/hızlı · müşteri vaadi · güven temeli) → geçti. Tek geliştirme: hedef-kitleyi keskinleştir → pazar araştırmasına geçildi."
     },
     {
-      "n": 6,
+      "n": 8,
       "baslik": "Pazar araştırması",
       "tip": "sistem",
       "durum": "tamam",
       "kisa": "Göteborg pazarı araştırıldı (gerçek verilerle doğrulandı).",
       "baris_aynen": null,
-      "detay": "- Rakipler: MöbelRent, Illos Möbelrekond. Pazar tam dolu değil (~600k nüfus)."
+      "detay": "- Rakipler: MöbelRent, Illos Möbelrekond. Pazar tam dolu değil."
     },
     {
-      "n": 7,
-      "baslik": "ŞİMDİ: senin kararın",
+      "n": 9,
+      "baslik": "Senin yanıtın",
       "tip": "baris",
-      "durum": "aktif",
-      "kisa": "⏳ İki tercihin bekleniyor.",
+      "durum": "tamam",
+      "kisa": "Evcil-hayvan segmentiyle başla dedin; kanalları kabul ettin; \"neden bu odak?\" diye sordun.",
+      "baris_aynen": "önce Evcil hayvan ile başlayalım, fakat bu kısıtlamayı neden yapıyoruz? Bu üç kanal yolu uygun.",
+      "detay": "Segment: evcil-hayvan (ilk odak). Kanallar: Google İşletme + Reco.se + Instagram — kabul. Soru: neden tek segmente odaklanıyoruz?"
+    },
+    {
+      "n": 10,
+      "baslik": "Neden bu odak?",
+      "tip": "sistem",
+      "durum": "tamam",
+      "kisa": "Kısıtlama değil, pazarlama odağı — hizmette herkese açıksın.",
       "baris_aynen": null,
-      "detay": "1. Önce hangi müşteri? Evcil-hayvan sahibi (tekrar iş getirir) / alerjik / yeni-taşınan."
+      "detay": "Herkesin koltuğunu temizlersin, iş geri çevirmezsin. Ama ilk içerik/reklam/yorumları evcil-hayvan sahiplerine yönlendiririz, çünkü:"
+    },
+    {
+      "n": 11,
+      "baslik": "ŞİMDİ: go-to-market",
+      "tip": "sistem",
+      "durum": "aktif",
+      "kisa": "⏳ Evcil-odaklı go-to-market planı hazırlanıyor.",
+      "baris_aynen": null,
+      "detay": "Sıradaki: ilk içerik/mesaj çatısı, Google İşletme + Reco.se kurulumu, ilk müşteri ve ilk yorumları toplama taktiği — hepsi evcil-hayvan segmentine göre somutlaştırılıyor."
     }
   ]
 }
