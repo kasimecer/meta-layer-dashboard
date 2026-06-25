@@ -1,0 +1,23 @@
+{
+  "name": "meta-layer-dashboard",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build-data": "node scripts/build-card-data.js",
+    "dev": "npm run build-data && vite",
+    "build": "npm run build-data && vite build",
+    "preview": "vite preview",
+    "deploy": "npm run build && gh-pages -d dist -b gh-pages"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^9.0.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^5.4.11",
+    "gh-pages": "^6.2.0"
+  }
+}
