@@ -1,0 +1,58 @@
+{
+  "proje": "baris",
+  "momentum": "master-plan onaylandı → A1-A4 bekleniyor",
+  "son_ilerleme": "Master-plan v2 E-onayından geçti = ilk-yarı kapandı. 4 açık düğüm (A1 şirket adı / A2 makine / A3 min-marj / A4 fiyat listesi onayı) Barış yüzeyine 4 KART olarak kondu (yolculuk KART 12-15, tip: girdi-talebi, durum: cevap-bekliyor). Dashboard'a deploy edildi. Barış cevabı = ikinci-yarı kapısını açar.",
+  "sonraki_kritik_adim": "Barış A1-A4'ü cevaplasın (şirket adı + makine + min-marj teyidi + fiyat listesi onayı). 4'ü de gelince ikinci-yarı (gerçek kurulum: kayıt/profil/launch) başlar.",
+  "bekleyen_insan_girdisi": "A1-A4 (şirket adı / makine / min-marj / fiyat listesi onayı)",
+  "acik_bayraklar": [
+    "A1-sirket-adi",
+    "A2-makine-karari",
+    "A3-min-ucret-marji",
+    "A4-fiyat-listesi-onay",
+    "R1-segment-hacim-dogrulanamadi",
+    "B7-recurring-specifik",
+    "B10-Airbnb-yonetim-dis-kaynak"
+  ],
+  "dokumanlar": [
+    {
+      "ad": "baris-cevaplar.md",
+      "yol": "projeler/baris/baris-cevaplar.md"
+    },
+    {
+      "ad": "baris-diyalog-kaydi-v2.md",
+      "yol": "projeler/baris/baris-diyalog-kaydi-v2.md"
+    },
+    {
+      "ad": "baris-diyalog-kaydi.md",
+      "yol": "projeler/baris/baris-diyalog-kaydi.md"
+    },
+    {
+      "ad": "durum.md",
+      "yol": "projeler/baris/durum.md"
+    },
+    {
+      "ad": "go-to-market-strateji-v1.md",
+      "yol": "projeler/baris/go-to-market-strateji-v1.md"
+    },
+    {
+      "ad": "inbox.md",
+      "yol": "projeler/baris/inbox.md"
+    },
+    {
+      "ad": "kart.md",
+      "yol": "projeler/baris/kart.md"
+    },
+    {
+      "ad": "master-plan-v1.md",
+      "yol": "projeler/baris/master-plan-v1.md"
+    },
+    {
+      "ad": "master-plan-v2.md",
+      "yol": "projeler/baris/master-plan-v2.md"
+    },
+    {
+      "ad": "yolculuk-partner.md",
+      "yol": "projeler/baris/yolculuk-partner.md"
+    }
+  ]
+}

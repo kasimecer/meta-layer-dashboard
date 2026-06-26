@@ -1,0 +1,48 @@
+{
+  "projeler": [
+    {
+      "id": "baris",
+      "ad": "Barış — Tekstil Temizliği (Göteborg)",
+      "durum": "build-onayı",
+      "rol": "uzman-ortak",
+      "status": "aktif",
+      "efor": "orta",
+      "deger": "orta",
+      "zaman_son_aktivite": "2026-06-26",
+      "ozet": "Master-plan onaylandı; Barış'tan A1-A4 bekleniyor."
+    },
+    {
+      "id": "mustafa",
+      "ad": "Mustafa — Kitap",
+      "durum": "araştırma",
+      "rol": "eş-ortak",
+      "status": "duraklı",
+      "efor": "düşük",
+      "deger": "?",
+      "zaman_son_aktivite": null,
+      "ozet": "Premise donduruldu; yeni veri-odaklı fikir aranıyor."
+    },
+    {
+      "id": "yakup",
+      "ad": "Yakup — Market App",
+      "durum": "fikir",
+      "rol": "eş-ortak",
+      "status": "duraklı",
+      "efor": "düşük",
+      "deger": "?",
+      "zaman_son_aktivite": null,
+      "ozet": "Duraklı."
+    },
+    {
+      "id": "noaval",
+      "ad": "Noaval — Kreş Yazılımı",
+      "durum": "fikir",
+      "rol": "eş-ortak",
+      "status": "duraklı",
+      "efor": "düşük",
+      "deger": "?",
+      "zaman_son_aktivite": null,
+      "ozet": "En erken/açık; duraklı."
+    }
+  ]
+}
