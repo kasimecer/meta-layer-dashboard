@@ -92,12 +92,48 @@
     },
     {
       "n": 11,
-      "baslik": "ŞİMDİ: go-to-market",
+      "baslik": "Plan hazır",
       "tip": "sistem",
-      "durum": "aktif",
-      "kisa": "⏳ Sıradaki: evcil-odaklı ilk içerik + Google İşletme/Reco kurulumu + ilk müşteri & yorum.",
+      "durum": "tamam",
+      "kisa": "Pazarlama + fiyat + ilk-müşteri planı hazırlandı ve onaylandı. Sıra sende: 4 karar.",
       "baris_aynen": null,
-      "detay": "Evcil-hayvan segmentine göre somutlaştırılıyor: ilk içerik/mesaj çatısı, Google İşletme + Reco.se kurulumu, ilk müşteri ve ilk yorumları toplama taktiği."
+      "detay": "Evcil-hayvan odağına göre tam plan çıkarıldı ve onaylandı:"
+    },
+    {
+      "n": 12,
+      "baslik": "A1: İsim",
+      "tip": "girdi-talebi",
+      "durum": "cevap-bekliyor",
+      "kisa": "Firmana bir isim seç",
+      "baris_aynen": null,
+      "detay": "Kayıt, Google profili, Reco — hepsi isme bağlı. Öneri: isim GENİŞ olsun (halı, yatak, tüm tekstili kapsasın; sadece kanepe ya da sadece evcil değil). Evcil uzmanlığın slogan ve içerikte yaşar. Fikir olsun diye: Fräsch & Fin Göteborg, Hemrena Göteborg, Textilproffs Göteborg. Aklındakini yaz, beraber netleştiririz."
+    },
+    {
+      "n": 13,
+      "baslik": "A2: Makine",
+      "tip": "girdi-talebi",
+      "durum": "cevap-bekliyor",
+      "kisa": "Hangi makineyle başlıyorsun?",
+      "baris_aynen": null,
+      "detay": "İkinci el (~5-20 bin kr, bütçe-dostu ama garanti riski) mi, sıfır (~40 bin kr) mı? Bu kararın maliyetini ve kârını belirliyor."
+    },
+    {
+      "n": 14,
+      "baslik": "A3: Kâr kontrolü",
+      "tip": "girdi-talebi",
+      "durum": "cevap-bekliyor",
+      "kisa": "En düşük iş ~999 kr — sana yetiyor mu?",
+      "baris_aynen": null,
+      "detay": "En düşük iş ücretimiz 999 kr; vergi sonrası eline ~799 kr kalıyor. Makine + yol + malzeme maliyetini düşününce bu sana yeterli kâr bırakıyor mu? (A2'deki makine kararına göre netleşir.)"
+    },
+    {
+      "n": 15,
+      "baslik": "A4: Fiyat listesi",
+      "tip": "girdi-talebi",
+      "durum": "cevap-bekliyor",
+      "kisa": "Başlangıç fiyat listesini onayla",
+      "baris_aynen": null,
+      "detay": "Rakiplerle aynı seviyede bir liste hazırladık: 2'li kanepe 949, 3'lü 1199, 4'lü 1399, halı 139/m², leke ek 99-199, en düşük fatura 999 kr. Bunu başlangıç listen olarak onaylıyor musun, değiştirmek istediğin var mı?"
     }
   ]
 }
