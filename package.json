@@ -1,12 +1,13 @@
 {
-  "name": "meta-layer-dashboard",
+  "name": "meta-layer-core",
   "private": true,
   "version": "0.1.0",
   "type": "module",
   "scripts": {
     "build-data": "node scripts/build-card-data.js",
+    "verify": "node scripts/verify-slice1.mjs",
     "dev": "npm run build-data && vite",
-    "build": "npm run build-data && vite build",
+    "build": "npm run build-data && npm run verify && vite build",
     "preview": "vite preview",
     "deploy": "npm run build && gh-pages -d dist -b gh-pages"
   },

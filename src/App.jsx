@@ -1,32 +1,60 @@
-import { useState, useEffect } from 'react'
-import BarisCard from './components/BarisCard.jsx'
+import { useEffect, useState } from 'react'
+import PartnerView from './views/PartnerView.jsx'
+import PortfolioView from './views/PortfolioView.jsx'
+import ProjectView from './views/ProjectView.jsx'
+
+// meta-layer-core — hash-tabanlı scoped router (GH-Pages-güvenli, ek bağımlılık yok).
+//   #/portfoy            → portföy (stub)
+//   #/proje/<id>         → proje (stub)
+//   #/partner/<id>       → partner (dolu — Barış)
+function rota() {
+  const h = (window.location.hash || '').replace(/^#\/?/, '')
+  const [view, projeId] = h.split('/')
+  return { view: view || 'portfoy', projeId: projeId || 'baris' }
+}
+
+const SEKMELER = [
+  { key: 'portfoy', label: 'Portföy', hash: '#/portfoy' },
+  { key: 'proje',   label: 'Proje',   hash: '#/proje/baris' },
+  { key: 'partner', label: 'Partner', hash: '#/partner/baris' },
+]
 
 export default function App() {
-  const [data, setData] = useState(null)
-  const [error, setError] = useState(null)
+  const [r, setR] = useState(rota())
 
   useEffect(() => {
-    fetch('./card-data.json')
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
-      .then(setData)
-      .catch(() => setError('card-data.json yüklenemedi — önce npm run build-data çalıştır.'))
+    const f = () => setR(rota())
+    window.addEventListener('hashchange', f)
+    if (!window.location.hash) window.location.hash = '#/portfoy'
+    return () => window.removeEventListener('hashchange', f)
   }, [])
-
-  if (error) return (
-    <div style={{ padding: 24, color: '#dc2626', fontSize: 14 }}>{error}</div>
-  )
-  if (!data) return (
-    <div style={{ padding: 24, color: '#71717a', fontSize: 14 }}>Yükleniyor…</div>
-  )
 
   return (
     <div>
-      <header style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 15, fontWeight: 600, color: '#71717a', letterSpacing: 0.3 }}>
-          Partner Dashboard
-        </h1>
+      <header style={{ marginBottom: 16 }}>
+        <h1 style={{ fontSize: 15, fontWeight: 700, color: '#18181b', letterSpacing: 0.2 }}>meta-layer-core</h1>
+        <div style={{ fontSize: 12, color: '#a1a1aa', marginTop: 2 }}>birleşik kontrol katmanı · slice 1</div>
       </header>
-      <BarisCard data={data} />
+
+      {/* Nav — üç scoped görünüm */}
+      <nav style={{ display: 'flex', gap: 6, marginBottom: 20, borderBottom: '1px solid #e4e4e7', paddingBottom: 0 }}>
+        {SEKMELER.map(s => {
+          const aktif = r.view === s.key
+          return (
+            <a key={s.key} href={s.hash} style={{
+              fontSize: 13, fontWeight: 600, textDecoration: 'none',
+              padding: '8px 14px', borderRadius: '8px 8px 0 0',
+              color: aktif ? '#4338ca' : '#71717a',
+              background: aktif ? '#eef2ff' : 'transparent',
+              borderBottom: aktif ? '2px solid #6366f1' : '2px solid transparent',
+            }}>{s.label}</a>
+          )
+        })}
+      </nav>
+
+      {r.view === 'portfoy' && <PortfolioView />}
+      {r.view === 'proje'   && <ProjectView projeId={r.projeId} />}
+      {r.view === 'partner' && <PartnerView projeId={r.projeId} />}
     </div>
   )
 }

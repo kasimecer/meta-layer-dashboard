@@ -1,10 +1,10 @@
 {
   "proje": "baris",
-  "tarih": "2026-06-24",
-  "momentum": "araştırma",
-  "son_ilerleme": "Barış portföy kararı materyalize edildi (Aday 1 aktif; 2+4 survivor-pull backlog). Aday 1 premise kapısı (KK-29) geçti — hedef-kitle alt-segmenti araştırmada netleşecek.",
-  "sonraki_kritik_adim": "Aday 1 araştırma: Göteborg möbelrengöring pazarı, fiyatlandırma, müşteri alt-segmenti, go-to-market kanalları, güven-inşa mekanizmaları",
-  "bekleyen_insan_girdisi": null,
-  "partner_ozet": "<!-- Loop bunu her partner-çıktısında KK-42 summary-first olarak yeniden üretir -->\n\n## Neredeyiz?\n\n**Aktif hizmet:** Göteborg'da ev & ofis tekstil temizliği (koltuk, halı, döşeme) — taşınabilir makineyle kapıya gelen premium servis.\n\nSenin seçimin: önce bu hattı kuruyoruz, diğer adaylar (Airbnb recurring, mobilya yenileme) koşul olgunlaşınca değerlendiriliyor.\n\n## Bu hafta ne yapılıyor?\n\nPazar araştırması: Göteborg möbelrengöring fiyatlandırması, hangi müşteri segmenti önce hedeflenmeli (ev sahipleri, kiracılar, Airbnb ev sahipleri?), müşteri güveni nasıl inşa edilir (ilk yorumlar, garanti, before/after içerik).\n\n## Sırada ne var?\n\nAraştırma bulgularına göre go-to-market planı hazırlanacak — hangi kanalla başlanır, fiyat aralığı nereye oturur, ilk müşteri nasıl gelir.\n\n---\n\n*Soru veya yeni bilgin varsa inbox.md'ye yaz.*\n",
+  "tarih": "2026-06-26",
+  "momentum": "master-plan onaylandı → A1-A4 bekleniyor",
+  "son_ilerleme": "Master-plan v2 E-onayından geçti = ilk-yarı kapandı. 4 açık düğüm (A1 şirket adı / A2 makine / A3 min-marj / A4 fiyat listesi onayı) Barış yüzeyine 4 KART olarak kondu (yolculuk KART 12-15, tip: girdi-talebi, durum: cevap-bekliyor). Dashboard'a deploy edildi. Barış cevabı = ikinci-yarı kapısını açar.",
+  "sonraki_kritik_adim": "Barış A1-A4'ü cevaplasın (şirket adı + makine + min-marj teyidi + fiyat listesi onayı). 4'ü de gelince ikinci-yarı (gerçek kurulum: kayıt/profil/launch) başlar.",
+  "bekleyen_insan_girdisi": "A1-A4 (şirket adı / makine / min-marj / fiyat listesi onayı)",
+  "partner_ozet": "<!-- Loop bunu her partner-çıktısında KK-42 summary-first olarak yeniden üretir -->\n\n## Neredeyiz?\n\nPlan hazır ve onaylandı. ✅ Pazarlama, fiyat ve ilk-müşteri stratejisinin tamamı çıkarıldı. Şirketi gerçekten kurmaya başlamadan önce senden **4 karar** gerekiyor.\n\n## Senden 4 karar (aşağıda ayrı kartlarda açtım)\n\n1. **İsim** — Firmana bir isim seç. Geniş olsun (halı/yatak/tüm tekstil); evcil uzmanlığın slogan ve içerikte yaşar.\n2. **Makine** — İkinci el (~5-20 bin kr) mi, sıfır (~40 bin kr) mı?\n3. **Kâr kontrolü** — En düşük iş 999 kr; vergi sonrası ~799 kr eline kalıyor. Maliyetleri düşününce yetiyor mu?\n4. **Fiyat listesi** — Hazırladığımız başlangıç fiyat listesini onaylıyor musun?\n\nHer kartı açınca arkasındaki \"neden\" ve \"seçenekler\" var.\n\n## Sonra ne olur?\n\nBu 4'ünü cevaplayınca **gerçek kurulum** başlar: şirket kaydı, Google İşletme + Reco profili, ilk ilan, ilk müşteri. Şu ana kadarki her şey plandı — bundan sonrası sahada.\n\nCevaplarını yaz; birlikte netleştirip başlarız.\n",
   "arsiv_link": null
 }

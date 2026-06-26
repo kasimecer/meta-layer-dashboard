@@ -1,0 +1,155 @@
+{
+  "proje": "baris",
+  "kartlar": [
+    {
+      "id": "baris-k1",
+      "tip": "ilerleme",
+      "durum": "bitti",
+      "ozet": "4 iş fikri sunuldu: tekstil temizliği · abonelik · mağaza-B2B · zanaat. Seçim sende.",
+      "detay": "Profilin temel alındı: yan-iş başlangıcı, ~50–100k SEK sermaye, araç yok, el becerisi + işletme tecrübesi + içerik alışkanlığı. Spesifik bir fikrin yoktu; sıralamasız sunuldu:",
+      "partner_cevap": null,
+      "olusturma": "2026-06-26",
+      "guncelleme": "2026-06-26"
+    },
+    {
+      "id": "baris-k2",
+      "tip": "ilerleme",
+      "durum": "bitti",
+      "ozet": "Seçmedin — \"rasyonel araştırmaya göre karar\" + kısıtların: küçük başla, ucuz makine, sosyal medya, test-önce.",
+      "detay": "Verdiğin kısıtlar filtre olarak alındı: küçük başla · uygun fiyat · ucuz makine al/kirala · sosyal medya · test-önce · zanaat koşullu-destek.",
+      "partner_cevap": "oncelikle benim arzum isin tutmasi, yani verilen seceneklerin hepsi de bana uyar, en guclu yol veya yollardan gitmek istiyorum. hepsi de olur, kucuk kucuk baslamak mantikli geliyor bana. sosyal medya paylasimlari ile de insanlara ulasmayi deneriz. uygun fiyat ile gireriz, makine uygun fiyata kovalariz veya kiralariz baslarda. test sureci yapariz, is nasil goruruz. her firsata bakariz. zanaat mobilya yenileme icin eli yatkin bir arkadasim var, ona danisabilir, bana baslangicta yardimci olmaini teklif ederim. dediigim gibi, burda benim zevkim bakimindan pek fark yok, rasyonel arastirmalara gore karar vermek istiyorum. kabiliyetim acisindan da zanaat konusu tam emin degilim, denem lazim, ya da destek ile olabilir",
+      "olusturma": "2026-06-26",
+      "guncelleme": "2026-06-26"
+    },
+    {
+      "id": "baris-k3",
+      "tip": "ilerleme",
+      "durum": "bitti",
+      "ozet": "Mağaza-B2B elendi (giriş yavaş). Sana iki soru: zanaatta tecrüben var mı? · \"hemen test\" mi, kurumsal için tanıtım mı?",
+      "detay": "Mobilya-mağaza B2B seçeneği elendi (resmi giriş aylar sürebilir → \"küçük başla\"ya ters). Geniş tekstil temizliği aktif kaldı; abonelik ve zanaat koşullu. Sorulan iki soru:",
+      "partner_cevap": null,
+      "olusturma": "2026-06-26",
+      "guncelleme": "2026-06-26"
+    },
+    {
+      "id": "baris-k4",
+      "tip": "ilerleme",
+      "durum": "bitti",
+      "ozet": "Önce kanıt istedin + iki soru: kumaş çeşitliliği engel mi? · kurumsal müşteri gerçekçi mi?",
+      "detay": "İki soru sordun: kumaş çeşitliliği/lojistiği bir engel mi, ve kurumsal müşteri gerçekçi mi.",
+      "partner_cevap": "diger seceneklerin arastirmasini en ozet halinde, avantaj ve dezavantajlarini az da olsa gormek isterdim. icten ikna olmak, kafama oturmasi icin. mobilya doseme yenileme icin plan, sartlar, firsatlar hesaplandi ve cok iyi ise varim. fakat, kumas cesitliligi, bunlarin logistigi, plani, gereken vakit, ozelllikle cok fazla cesit renk kumas gerekir diye aklima geliyor, yoksa plan farkli mi? mesela el aletleri isin kolay kismi, yardim alma durumum mumkun. dedigim gibi arastirma ve plan guclu ise varim. degilse bunu ek portfoy e dahil, ufak ufak baslanabilir. duzenli ve kurumsal musteriler baslangicta cok iyimser duruyor. bireysel ile baslamak mantikli. mesela kurumsal secenek senin arastirmalarinda cok mu mumkun cikiyor, bakmak lazim. zaman acisindan cok acelem yok, dogru adimi atmak zamandan daha onemli.",
+      "olusturma": "2026-06-26",
+      "guncelleme": "2026-06-26"
+    },
+    {
+      "id": "baris-k5",
+      "tip": "ilerleme",
+      "durum": "bitti",
+      "ozet": "Kumaş endişesi temelsiz (made-to-order) — asıl konu makine maliyeti. Kurumsal değil, bireysel başla.",
+      "detay": "- Kumaş stoku endişen → temelsiz. Made-to-order: müşteri tedarikçinin numune-kitabından seçer, sen o iş için sipariş edersin; stok tutmana gerek yok. Asıl konu ekipman: yeni endüstriyel makine ~40.000 SEK (bütçeyi zorlar), ikinci-el 5.000–20.000 SEK (sığar, garanti riski).",
+      "partner_cevap": null,
+      "olusturma": "2026-06-26",
+      "guncelleme": "2026-06-26"
+    },
+    {
+      "id": "baris-k6",
+      "tip": "ilerleme",
+      "durum": "bitti",
+      "ozet": "Karar: Aday 1 (tekstil temizliği) ile tek şirket; abonelik + zanaat portföyde, sonra.",
+      "detay": "Tek şirket: Geniş Tekstil Temizliği = aktif başlangıç (öncelik). Abonelik + zanaat = portföyde; makine + bütçe olunca ve zanaat-yatkın arkadaş katılınca (~3-5 ay) sıraya alınacak.",
+      "partner_cevap": "en kolay gelen secenek 1. fakat bir sirket kuruyoruz, secenek 1 ile baslariz. oncelik. fakt portfoy olrak 1,2 ve 4 te olsun. farkli makine gerektiginde ve butcemiz oldugunda aliriz. secenek 1 ile baslanip tekerlek doner 3-5 ay sonra belki zanaat-yatkin arkadasim da ise dahil olur, zanaat tarafini o goturur. sonra. kararim bu sekilde.",
+      "olusturma": "2026-06-26",
+      "guncelleme": "2026-06-26"
+    },
+    {
+      "id": "baris-k7",
+      "tip": "ilerleme",
+      "durum": "bitti",
+      "ozet": "Şirket kuruldu (Geniş Tekstil Temizliği). Sağlamlık geçti → tek eksik: hedef-kitleyi netleştir.",
+      "detay": "Geniş Tekstil Temizliği = aktif hat. Dört açıdan kontrol edildi (konu net · fark: premium + before/after içerik + yerel/hızlı · müşteri vaadi · güven temeli) → geçti. Tek geliştirme: hedef-kitleyi keskinleştir → pazar araştırmasına geçildi.",
+      "partner_cevap": null,
+      "olusturma": "2026-06-26",
+      "guncelleme": "2026-06-26"
+    },
+    {
+      "id": "baris-k8",
+      "tip": "ilerleme",
+      "durum": "bitti",
+      "ozet": "Göteborg: 2 rakip, pazar dolu değil · fiyat 949–2299 SEK · RUT yok · kanal: Google + Reco + Instagram.",
+      "detay": "- Rakipler: MöbelRent, Illos Möbelrekond. Pazar tam dolu değil.",
+      "partner_cevap": null,
+      "olusturma": "2026-06-26",
+      "guncelleme": "2026-06-26"
+    },
+    {
+      "id": "baris-k9",
+      "tip": "ilerleme",
+      "durum": "bitti",
+      "ozet": "Evcil-hayvan ile başla dedin · kanalları kabul ettin · \"neden tek segmente odak?\" diye sordun.",
+      "detay": "Segment: evcil-hayvan (ilk odak). Kanallar: Google İşletme + Reco.se + Instagram — kabul. Soru: neden tek segmente odaklanıyoruz?",
+      "partner_cevap": "önce Evcil hayvan ile başlayalım, fakat bu kısıtlamayı neden yapıyoruz? Bu üç kanal yolu uygun.",
+      "olusturma": "2026-06-26",
+      "guncelleme": "2026-06-26"
+    },
+    {
+      "id": "baris-k10",
+      "tip": "ilerleme",
+      "durum": "bitti",
+      "ozet": "Kısıtlama değil, pazarlama odağı: herkese hizmet verirsin, ama ilk reklam/içerik evcil sahiplerine.",
+      "detay": "Herkesin koltuğunu temizlersin, iş geri çevirmezsin. Ama ilk içerik/reklam/yorumları evcil-hayvan sahiplerine yönlendiririz, çünkü:",
+      "partner_cevap": null,
+      "olusturma": "2026-06-26",
+      "guncelleme": "2026-06-26"
+    },
+    {
+      "id": "baris-k11",
+      "tip": "ilerleme",
+      "durum": "bitti",
+      "ozet": "Pazarlama + fiyat + ilk-müşteri planı hazırlandı ve onaylandı. Sıra sende: 4 karar.",
+      "detay": "Evcil-hayvan odağına göre tam plan çıkarıldı ve onaylandı:",
+      "partner_cevap": null,
+      "olusturma": "2026-06-26",
+      "guncelleme": "2026-06-26"
+    },
+    {
+      "id": "baris-k12",
+      "tip": "girdi-talebi",
+      "durum": "cevap-bekliyor",
+      "ozet": "Firmana bir isim seç",
+      "detay": "Kayıt, Google profili, Reco — hepsi isme bağlı. Öneri: isim GENİŞ olsun (halı, yatak, tüm tekstili kapsasın; sadece kanepe ya da sadece evcil değil). Evcil uzmanlığın slogan ve içerikte yaşar. Fikir olsun diye: Fräsch & Fin Göteborg, Hemrena Göteborg, Textilproffs Göteborg. Aklındakini yaz, beraber netleştiririz.",
+      "partner_cevap": null,
+      "olusturma": "2026-06-26",
+      "guncelleme": "2026-06-26"
+    },
+    {
+      "id": "baris-k13",
+      "tip": "girdi-talebi",
+      "durum": "cevap-bekliyor",
+      "ozet": "Hangi makineyle başlıyorsun?",
+      "detay": "İkinci el (~5-20 bin kr, bütçe-dostu ama garanti riski) mi, sıfır (~40 bin kr) mı? Bu kararın maliyetini ve kârını belirliyor.",
+      "partner_cevap": null,
+      "olusturma": "2026-06-26",
+      "guncelleme": "2026-06-26"
+    },
+    {
+      "id": "baris-k14",
+      "tip": "girdi-talebi",
+      "durum": "cevap-bekliyor",
+      "ozet": "En düşük iş ~999 kr — sana yetiyor mu?",
+      "detay": "En düşük iş ücretimiz 999 kr; vergi sonrası eline ~799 kr kalıyor. Makine + yol + malzeme maliyetini düşününce bu sana yeterli kâr bırakıyor mu? (A2'deki makine kararına göre netleşir.)",
+      "partner_cevap": null,
+      "olusturma": "2026-06-26",
+      "guncelleme": "2026-06-26"
+    },
+    {
+      "id": "baris-k15",
+      "tip": "girdi-talebi",
+      "durum": "cevap-bekliyor",
+      "ozet": "Başlangıç fiyat listesini onayla",
+      "detay": "Rakiplerle aynı seviyede bir liste hazırladık: 2'li kanepe 949, 3'lü 1199, 4'lü 1399, halı 139/m², leke ek 99-199, en düşük fatura 999 kr. Bunu başlangıç listen olarak onaylıyor musun, değiştirmek istediğin var mı?",
+      "partner_cevap": null,
+      "olusturma": "2026-06-26",
+      "guncelleme": "2026-06-26"
+    }
+  ]
+}
