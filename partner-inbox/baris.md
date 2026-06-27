@@ -9,3 +9,4 @@
 [2026-06-27] partner-cevap · proje:baris · kart:baris-k15 (Başlangıç fiyat listesini onayla) → "Evet"
 [2026-06-27] partner-cevap · proje:baris · kart:baris-k12 (Firmana bir isim seç) → "TextilRena Göteborg"
 [2026-06-27] partner-cevap · proje:baris · kart:baris-k13 (Hangi makineyle başlıyorsun?) → "İkinci el"
+[2026-06-27] partner-cevap · proje:baris · kart:baris-k14 (En düşük iş ~999 kr — sana yetiyor mu?) → "Rakiplere göre biraz daha agresif fiyat verelim. İlk müşterileri bulalım. İse giriş için fiyat strateji önerilerine açığım"
