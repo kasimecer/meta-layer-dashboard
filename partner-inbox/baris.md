@@ -7,3 +7,4 @@
 [2026-06-27] partner-cevap · proje:baris · kart:baris-k13 (Hangi makineyle başlıyorsun?) → "Kärcher Pizzi 8"
 [2026-06-27] partner-cevap · proje:baris · kart:baris-k14 (En düşük iş ~999 kr — sana yetiyor mu?) → "Evet"
 [2026-06-27] partner-cevap · proje:baris · kart:baris-k15 (Başlangıç fiyat listesini onayla) → "Evet"
+[2026-06-27] partner-cevap · proje:baris · kart:baris-k12 (Firmana bir isim seç) → "TextilRena Göteborg"
