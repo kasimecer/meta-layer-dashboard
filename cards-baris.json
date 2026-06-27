@@ -134,20 +134,20 @@
     {
       "id": "baris-k14",
       "tip": "girdi-talebi",
-      "durum": "cevap-bekliyor",
+      "durum": "cevaplandi",
       "ozet": "En düşük iş ~999 kr — sana yetiyor mu?",
       "detay": "En düşük iş ücretimiz 999 kr; vergi sonrası eline ~799 kr kalıyor. Makine + yol + malzeme maliyetini düşününce bu sana yeterli kâr bırakıyor mu? (A2'deki makine kararına göre netleşir.)",
-      "partner_cevap": null,
+      "partner_cevap": "Rakiplere göre biraz daha agresif fiyat verelim. İlk müşterileri bulalım. İse giriş için fiyat strateji önerilerine açığım",
       "olusturma": "2026-06-27",
       "guncelleme": "2026-06-27"
     },
     {
       "id": "baris-k15",
       "tip": "girdi-talebi",
-      "durum": "cevap-bekliyor",
+      "durum": "cevaplandi",
       "ozet": "Başlangıç fiyat listesini onayla",
       "detay": "Rakiplerle aynı seviyede bir liste hazırladık: 2'li kanepe 949, 3'lü 1199, 4'lü 1399, halı 139/m², leke ek 99-199, en düşük fatura 999 kr. Bunu başlangıç listen olarak onaylıyor musun, değiştirmek istediğin var mı?",
-      "partner_cevap": null,
+      "partner_cevap": "Biraz daha düşük olabilir. Ya da müşteri gelmezse dusurebilriz",
       "olusturma": "2026-06-27",
       "guncelleme": "2026-06-27"
     },
