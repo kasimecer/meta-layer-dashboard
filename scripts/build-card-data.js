@@ -94,7 +94,7 @@ function parseYolculuk(content) {
     const kisa = kisaM ? kisaM[1].trim() : ''
     const barisM = block.match(/\*\*Barış \(aynen\):\*\*\s*"([\s\S]+?)"/)
     const baris_aynen = barisM ? barisM[1].trim() : null
-    const detayM = block.match(/\*\*Detay:\*\*\s*([\s\S]+?)(?=^## KART|\s*$)/m)
+    const detayM = block.match(/\*\*Detay:\*\*\s*([\s\S]*)/)
     const detay = detayM ? detayM[1].trim() : ''
     kartlar.push({ n, tip, durum, kisa, baris_aynen, detay })
   }
