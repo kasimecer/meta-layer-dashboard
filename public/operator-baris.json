@@ -1,14 +1,12 @@
 {
   "proje": "baris",
-  "momentum": "master-plan onaylandı → A1-A4 bekleniyor",
-  "son_ilerleme": "Master-plan v2 E-onayından geçti = ilk-yarı kapandı. 4 açık düğüm (A1 şirket adı / A2 makine / A3 min-marj / A4 fiyat listesi onayı) Barış yüzeyine 4 KART olarak kondu (yolculuk KART 12-15, tip: girdi-talebi, durum: cevap-bekliyor). Dashboard'a deploy edildi. Barış cevabı = ikinci-yarı kapısını açar.",
-  "sonraki_kritik_adim": "Barış A1-A4'ü cevaplasın (şirket adı + makine + min-marj teyidi + fiyat listesi onayı). 4'ü de gelince ikinci-yarı (gerçek kurulum: kayıt/profil/launch) başlar.",
-  "bekleyen_insan_girdisi": "A1-A4 (şirket adı / makine / min-marj / fiyat listesi onayı)",
+  "momentum": "karar-bekliyor",
+  "son_ilerleme": "İsim Microstäd, makine ikinci el — bu ikisi kararlandı. Fiyat konusunda net karar için yeni bir kart açıldı (k16). Cevabın gelince gerçek kurulum başlar.",
+  "sonraki_kritik_adim": "Fiyat seçimini yap (k16): parite + giriş teklifi mi, hafif altfiyat mı?",
+  "bekleyen_insan_girdisi": "fiyat seçimi (k16: parite+giriş teklifi vs hafif-altfiyat)",
   "acik_bayraklar": [
-    "A1-sirket-adi",
-    "A2-makine-karari",
-    "A3-min-ucret-marji",
-    "A4-fiyat-listesi-onay",
+    "A3-fiyat-kararı-k16-cevap-bekliyor",
+    "AD-UYGUNLUGU-Microstäd-Bolagsverket-domain-nisfitRUT-secondhalf",
     "R1-segment-hacim-dogrulanamadi",
     "B7-recurring-specifik",
     "B10-Airbnb-yonetim-dis-kaynak"
@@ -29,6 +27,10 @@
     {
       "ad": "durum.md",
       "yol": "projeler/baris/durum.md"
+    },
+    {
+      "ad": "fiyat-reengagement-draft.md",
+      "yol": "projeler/baris/fiyat-reengagement-draft.md"
     },
     {
       "ad": "go-to-market-strateji-v1.md",
