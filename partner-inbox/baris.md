@@ -4,3 +4,4 @@
 > Loop okur → kanonik (projeler/<proje>/inbox.md + durum.md) ile uzlaştırır → buradan temizler.
 > Format: [tarih] partner-cevap · proje:<id> · kart:<id> (<özet>) → "<cevap>"
 [2026-06-27] partner-cevap · proje:baris · kart:baris-k12 (Firmana bir isim seç) → "Microstäd"
+[2026-06-27] partner-cevap · proje:baris · kart:baris-k13 (Hangi makineyle başlıyorsun?) → "Kärcher Pizzi 8"
