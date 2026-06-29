@@ -1,0 +1,43 @@
+{
+  "proje": "Balkon Bahçesi",
+  "proje_id": "demo-foya",
+  "tarih": "2026-06-29",
+  "momentum": "karar-bekliyor",
+  "son_ilerleme": "Beş aşamalı planlama bitti: pazar araştırması, teknik doğrulama ve strateji hazır. Senden iki karar bekliyoruz.",
+  "sonraki_kritik_adim": "Kararlar gelince kişiselleştirici MVP'ye başlarız — hangi bitki, hangi yön, hangi mevsim.",
+  "bekleyen_insan_girdisi": "Abonelik fiyatı ve ilk dönem odak şehri için görüşünü bekliyoruz.",
+  "asamalar": ["Araştırma", "Strateji", "Karar", "MVP", "Yayın"],
+  "asama_indeks": 2,
+  "kartlar": [
+    {
+      "id": "foya-k01",
+      "tip": "ilerleme",
+      "durum": "bitti",
+      "ozet": "Planınız hazır — araştırma ve strateji tamamlandı",
+      "detay": "**Ne yaptık?**\n\nBalkon Bahçesi için kapsamlı bir planlama tamamladık:\n\n- **Pazar araştırması:** Türkçe pazarda balkon yönü ve mevsimine göre kişiselleştirilmiş rehber neredeyse yok. Bu alan doldurulamayan bir boşluk.\n- **Teknik doğrulama:** Hangi bitkinin hangi balkona uyduğunu eşledik — marul/roka kuzey balkona gider, domates/biber güney balkona. Kişiselleştirici bunun üzerine kuruluyor.\n- **İş modeli:** Ücretsiz başlangıç (giriş engeli yok) + düşük fiyatlı abonelik (devam eden değer). İlk 12 ayda 30–50 ücretli kullanıcı gerçekçi bir hedef.\n\n**Sırada ne var?**\n\nİki küçük karar verdikten sonra kişiselleştirici MVP'ye — \"benim balkonum, benim takvimim\" — geçiyoruz.",
+      "partner_cevap": null,
+      "olusturma": "2026-06-29",
+      "guncelleme": "2026-06-29"
+    },
+    {
+      "id": "foya-k02",
+      "tip": "girdi-talebi",
+      "durum": "cevap-bekliyor",
+      "ozet": "Abonelik fiyatı: aylık ₺79 mantıklı mı sana göre?",
+      "detay": "**Neden ₺79 önerdik?**\n\nTürkiye'de benzer dijital rehber ve uygulama abonelikleri genellikle aylık ₺49–₺149 aralığında. Bu ürün kişiselleştirme (balkon yönü × şehir × mevsim) ve topluluk erişimi sunduğundan orta bandı önerdik.\n\nÜcretsiz bir katman da var — giriş engeli yok. Abonelik sadece devam etmek isteyenler için.\n\n**Seçeneklerin:**\n\n**A — ₺79/ay onaylıyorum.** Piyasayla uyumlu, makul bir rakam. Bunu yazarsan devam.\n\n**B — Farklı bir rakam öner.** Düşük ya da yüksek — aklındaki tutarı ve kısa gerekçeni yaz. İkisi de geçerli, senin kararın.",
+      "partner_cevap": null,
+      "olusturma": "2026-06-29",
+      "guncelleme": "2026-06-29"
+    },
+    {
+      "id": "foya-k03",
+      "tip": "girdi-talebi",
+      "durum": "cevap-bekliyor",
+      "ozet": "İlk dönemde nereyi hedefleyelim: İstanbul odaklı mı başlayalım?",
+      "detay": "**Neden bu karar önemli?**\n\nKişiselleştirici \"şehir + balkon yönü + mevsim\" kombinezonuna göre plan üretiyor. İçerik hazırlarken derinlik mi (az şehir, çok detay) yoksa genişlik mi (her şehir, genel detay) tercih ettiğini bilmek gerekiyor.\n\n**A — İstanbul önce.**\nİçerik daha derin ve özgün olur. İlk kullanıcıların büyük çoğunluğu büyük ihtimalle büyük şehirlerden. Sonradan genişletmek kolay.\n\n**B — Tüm Türkiye baştan.**\nDaha geniş kitle ama içerik daha genel kalır. Ankara kışı ile Antalya yazı çok farklı — hepsini karşılamak başta daha fazla iş.\n\nHangisi sana daha doğal geliyor?",
+      "partner_cevap": null,
+      "olusturma": "2026-06-29",
+      "guncelleme": "2026-06-29"
+    }
+  ]
+}
