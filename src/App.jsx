@@ -4,9 +4,9 @@ import PortfolioView from './views/PortfolioView.jsx'
 import ProjectView from './views/ProjectView.jsx'
 
 // meta-layer-core — hash-tabanlı scoped router (GH-Pages-güvenli, ek bağımlılık yok).
-//   #/portfoy            → portföy (stub)
-//   #/proje/<id>         → proje (stub)
-//   #/partner/<id>       → partner (dolu — Barış)
+//   #/portfoy            → portföy
+//   #/proje/<id>         → proje
+//   #/partner/<id>       → partner — temiz sayfa (iç başlık/nav gizlenir)
 function rota() {
   const h = (window.location.hash || '').replace(/^#\/?/, '')
   const [view, projeId] = h.split('/')
@@ -28,6 +28,11 @@ export default function App() {
     if (!window.location.hash) window.location.hash = '#/portfoy'
     return () => window.removeEventListener('hashchange', f)
   }, [])
+
+  // Partner görünümü: iç başlık ve nav tab'lar gizlenir — ortak sade bir sayfa görür.
+  if (r.view === 'partner') {
+    return <PartnerView projeId={r.projeId} />
+  }
 
   return (
     <div>
@@ -54,7 +59,6 @@ export default function App() {
 
       {r.view === 'portfoy' && <PortfolioView />}
       {r.view === 'proje'   && <ProjectView projeId={r.projeId} />}
-      {r.view === 'partner' && <PartnerView projeId={r.projeId} />}
     </div>
   )
 }

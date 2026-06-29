@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
 import Markdown from 'react-markdown'
 import Card from '../components/Card.jsx'
-import { kartDogrula } from '../lib/stateMachine.js'
-import { submitPartnerInput } from '../lib/writePath.js'
+import { kartDogrula, gecisUygula } from '../lib/stateMachine.js'
+import { submitPartnerInput, CANLI } from '../lib/writePath.js'
 
-// Placeholder SİMÜLASYON cevapları — GERÇEK Barış cevabı DEĞİL; yalnız uçtan-uca test.
-// In-memory; sayfa yenileyince sıfırlanır (localStorage yok, gerçek dosya bozulmaz).
+// Simülasyon cevapları — yalnız baris; gerçek cevap değil, uçtan-uca test.
 const SIM_CEVAP = {
   'baris-k12': 'Hemrena Göteborg',
   'baris-k13': 'begagnad (ikinci el) makine',
@@ -18,6 +17,7 @@ const MOMENTUM_STYLE = {
   'planlama':         { bg: '#fef9c3', color: '#854d0e' },
   'karar-bekliyor':   { bg: '#fde8c8', color: '#9a3412' },
   'aktif':            { bg: '#dcfce7', color: '#166534' },
+  'tamamlandı':       { bg: '#dcfce7', color: '#166534' },
 }
 
 function MomentumBadge({ value }) {
@@ -26,11 +26,12 @@ function MomentumBadge({ value }) {
     <span style={{
       display: 'inline-block', padding: '3px 10px', borderRadius: 99,
       fontSize: 12, fontWeight: 600, background: s.bg, color: s.color,
-      lineHeight: 1.4, maxWidth: '100%',
+      lineHeight: 1.4,
     }}>{value}</span>
   )
 }
 
+// ── Baris için mevcut Ozet bileşeni (değişmedi) ─────────────────────────────
 function Ozet({ data }) {
   const [open, setOpen] = useState(false)
   const { proje, tarih, momentum, son_ilerleme, sonraki_kritik_adim, bekleyen_insan_girdisi, partner_ozet, arsiv_link } = data
@@ -69,10 +70,94 @@ function Ozet({ data }) {
   )
 }
 
+// ── Yeni proje yüzü başlığı (baris dışı projeler için) ──────────────────────
+function AsamaAdim({ ad, durum }) {
+  const cfg = {
+    bitti:   { renk: '#16a34a', bg: '#f0fdf4', isaret: '✓ ' },
+    aktif:   { renk: '#4f46e5', bg: '#eef2ff', isaret: '● ' },
+    gelecek: { renk: '#a1a1aa', bg: 'transparent', isaret: '' },
+  }
+  const r = cfg[durum] ?? cfg.gelecek
+  return (
+    <span style={{
+      fontSize: 12, fontWeight: durum === 'aktif' ? 700 : 500,
+      color: r.renk, background: r.bg,
+      padding: '3px 8px', borderRadius: 6, whiteSpace: 'nowrap',
+    }}>
+      {r.isaret}{ad}
+    </span>
+  )
+}
+
+function ProjeHeader({ ozet, hepsiBitti }) {
+  const asamalar = ozet.asamalar ?? []
+  const asamaIndeks = ozet.asama_indeks ?? 0
+
+  return (
+    <div style={{
+      background: '#fff', border: '1px solid #e4e4e7', borderRadius: 14,
+      padding: '24px 24px 20px', boxShadow: '0 1px 4px rgba(0,0,0,.06)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <h1 style={{ fontSize: 21, fontWeight: 700, color: '#18181b', margin: 0, letterSpacing: -0.3 }}>
+          {ozet.proje}
+        </h1>
+        <MomentumBadge value={hepsiBitti ? 'tamamlandı' : ozet.momentum} />
+      </div>
+
+      {asamalar.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 14, flexWrap: 'wrap' }}>
+          {asamalar.map((a, i) => {
+            const durum = (hepsiBitti && i === asamaIndeks)
+              ? 'bitti'
+              : i < asamaIndeks ? 'bitti' : i === asamaIndeks ? 'aktif' : 'gelecek'
+            return (
+              <span key={a} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <AsamaAdim ad={a} durum={durum} />
+                {i < asamalar.length - 1 && (
+                  <span style={{ color: '#d4d4d8', fontSize: 11, userSelect: 'none' }}>›</span>
+                )}
+              </span>
+            )
+          })}
+        </div>
+      )}
+
+      {hepsiBitti ? (
+        <div style={{
+          marginTop: 16, padding: '12px 16px',
+          background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10,
+          fontSize: 14, color: '#15803d', fontWeight: 600, lineHeight: 1.5,
+        }}>
+          Kararlarınız alındı. Sıradaki adım: {ozet.sonraki_kritik_adim}
+        </div>
+      ) : (
+        <>
+          <p style={{ fontSize: 14, color: '#3f3f46', lineHeight: 1.6, marginTop: 14, marginBottom: 0 }}>
+            {ozet.son_ilerleme}
+          </p>
+          {ozet.bekleyen_insan_girdisi && (
+            <div style={{
+              display: 'flex', gap: 8,
+              background: '#fefce8', border: '1px solid #fde68a',
+              borderRadius: 8, padding: '9px 13px', marginTop: 12,
+              fontSize: 13, color: '#713f12', lineHeight: 1.45,
+            }}>
+              <span>⏳</span>
+              <span><strong>Senden bekleniyor:</strong> {ozet.bekleyen_insan_girdisi}</span>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 function Pipe() {
   return <div style={{ display: 'flex', justifyContent: 'center', padding: '2px 0' }}><div style={{ width: 2, height: 24, background: '#e4e4e7', borderRadius: 1 }} /></div>
 }
 
+// ── Ana bileşen ──────────────────────────────────────────────────────────────
 export default function PartnerView({ projeId = 'baris' }) {
   const [ozet, setOzet] = useState(null)
   const [kartlar, setKartlar] = useState(null)
@@ -80,19 +165,39 @@ export default function PartnerView({ projeId = 'baris' }) {
   const [inboxLog, setInboxLog] = useState([])
   const [simAktif, setSimAktif] = useState(false)
 
+  const isBaris = projeId === 'baris'
+
   useEffect(() => {
-    Promise.all([
-      fetch('./card-data.json').then(r => r.ok ? r.json() : Promise.reject('card-data.json yüklenemedi')),
-      fetch('./cards-baris.json').then(r => r.ok ? r.json() : Promise.reject('cards-baris.json yüklenemedi')),
-    ]).then(([c, cards]) => {
-      const liste = cards.kartlar ?? cards
-      liste.forEach(k => { const h = kartDogrula(k); if (h.length) console.warn('şema uyarısı', k.id, h) })
-      setOzet(c)
-      setKartlar(liste)
-    }).catch(e => setHata(String(e)))
-  }, [projeId])
+    if (isBaris) {
+      Promise.all([
+        fetch('./card-data.json').then(r => r.ok ? r.json() : Promise.reject('card-data.json yüklenemedi')),
+        fetch('./cards-baris.json').then(r => r.ok ? r.json() : Promise.reject('cards-baris.json yüklenemedi')),
+      ]).then(([c, cards]) => {
+        const liste = cards.kartlar ?? cards
+        liste.forEach(k => { const h = kartDogrula(k); if (h.length) console.warn('şema uyarısı', k.id, h) })
+        setOzet(c)
+        setKartlar(liste)
+      }).catch(e => setHata(String(e)))
+    } else {
+      fetch(`./cards-${projeId}.json`)
+        .then(r => r.ok ? r.json() : Promise.reject(`cards-${projeId}.json yüklenemedi`))
+        .then(data => {
+          const liste = data.kartlar ?? []
+          liste.forEach(k => { const h = kartDogrula(k); if (h.length) console.warn('şema uyarısı', k.id, h) })
+          setOzet(data)
+          setKartlar(liste)
+        })
+        .catch(e => setHata(String(e)))
+    }
+  }, [projeId, isBaris])
 
   async function cevapla(kart, cevap) {
+    if (!isBaris) {
+      // Demo projeler: in-memory, inbox'a YAZILMAZ
+      const yeniKart = { ...gecisUygula(kart, 'cevaplandi'), partner_cevap: cevap }
+      setKartlar(ks => ks.map(k => k.id === kart.id ? yeniKart : k))
+      return { ok: true, kart: yeniKart, mock: true }
+    }
     const r = await submitPartnerInput({ projeId, kart, cevap })
     if (!r.ok) { console.warn('yazma-yolu:', r.hata); return r }
     setKartlar(ks => ks.map(k => (k.id === kart.id ? r.kart : k)))
@@ -102,7 +207,6 @@ export default function PartnerView({ projeId = 'baris' }) {
 
   async function simulasyonCalistir() {
     setSimAktif(true)
-    // güncel state'ten oku; sıralı işle
     for (const k of kartlar) {
       if (k.tip === 'girdi-talebi' && k.durum === 'cevap-bekliyor' && SIM_CEVAP[k.id]) {
         await cevapla(k, SIM_CEVAP[k.id])
@@ -114,13 +218,19 @@ export default function PartnerView({ projeId = 'baris' }) {
   if (!ozet || !kartlar) return <div style={{ padding: 24, color: '#71717a', fontSize: 14 }}>Yükleniyor…</div>
 
   const bekleyenSayi = kartlar.filter(k => k.tip === 'girdi-talebi' && k.durum === 'cevap-bekliyor').length
+  const toplamGirdiSayi = kartlar.filter(k => k.tip === 'girdi-talebi').length
+  const hepsiBitti = bekleyenSayi === 0 && toplamGirdiSayi > 0
 
   return (
     <div>
-      <Ozet data={ozet} />
+      {isBaris ? (
+        <Ozet data={ozet} />
+      ) : (
+        <ProjeHeader ozet={ozet} hepsiBitti={hepsiBitti} />
+      )}
 
-      {/* Simülasyon kontrolü (SLICE 1 e2e testi — placeholder, gerçek değil) */}
-      {bekleyenSayi > 0 && (
+      {/* Simülasyon — yalnız baris, yalnız dev */}
+      {isBaris && bekleyenSayi > 0 && !CANLI && (
         <div style={{ marginTop: 16, padding: '10px 14px', background: '#f5f3ff', border: '1px dashed #c4b5fd', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <button onClick={simulasyonCalistir} style={{ fontSize: 13, fontWeight: 600, color: '#fff', background: '#7c3aed', border: 'none', borderRadius: 8, padding: '8px 14px', cursor: 'pointer' }}>
             ▶ Simülasyonu çalıştır (placeholder A1–A4)
@@ -128,17 +238,19 @@ export default function PartnerView({ projeId = 'baris' }) {
           <span style={{ fontSize: 12, color: '#6d28d9' }}>Test amaçlı; gerçek Barış cevabı değil. Yenileyince sıfırlanır.</span>
         </div>
       )}
-      {simAktif && (
+      {isBaris && simAktif && (
         <div style={{ marginTop: 10, padding: '8px 14px', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#92400e' }}>
           ⚠ SİMÜLASYON — placeholder cevaplar, gerçek Barış verisi DEĞİL
         </div>
       )}
 
-      {/* Kartlar — paylaşılan primitive */}
-      <div style={{ marginTop: 24 }}>
-        <h2 style={{ fontSize: 13, fontWeight: 600, color: '#71717a', letterSpacing: 0.3, textTransform: 'uppercase', marginBottom: 16 }}>
-          Yolculuk — {kartlar.length} adım
-        </h2>
+      {/* Kart listesi */}
+      <div style={{ marginTop: 22 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#a1a1aa', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 14 }}>
+          {isBaris
+            ? `Yolculuk — ${kartlar.length} adım`
+            : `${kartlar.length} adım`}
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {kartlar.map((kart, i) => (
             <div key={kart.id}>
@@ -149,8 +261,8 @@ export default function PartnerView({ projeId = 'baris' }) {
         </div>
       </div>
 
-      {/* Yazma-yolu çıktısı — mock inbox.md satırları (write-interface görünür kanıt) */}
-      {inboxLog.length > 0 && (
+      {/* Yazma-yolu çıktısı — yalnız baris */}
+      {isBaris && inboxLog.length > 0 && (
         <div style={{ marginTop: 24, padding: '14px 16px', background: '#0f172a', borderRadius: 10 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 }}>
             yazma-yolu çıktısı (mock) — inbox.md'ye eklenecek satırlar

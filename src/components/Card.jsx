@@ -3,7 +3,6 @@ import Markdown from 'react-markdown'
 import { TIP } from '../lib/stateMachine.js'
 
 // Paylaşılan kart primitive'i. tip + durum'a göre render eder.
-// Görsel stiller bootstrap-dashboard'dan TAŞINDI (promote, yeniden-yazım değil).
 
 const SISTEM = { borderLeft: '3px solid #d4d4d8', background: '#fafafa', marginRight: 'auto', maxWidth: '88%' }
 const BARIS  = { borderLeft: '3px solid #f97316', background: '#fff7ed', marginLeft: 'auto', maxWidth: '88%' }
@@ -35,34 +34,53 @@ function Rozet({ durum }) {
 function CevapKutusu({ onCevap }) {
   const [val, setVal] = useState('')
   const [gonderiliyor, setG] = useState(false)
+  const [hata, setHata] = useState('')
+
   const gonder = async (e) => {
     e.stopPropagation()
     if (!val.trim() || gonderiliyor) return
-    setG(true)
-    await onCevap(val.trim())
+    setG(true); setHata('')
+    const r = await onCevap(val.trim())
     setG(false)
+    if (r && r.ok === false) { setHata(r.hata || 'Gönderilemedi'); return }
     setVal('')
   }
+
   return (
-    <div onClick={e => e.stopPropagation()} style={{ marginTop: 12 }}>
+    <div onClick={e => e.stopPropagation()} style={{ marginTop: 14 }}>
       <textarea
         value={val}
-        onChange={e => setVal(e.target.value)}
+        onChange={e => { setVal(e.target.value); if (hata) setHata('') }}
         placeholder="Cevabını buraya yaz…"
         rows={3}
         style={{
-          width: '100%', boxSizing: 'border-box', fontSize: 13,
-          padding: '8px 10px', border: '1px solid #c7d2fe', borderRadius: 8,
-          resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5,
+          width: '100%', boxSizing: 'border-box', fontSize: 14,
+          padding: '10px 12px', border: '1.5px solid #c7d2fe', borderRadius: 8,
+          resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.55,
+          background: '#fff', outline: 'none', color: '#18181b',
         }}
       />
-      <button onClick={gonder} disabled={!val.trim() || gonderiliyor} style={{
-        marginTop: 8, fontSize: 13, fontWeight: 600, color: '#fff',
-        background: val.trim() ? '#6366f1' : '#c7d2fe', border: 'none',
-        borderRadius: 8, padding: '8px 16px', cursor: val.trim() ? 'pointer' : 'default',
-      }}>
+      <button
+        onClick={gonder}
+        disabled={!val.trim() || gonderiliyor}
+        style={{
+          marginTop: 8, fontSize: 13, fontWeight: 700, color: '#fff',
+          background: val.trim() && !gonderiliyor ? '#6366f1' : '#c7d2fe',
+          border: 'none', borderRadius: 8, padding: '9px 20px',
+          cursor: val.trim() && !gonderiliyor ? 'pointer' : 'default',
+          letterSpacing: 0.1,
+        }}
+      >
         {gonderiliyor ? 'Gönderiliyor…' : 'Gönder'}
       </button>
+      {hata && (
+        <div style={{
+          marginTop: 8, padding: '7px 11px', background: '#fef2f2',
+          border: '1px solid #fecaca', borderRadius: 8, fontSize: 12.5, color: '#b91c1c', lineHeight: 1.45,
+        }}>
+          ⚠ {hata} — tekrar dene; cevabın korundu.
+        </div>
+      )}
     </div>
   )
 }
@@ -74,15 +92,14 @@ export default function Card({ kart, onCevap }) {
   const isFb       = kart.tip === TIP.FEEDBACK
   const cevapBekliyor = kart.durum === 'cevap-bekliyor'
   const cevaplandi    = kart.durum === 'cevaplandi'
-  // ilerleme: partner_cevap varsa Barış-tarafı (sağ/turuncu), yoksa sistem (sol/gri)
-  const barisTarafi = isIlerleme && !!kart.partner_cevap
+  const barisTarafi   = isIlerleme && !!kart.partner_cevap
 
   const base = isGirdi ? GIRDI : isTask ? TASK : isFb ? FB : barisTarafi ? BARIS : SISTEM
 
   const [open, setOpen] = useState(false)
   const acilabilir = !!(kart.detay || (isIlerleme && kart.partner_cevap) || (isGirdi && cevapBekliyor))
 
-  const etiket = isGirdi ? '✍️ Senden isteniyor'
+  const etiket = isGirdi ? '✍ Senden isteniyor'
     : isTask ? '🔧 Build görevi'
     : isFb ? '💬 Geri bildirim'
     : barisTarafi ? 'Barış' : 'Sistem'
@@ -91,43 +108,58 @@ export default function Card({ kart, onCevap }) {
   const style = {
     ...base,
     ...(cevapBekliyor ? { boxShadow: '0 0 0 2px #c7d2fe' } : {}),
-    borderRadius: 10, padding: '14px 16px', width: '100%',
+    borderRadius: 10, padding: '16px 18px', width: '100%',
     cursor: acilabilir ? 'pointer' : 'default',
   }
 
   return (
     <div style={style} onClick={() => acilabilir && setOpen(o => !o)} role={acilabilir ? 'button' : undefined} aria-expanded={open}>
+      {kart.escalation_flag && (
+        <div style={{
+          marginBottom: 8, padding: '5px 10px',
+          background: '#fff7ed', border: '1px solid #fed7aa',
+          borderRadius: 6, fontSize: 12, color: '#9a3412', fontWeight: 600,
+        }}>
+          ⚠ Taraflar uzlaşmadı — karar sizde
+        </div>
+      )}
+
       {/* Başlık */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
         <div style={{ flex: 1 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, color: etiketRenk, textTransform: 'uppercase' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, color: etiketRenk, textTransform: 'uppercase' }}>
             {etiket}
           </span>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#18181b', marginTop: 2 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#18181b', marginTop: 3, lineHeight: 1.45 }}>
             {cevapBekliyor && '📩 '}{kart.ozet}
           </div>
         </div>
         {(isGirdi || isTask || isFb) && <Rozet durum={kart.durum} />}
       </div>
 
-      {/* cevaplandı: cevap her zaman görünür (soru+cevap salt-okunur) */}
-      {cevaplandi && kart.partner_cevap && (
+      {/* cevaplandı: kısa teyit + partner_cevap */}
+      {cevaplandi && (
         <div style={{
-          marginTop: 8, padding: '8px 12px', background: '#f0fdf4',
+          marginTop: 10, padding: '9px 13px', background: '#f0fdf4',
           border: '1px solid #bbf7d0', borderRadius: 8, fontSize: 13, color: '#166534', lineHeight: 1.5,
         }}>
-          <strong>Cevabın:</strong> {kart.partner_cevap}
+          {kart.partner_cevap
+            ? <><strong>Aldık ✓</strong> — {kart.partner_cevap}</>
+            : <strong>✓ Tamamlandı</strong>}
         </div>
       )}
 
       {/* Açılabilirlik ipucu */}
-      {acilabilir && !open && (
+      {acilabilir && !open && !cevaplandi && (
         <div style={{ marginTop: 6, fontSize: 11, color: isGirdi ? '#4f46e5' : '#a1a1aa' }}>
-          {isGirdi && cevapBekliyor ? '▸ aç: neden + cevapla' : '▸ detay'}
+          {isGirdi && cevapBekliyor ? '▸ aç: detay + cevapla' : '▸ detay'}
         </div>
       )}
+      {acilabilir && !open && cevaplandi && kart.detay && (
+        <div style={{ marginTop: 6, fontSize: 11, color: '#a1a1aa' }}>▸ detay</div>
+      )}
 
-      {/* Genişletilmiş */}
+      {/* Genişletilmiş içerik */}
       {open && (
         <div style={{ marginTop: 12, borderTop: '1px solid', borderColor: isGirdi ? '#c7d2fe' : barisTarafi ? '#fed7aa' : '#e4e4e7', paddingTop: 12 }}>
           {isIlerleme && kart.partner_cevap && (
@@ -140,7 +172,7 @@ export default function Card({ kart, onCevap }) {
             </blockquote>
           )}
           {kart.detay && (
-            <div style={{ fontSize: 13, color: '#3f3f46', lineHeight: 1.65 }}>
+            <div style={{ fontSize: 13.5, color: '#3f3f46', lineHeight: 1.7 }}>
               <Markdown>{kart.detay}</Markdown>
             </div>
           )}
