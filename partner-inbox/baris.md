@@ -5,3 +5,4 @@
 > Format: [tarih] partner-cevap · proje:<id> · kart:<id> (<özet>) → "<cevap>"
 [2026-06-27] partner-cevap · proje:baris · kart:baris-k16 (📩 Fiyat: girişte nasıl rekabet edelim? İki yol var, birini seç.) → "A"
 [2026-06-28] partner-cevap · proje:baris · kart:baris-k16 (📩 Fiyat: girişte nasıl rekabet edelim? İki yol var, birini seç.) → "A"
+[2026-06-29] partner-cevap · proje:baris · kart:baris-k16 (📩 Fiyat: girişte nasıl rekabet edelim? İki yol var, birini seç.) → "A"
