@@ -37,6 +37,59 @@ function DocRow({ d }) {
   )
 }
 
+function TaslakRow({ t }) {
+  const sinifRenk = t.terminal_sinif === 'yakinsama'
+    ? { bg: '#dcfce7', fg: '#166534' }
+    : { bg: '#fff7ed', fg: '#9a3412' }
+  return (
+    <div style={{ padding: '8px 12px', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: 8, marginBottom: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 12, fontWeight: 700, fontFamily: 'ui-monospace, monospace', color: '#3f3f46' }}>
+          {t.karar_id}
+        </span>
+        <span style={{
+          fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 999,
+          background: sinifRenk.bg, color: sinifRenk.fg, textTransform: 'uppercase', letterSpacing: 0.4,
+        }}>
+          {t.terminal_sinif ?? '—'}
+        </span>
+      </div>
+      <div style={{ marginTop: 4, fontSize: 11, color: '#71717a', fontFamily: 'ui-monospace, monospace' }}>
+        {t.yayinla_cli}
+      </div>
+    </div>
+  )
+}
+
+// Build-board: 3-kolon operatör görünümü. Partner görmez.
+function BoardKolon({ label, items }) {
+  return (
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 }}>
+        {label} <span style={{ fontWeight: 400 }}>({items.length})</span>
+      </div>
+      {items.length === 0 && (
+        <div style={{ padding: '10px 12px', fontSize: 12, color: '#a1a1aa', background: '#fafafa', border: '1px dashed #e4e4e7', borderRadius: 8 }}>boş</div>
+      )}
+      {items.map(({ kart, event_blok, bağlı_olay }) => (
+        <div key={kart.id} style={{ marginBottom: 10 }}>
+          {event_blok && (
+            <div style={{ marginBottom: 3, padding: '2px 8px', fontSize: 10, fontFamily: 'ui-monospace, monospace', color: '#9a3412', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 5 }}>
+              ⏳ blok: {event_blok}
+            </div>
+          )}
+          {bağlı_olay && (
+            <div style={{ marginBottom: 3, padding: '2px 8px', fontSize: 10, fontFamily: 'ui-monospace, monospace', color: bağlı_olay.escalation ? '#7e22ce' : '#166534', background: bağlı_olay.escalation ? '#faf5ff' : '#f0fdf4', border: '1px solid', borderColor: bağlı_olay.escalation ? '#e9d5ff' : '#bbf7d0', borderRadius: 5 }}>
+              {bağlı_olay.escalation ? '⚠' : '✓'} {bağlı_olay.karar_id} [{bağlı_olay.terminal_sinif ?? '—'}]
+            </div>
+          )}
+          <Card kart={kart} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function ProjectView({ projeId = 'baris' }) {
   const [proje, setProje] = useState(undefined)   // undefined = yükleniyor, null = bulunamadı
   const [kartlar, setKartlar] = useState(null)
@@ -56,6 +109,8 @@ export default function ProjectView({ projeId = 'baris' }) {
 
   if (proje === undefined) return <div style={{ padding: 24, color: '#71717a', fontSize: 14 }}>Yükleniyor…</div>
 
+  // registry'de yoksa operator.proje_meta yedek metadata olarak kullanılır
+  const projeEtkin = proje ?? operator?.proje_meta ?? null
   const kartVar = kartlar && kartlar.length > 0
 
   return (
@@ -65,19 +120,19 @@ export default function ProjectView({ projeId = 'baris' }) {
       {/* Operatör başlık: durum + rol + metrikler + operasyonel bağlam */}
       <div style={{ marginTop: 10, background: '#fff', border: '1px solid #e4e4e7', borderRadius: 12, padding: '18px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-          <span style={{ fontSize: 17, fontWeight: 700 }}>{proje?.ad ?? projeId}</span>
-          {proje && <DurumBadge durum={proje.durum} />}
-          {proje && <StatusBadge status={proje.status} />}
+          <span style={{ fontSize: 17, fontWeight: 700 }}>{projeEtkin?.ad ?? projeId}</span>
+          {projeEtkin && <DurumBadge durum={projeEtkin.durum} />}
+          {projeEtkin?.status && <StatusBadge status={projeEtkin.status} />}
         </div>
-        {proje && (
+        {projeEtkin && (
           <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 10 }}>
-            <span style={{ fontSize: 12, color: '#71717a' }}>rol: <strong style={{ color: '#52525b' }}>{proje.rol}</strong></span>
-            <EtiketBadge label="efor:" value={proje.efor} />
-            <EtiketBadge label="değer:" value={proje.deger} />
-            <span style={{ fontSize: 12, color: '#a1a1aa' }}>son: {proje.zaman_son_aktivite || '—'}</span>
+            <span style={{ fontSize: 12, color: '#71717a' }}>rol: <strong style={{ color: '#52525b' }}>{projeEtkin.rol}</strong></span>
+            <EtiketBadge label="efor:" value={projeEtkin.efor} />
+            <EtiketBadge label="değer:" value={projeEtkin.deger} />
+            <span style={{ fontSize: 12, color: '#a1a1aa' }}>son: {projeEtkin.zaman_son_aktivite || '—'}</span>
           </div>
         )}
-        {proje?.ozet && <p style={{ fontSize: 13, color: '#3f3f46', lineHeight: 1.55, margin: '0 0 6px' }}>{proje.ozet}</p>}
+        {projeEtkin?.ozet && <p style={{ fontSize: 13, color: '#3f3f46', lineHeight: 1.55, margin: '0 0 6px' }}>{projeEtkin.ozet}</p>}
         {operator?.bekleyen_insan_girdisi && (
           <div style={{ marginTop: 8, display: 'flex', gap: 8, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: '#9a3412' }}>
             <span>⏳</span><span><strong>Bekleyen girdi:</strong> {operator.bekleyen_insan_girdisi}</span>
@@ -107,8 +162,26 @@ export default function ProjectView({ projeId = 'baris' }) {
         </Section>
       )}
 
-      {/* Kart yığını — Card primitive yeniden kullanım (read-only operatör; input yok) */}
-      {kartVar ? (
+      {/* OPERATÖR-EK: fasilitasyon taslakları (partner GÖRMEZ) */}
+      {operator?.fasilitasyon_taslaklar?.length > 0 && (
+        <Section title="fasilitasyon taslakları — operatör (partner görmez)">
+          <div style={{ marginBottom: 6, fontSize: 11, color: '#71717a' }}>
+            Yayınlamak için terminalde CLI komutunu çalıştır:
+          </div>
+          {operator.fasilitasyon_taslaklar.map(t => <TaslakRow key={t.karar_id} t={t} />)}
+        </Section>
+      )}
+
+      {/* Build-board (operator.board varsa) veya düz kart yığını */}
+      {operator?.board ? (
+        <Section title="build board">
+          <div style={{ display: 'flex', gap: 14 }}>
+            <BoardKolon label="Yapılacak" items={operator.board.bekliyor ?? []} />
+            <BoardKolon label="Devam"     items={operator.board.devam    ?? []} />
+            <BoardKolon label="Bitti"     items={operator.board.bitti    ?? []} />
+          </div>
+        </Section>
+      ) : kartVar ? (
         <Section title={`kartlar — ${kartlar.length}`}>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {kartlar.map((k, i) => (
@@ -121,7 +194,7 @@ export default function ProjectView({ projeId = 'baris' }) {
         </Section>
       ) : (
         <div style={{ marginTop: 20, padding: '16px 18px', background: '#fafafa', border: '1px dashed #e4e4e7', borderRadius: 10, fontSize: 13, color: '#71717a' }}>
-          Henüz kart yok — <strong>{proje?.durum || 'erken'}</strong> aşaması. {proje?.status === 'duraklı' && 'Proje duraklı.'}
+          Henüz kart yok — <strong>{projeEtkin?.durum || 'erken'}</strong> aşaması. {projeEtkin?.status === 'duraklı' && 'Proje duraklı.'}
         </div>
       )}
     </div>
