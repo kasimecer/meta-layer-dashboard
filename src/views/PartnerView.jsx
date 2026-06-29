@@ -157,6 +157,35 @@ function Pipe() {
   return <div style={{ display: 'flex', justifyContent: 'center', padding: '2px 0' }}><div style={{ width: 2, height: 24, background: '#e4e4e7', borderRadius: 1 }} /></div>
 }
 
+// ── localStorage yardımcıları (yalnız baris-dışı projeler; tamamen izole) ──
+function localStorageAnahtari(projeId) {
+  return `ml-partner-cevaplar-${projeId}`
+}
+
+function yerelCevaplariYukle(projeId) {
+  try {
+    return JSON.parse(localStorage.getItem(localStorageAnahtari(projeId)) ?? '[]')
+  } catch { return [] }
+}
+
+function yerelCevapKaydet(projeId, kart) {
+  try {
+    const mevcut = yerelCevaplariYukle(projeId)
+    const idx = mevcut.findIndex(c => c.id === kart.id)
+    const kayit = { id: kart.id, durum: kart.durum, partner_cevap: kart.partner_cevap ?? null }
+    if (idx >= 0) mevcut[idx] = kayit; else mevcut.push(kayit)
+    localStorage.setItem(localStorageAnahtari(projeId), JSON.stringify(mevcut))
+  } catch { /* localStorage erişilemez — sessizce atla */ }
+}
+
+// Yerel kayıtları JSON'dan gelen kartlara overlay eder (refresh sonrası cevaplar korunur).
+function yerelCevaplariUygula(kartlar, projeId) {
+  const kayitlar = yerelCevaplariYukle(projeId)
+  if (!kayitlar.length) return kartlar
+  const kayitMap = Object.fromEntries(kayitlar.map(c => [c.id, c]))
+  return kartlar.map(k => kayitMap[k.id] ? { ...k, ...kayitMap[k.id] } : k)
+}
+
 // ── Ana bileşen ──────────────────────────────────────────────────────────────
 export default function PartnerView({ projeId = 'baris' }) {
   const [ozet, setOzet] = useState(null)
@@ -182,7 +211,10 @@ export default function PartnerView({ projeId = 'baris' }) {
       fetch(`./cards-${projeId}.json`)
         .then(r => r.ok ? r.json() : Promise.reject(`cards-${projeId}.json yüklenemedi`))
         .then(data => {
-          const liste = data.kartlar ?? []
+          const rawListe = data.kartlar ?? []
+          // Yerel cevapları JSON üstüne overlay et → refresh sonrası cevaplandı durumu korunur.
+          // Yalnız baris-dışı (demo) projeler; baris kanonik yol kullanır.
+          const liste = yerelCevaplariUygula(rawListe, projeId)
           liste.forEach(k => { const h = kartDogrula(k); if (h.length) console.warn('şema uyarısı', k.id, h) })
           setOzet(data)
           setKartlar(liste)
@@ -193,8 +225,9 @@ export default function PartnerView({ projeId = 'baris' }) {
 
   async function cevapla(kart, cevap) {
     if (!isBaris) {
-      // Demo projeler: in-memory, inbox'a YAZILMAZ
+      // Demo projeler: in-memory + localStorage kalıcılık; inbox'a / git'e YAZILMAZ.
       const yeniKart = { ...gecisUygula(kart, 'cevaplandi'), partner_cevap: cevap }
+      yerelCevapKaydet(projeId, yeniKart)   // yenilemeye karşı tarayıcı-yerel kayıt
       setKartlar(ks => ks.map(k => k.id === kart.id ? yeniKart : k))
       return { ok: true, kart: yeniKart, mock: true }
     }
