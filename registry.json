@@ -43,6 +43,18 @@
       "deger": "?",
       "zaman_son_aktivite": null,
       "ozet": "En erken/açık; duraklı."
+    },
+    {
+      "id": "nevresim-sabitleyici-2026-07-01",
+      "ad": "Nevresim Sabitleyici",
+      "durum": "fikir",
+      "faz": "planlama",
+      "rol": "solo",
+      "status": "aktif",
+      "efor": "?",
+      "deger": "?",
+      "zaman_son_aktivite": "2026-07-01",
+      "ozet": "İsveç'te yaşıyorum. Yorgan ve nevresim arasında bir sabitleme olmadığı için yorgan nevresim içinde sabit durmuyor, sürekli kayıyor, nevresim"
     }
   ]
 }
