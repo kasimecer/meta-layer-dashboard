@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react'
 import Card from '../components/Card.jsx'
 import { DurumBadge, StatusBadge, EtiketBadge, TaslakBadge, FazBadge } from '../components/Badges.jsx'
-import { taslaklariOku, taslakSil, fazHesapla } from '../lib/intakeBuilder.js'
+import { taslaklariOku, taslakSil, taslakKaydet, fazHesapla } from '../lib/intakeBuilder.js'
+import { gecisUygula } from '../lib/stateMachine.js'
 
 // #/proje/<id> — OPERATÖR seviyesi. Partner-view'den FARKLI: jargon-saklama YOK, her şey görünür.
-// Kart yığını için slice-1 Card primitive'ini YENİDEN KULLANIR (onCevap YOK = read-only/izleme).
+// Kart yığını için slice-1 Card primitive'ini YENİDEN KULLANIR.
+// Gerçek/materyalize projede onCevap YOK = read-only/izleme (gerçek cevap yolu #/partner/<id>).
+// Taslak/draft projede onCevap YEREL (localStorage) bağlanır — henüz cards-<id>.json
+// üretilmediği için partner-view bu projeyi yükleyemez; tek cevaplama yolu burasıdır.
 
 function Pipe() {
   return <div style={{ display: 'flex', justifyContent: 'center', padding: '2px 0' }}><div style={{ width: 2, height: 24, background: '#e4e4e7', borderRadius: 1 }} /></div>
@@ -119,6 +123,20 @@ export default function ProjectView({ projeId = 'baris' }) {
       .then(setOperator).catch(() => setOperator(null))
   }, [projeId])
 
+  // Yalnız taslak/draft projede: cevap localStorage'a yazılır (kalıcı, yenilemeye dayanıklı).
+  // Gerçek/materyalize projede bu fonksiyon hiç bağlanmaz — Card onCevap={undefined} alır.
+  async function cevapla(kart, cevap) {
+    const yeniKart = { ...gecisUygula(kart, 'cevaplandi'), partner_cevap: cevap }
+    setKartlar(ks => ks.map(k => (k.id === kart.id ? yeniKart : k)))
+    setTaslak(t => {
+      const guncelKartlar = (t.cardsJson?.kartlar ?? []).map(k => (k.id === kart.id ? yeniKart : k))
+      const guncelTaslak = { ...t, cardsJson: { ...t.cardsJson, kartlar: guncelKartlar } }
+      taslakKaydet(guncelTaslak)
+      return guncelTaslak
+    })
+    return { ok: true, kart: yeniKart }
+  }
+
   if (proje === undefined) return <div style={{ padding: 24, color: '#71717a', fontSize: 14 }}>Yükleniyor…</div>
 
   const projeEtkin = proje ?? operator?.proje_meta ?? null
@@ -217,7 +235,7 @@ export default function ProjectView({ projeId = 'baris' }) {
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {kartlar.map((k, i) => (
               <div key={k.id}>
-                <Card kart={k} />
+                <Card kart={k} onCevap={taslak ? (cevap) => cevapla(k, cevap) : undefined} />
                 {i < kartlar.length - 1 && <Pipe />}
               </div>
             ))}

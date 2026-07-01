@@ -98,6 +98,9 @@ export default function Card({ kart, onCevap }) {
 
   const [open, setOpen] = useState(false)
   const acilabilir = !!(kart.detay || (isIlerleme && kart.partner_cevap) || (isGirdi && cevapBekliyor))
+  // Gerçekten cevaplanabilir mi: tip+durum yetmez, onCevap GERÇEKTEN verilmiş olmalı —
+  // aksi halde ipucu "cevapla" der ama açılınca input çıkmaz (sahte vaat).
+  const cevaplanabilir = isGirdi && cevapBekliyor && !!onCevap
 
   const etiket = isGirdi ? '✍ Senden isteniyor'
     : isTask ? '🔧 Build görevi'
@@ -151,8 +154,8 @@ export default function Card({ kart, onCevap }) {
 
       {/* Açılabilirlik ipucu */}
       {acilabilir && !open && !cevaplandi && (
-        <div style={{ marginTop: 6, fontSize: 11, color: isGirdi ? '#4f46e5' : '#a1a1aa' }}>
-          {isGirdi && cevapBekliyor ? '▸ aç: detay + cevapla' : '▸ detay'}
+        <div style={{ marginTop: 6, fontSize: 11, color: cevaplanabilir ? '#4f46e5' : '#a1a1aa' }}>
+          {cevaplanabilir ? '▸ aç: detay + cevapla' : '▸ detay'}
         </div>
       )}
       {acilabilir && !open && cevaplandi && kart.detay && (
