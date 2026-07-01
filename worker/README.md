@@ -3,6 +3,10 @@
 Statik site (GH-Pages) **olduğu gibi kalır**. Bu Worker ayrı bir write/auth endpoint'idir.
 
 - `POST /submit` — partner cevabını GitHub'daki inbox dosyasına APPEND eder (`SUBMIT_TOKEN` kapısı).
+- `POST /intake-queue` — intake taslağını `intake-kuyruk/<id>.json` olarak commit eder (`SUBMIT_TOKEN`
+  kapısı). Worker burada **materyalize ETMEZ** — yalnız git'e yazar. Kullanıcının kendi makinesinde
+  çalışan `node scripts/intake-queue-watch.mjs` bu dosyayı bulup YEREL materyalize eder + planlama
+  pipeline'ını (abonelik-auth ile) çalıştırır. Bkz `intake-kuyruk/README.md`.
 - `GET /operator` — `OPERATOR_TOKEN` kapısı (şimdilik **iskelet**: veriyi henüz servis etmez).
 - `GET /health` — canlılık testi.
 
@@ -55,6 +59,25 @@ curl https://meta-layer-write.<altad>.workers.dev/health        # → {"ok":true
 ```
 Sonra partner sayfasında bir kartı cevapla → `partner-inbox/baris.md` (main) dosyasında commit görmelisin.
 İlk cevapta dosya yoksa Worker başlıkla oluşturur.
+
+---
+
+## Intake-kuyruğu izleyici (yerel materyalizasyon)
+
+`.env`'de `VITE_WORKER_URL`/`VITE_SUBMIT_TOKEN` doluysa IntakeView'deki **"Materyalize et"**
+butonu taslağı `POST /intake-queue` ile kuyruğa alır. Bunu işlemek için makinende (abonelik
+oturumunun olduğu yerde) izleyiciyi çalıştır:
+
+```bash
+node scripts/intake-queue-watch.mjs            # her 45s'de bir kontrol eder, açık kalır
+node scripts/intake-queue-watch.mjs --once      # tek tur (test/cron için)
+```
+
+İzleyici `git pull` yapar, `intake-kuyruk/*.json` bulur, `tools/intakeMateryalizeEt.mjs` ile
+YEREL materyalize edip planlama pipeline'ını (genesis→master-plan) çalıştırır, sonra dosyayı
+kuyruktan kaldırıp push eder. **Yalnız makine + bu process açıkken çalışır** — anlık/her-zaman-açık
+bir bulut-servisi değildir; kapatılırsa kayıt kuyrukta bekler. Elle materyalize etmek istersen
+yedek yol hâlâ çalışır: `node scripts/intake-materialize.mjs <taslak.json>`.
 
 ---
 

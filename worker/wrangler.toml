@@ -16,5 +16,8 @@ GH_BRANCH = "main"
 # git-kanalı (seam): loop bunu uzlaştırıp projeler/<proje>/inbox.md'ye taşır.
 # Çok-proje olunca proje başına yol gerekebilir; v1 = tek dosya (Barış).
 INBOX_PATH = "partner-inbox/baris.md"
+# Intake taslakları bu dizine <id>.json olarak commit edilir; yerel izleyici
+# (scripts/intake-queue-watch.mjs) buradan okuyup materyalize eder.
+INTAKE_QUEUE_PATH = "intake-kuyruk"
 # CORS + origin-allowlist. Virgülle çok-origin. Lokal test için localhost ekleyebilirsin.
 ALLOWED_ORIGIN = "https://kasimecer.github.io"

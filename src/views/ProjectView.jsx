@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Card from '../components/Card.jsx'
 import { DurumBadge, StatusBadge, EtiketBadge, TaslakBadge, FazBadge } from '../components/Badges.jsx'
+import MateryalizeButton from '../components/MateryalizeButton.jsx'
 import { taslaklariOku, taslakSil, taslakKaydet, fazHesapla } from '../lib/intakeBuilder.js'
 import { gecisUygula } from '../lib/stateMachine.js'
 
@@ -149,18 +150,25 @@ export default function ProjectView({ projeId = 'baris' }) {
 
       {/* Taslak uyarı bandı */}
       {taslak && (
-        <div style={{ marginTop: 12, padding: '10px 14px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-          <div style={{ fontSize: 12.5, color: '#92400e' }}>
-            <strong>Taslak proje</strong> — sadece localStorage'da. Materyalize etmek için{' '}
-            <code style={{ fontSize: 11, fontFamily: 'ui-monospace, monospace', background: '#fef3c7', padding: '1px 5px', borderRadius: 4 }}>
-              node scripts/intake-materialize.mjs
-            </code> çalıştır.
+        <div style={{ marginTop: 12, padding: '12px 14px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ fontSize: 12.5, color: '#92400e' }}>
+              <strong>Taslak proje</strong> — sadece localStorage'da, henüz materyalize edilmedi.
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <a href="#/baslat" style={{ fontSize: 12, color: '#6366f1', textDecoration: 'none', fontWeight: 600 }}>Düzenle</a>
+              <button onClick={() => { taslakSil(projeId); window.location.hash = '#/portfoy' }} style={{
+                fontSize: 12, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, padding: 0,
+              }}>Taslağı sil</button>
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <a href="#/baslat" style={{ fontSize: 12, color: '#6366f1', textDecoration: 'none', fontWeight: 600 }}>Düzenle</a>
-            <button onClick={() => { taslakSil(projeId); window.location.hash = '#/portfoy' }} style={{
-              fontSize: 12, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, padding: 0,
-            }}>Taslağı sil</button>
+          <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #fde68a' }}>
+            <MateryalizeButton taslak={taslak} />
+          </div>
+          <div style={{ marginTop: 8, fontSize: 11.5, color: '#92400e' }}>
+            Yedek yol (elle): <code style={{ fontSize: 11, fontFamily: 'ui-monospace, monospace', background: '#fef3c7', padding: '1px 5px', borderRadius: 4 }}>
+              node scripts/intake-materialize.mjs
+            </code>
           </div>
         </div>
       )}

@@ -1,11 +1,15 @@
 // meta-layer-write — TEK standalone Cloudflare Worker.
-// İki iş taşır: (1) yazma-yolu  POST /submit  (partner cevabı → GitHub inbox dosyası)
-//              (2) auth temeli  GET  /operator (OPERATOR_TOKEN kapısı — şimdilik iskelet)
+// Üç iş taşır: (1) yazma-yolu    POST /submit        (partner cevabı → GitHub inbox dosyası)
+//              (2) intake-kuyruğu POST /intake-queue  (taslak → GitHub kuyruk dosyası; yerel
+//                  izleyici (scripts/intake-queue-watch.mjs) bunu görüp materyalize+loop koşar)
+//              (3) auth temeli    GET  /operator       (OPERATOR_TOKEN kapısı — şimdilik iskelet)
 //
 // GH-Pages statik kalır (RE-HOST YOK). Statik site bu Worker'ı ayrı origin'den çağırır → CORS şart.
+// Worker HİÇBİR ZAMAN `claude` çalıştırmaz / pipeline'a dokunmaz — yalnız git'e yazar. Abonelik-auth
+// gerektiren tüm iş (materyalize + planlama pipeline) YEREL izleyicide, kullanıcının makinesinde kalır.
 //
 // Yapılandırma (wrangler [vars], HARDCODE YOK):
-//   GH_OWNER, GH_REPO, GH_BRANCH, INBOX_PATH, ALLOWED_ORIGIN (virgülle çok-origin)
+//   GH_OWNER, GH_REPO, GH_BRANCH, INBOX_PATH, INTAKE_QUEUE_PATH, ALLOWED_ORIGIN (virgülle çok-origin)
 // Secret (wrangler secret put — repoya GİRMEZ):
 //   GITHUB_TOKEN (server-side, GERÇEK) · SUBMIT_TOKEN (client'ta görünür, hafif kapı) · OPERATOR_TOKEN (server-side, GERÇEK)
 
@@ -28,6 +32,9 @@ export default {
       }
       if (url.pathname === '/submit' && request.method === 'POST') {
         return await handleSubmit(request, env, origin)
+      }
+      if (url.pathname === '/intake-queue' && request.method === 'POST') {
+        return await handleIntakeQueue(request, env, origin)
       }
       if (url.pathname === '/operator' && request.method === 'GET') {
         return await handleOperator(request, env, origin, url)
@@ -78,6 +85,51 @@ async function handleSubmit(request, env, origin) {
   if (!sonuc.ok) return json({ ok: false, hata: sonuc.hata }, sonuc.status || 502, origin, env)
 
   return json({ ok: true, commit: sonuc.commit, path: gh.path }, 200, origin, env)
+}
+
+// ============================================================
+// POST /intake-queue — intake taslağını kuyruğa yazar (yerel izleyici okur)
+// body: { taslak: { id, projeKaydi, cardsJson, intakeMd } } · header: x-submit-token
+// Worker BURADA materyalize ETMEZ / claude ÇALIŞTIRMAZ — yalnız git'e commit eder.
+// Abonelik-auth gerektiren gerçek iş scripts/intake-queue-watch.mjs'de, kullanıcının
+// kendi makinesinde koşar (bkz worker.js dosya başı yorumu).
+// ============================================================
+async function handleIntakeQueue(request, env, origin) {
+  if (origin && !originAllowed(origin, env)) {
+    return json({ ok: false, hata: 'origin reddedildi' }, 403, origin, env)
+  }
+  const token = request.headers.get('x-submit-token') || bearer(request)
+  if (!env.SUBMIT_TOKEN || !safeEqual(token, env.SUBMIT_TOKEN)) {
+    return json({ ok: false, hata: 'yetkisiz' }, 401, origin, env)
+  }
+
+  let body
+  try { body = await request.json() } catch { return json({ ok: false, hata: 'geçersiz json' }, 400, origin, env) }
+
+  const taslak = body?.taslak
+  const id = String(taslak?.id || '').trim()
+  if (!id || !taslak?.projeKaydi || !taslak?.cardsJson) {
+    return json({ ok: false, hata: 'geçersiz taslak (id/projeKaydi/cardsJson eksik)' }, 400, origin, env)
+  }
+  // Path-traversal koruması: id yalnız güvenli slug karakterleri taşımalı (harf/rakam/tire/
+  // alt-çizgi). Baştaki `_` özellikle İZİNLİ — _demo-*/_test-* atılır-namespace konvansiyonu.
+  if (!/^[a-z0-9_][a-z0-9_-]{0,80}$/.test(id)) {
+    return json({ ok: false, hata: 'geçersiz id biçimi' }, 400, origin, env)
+  }
+  // Hafif boyut koruması (abuse / dev kazası)
+  const boyut = JSON.stringify(taslak).length
+  if (boyut > 200_000) return json({ ok: false, hata: 'taslak çok büyük' }, 413, origin, env)
+
+  const gh = ghConfig(env)
+  if (!gh.token) return json({ ok: false, hata: 'GITHUB_TOKEN ayarlı değil' }, 500, origin, env)
+
+  const kuyrukDizin = String(env.INTAKE_QUEUE_PATH || 'intake-kuyruk').replace(/\/$/, '')
+  const kuyrukYol = `${kuyrukDizin}/${id}.json`
+
+  const sonuc = await putGithubJsonFile(gh, kuyrukYol, taslak, `intake-app: kuyruk (${id})`)
+  if (!sonuc.ok) return json({ ok: false, hata: sonuc.hata }, sonuc.status || 502, origin, env)
+
+  return json({ ok: true, commit: sonuc.commit, path: kuyrukYol }, 200, origin, env)
 }
 
 // ============================================================
@@ -155,6 +207,46 @@ async function appendToInbox(gh, satir, retry = true) {
   // 409 = sha çakışması (eşzamanlı yazım) → bir kez tekrar dene
   if (putRes.status === 409 && retry) {
     return appendToInbox(gh, satir, false)
+  }
+  let detay = ''
+  try { detay = (await putRes.json()).message || '' } catch { /* noop */ }
+  return { ok: false, status: 502, hata: `github put ${putRes.status}${detay ? ': ' + detay : ''}` }
+}
+
+// Yeni-dosya oluştur/güncelle (JSON, tam-değiştir) — intake-kuyruğu için.
+// appendToInbox'tan FARKI: mevcut içeriğe eklemez, dosyayı doğrudan JSON olarak yazar
+// (kuyruk dosyaları tek-taslak, satır-satır büyüyen bir log değil).
+async function putGithubJsonFile(gh, path, obj, mesaj, retry = true) {
+  const base = `${GH_API}/repos/${gh.owner}/${gh.repo}/contents/${encodePath(path)}`
+  const headers = {
+    'Authorization': `Bearer ${gh.token}`,
+    'Accept': 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+    'User-Agent': UA,
+  }
+
+  let sha = null
+  const getRes = await fetch(`${base}?ref=${encodeURIComponent(gh.branch)}`, { headers })
+  if (getRes.status === 200) {
+    sha = (await getRes.json()).sha
+  } else if (getRes.status !== 404) {
+    return { ok: false, status: 502, hata: `github get ${getRes.status}` }
+  }
+
+  const putBody = {
+    message: mesaj,
+    content: b64encodeUtf8(JSON.stringify(obj, null, 2) + '\n'),
+    branch: gh.branch,
+  }
+  if (sha) putBody.sha = sha
+
+  const putRes = await fetch(base, { method: 'PUT', headers, body: JSON.stringify(putBody) })
+  if (putRes.status === 200 || putRes.status === 201) {
+    const data = await putRes.json()
+    return { ok: true, commit: data.commit && data.commit.sha }
+  }
+  if (putRes.status === 409 && retry) {
+    return putGithubJsonFile(gh, path, obj, mesaj, false)
   }
   let detay = ''
   try { detay = (await putRes.json()).message || '' } catch { /* noop */ }

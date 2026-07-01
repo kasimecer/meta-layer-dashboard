@@ -58,3 +58,38 @@ export async function submitPartnerInput({ projeId, kart, cevap }) {
     return { ok: false, hata: `Ağ hatası: ${String(e?.message || e)}` }
   }
 }
+
+/**
+ * Intake taslağını Worker üzerinden GitHub kuyruğuna yazar (intake-kuyruk/<id>.json).
+ * Worker BURADA materyalize ETMEZ — yalnız git'e commit eder. Kullanıcının kendi
+ * makinesinde çalışan scripts/intake-queue-watch.mjs bu dosyayı bulup YEREL materyalize
+ * eder + planlama pipeline'ını (abonelik-auth ile) çalıştırır.
+ * @returns {Promise<{ok:true, path:string, commit?:string} | {ok:false, hata:string, mock?:boolean}>}
+ */
+export async function submitIntakeQueue({ taslak }) {
+  if (!taslak?.id || !taslak?.projeKaydi || !taslak?.cardsJson) {
+    return { ok: false, hata: 'Geçersiz taslak (id/projeKaydi/cardsJson eksik)' }
+  }
+
+  // MOCK: Worker yapılandırılmamış → otomatik kuyruk yok, elle materyalize gerekir.
+  if (!CANLI) {
+    return { ok: false, mock: true, hata: 'Worker yapılandırılmamış (MOCK mod) — yalnız elle materyalize edilebilir.' }
+  }
+
+  try {
+    const r = await fetch(`${WORKER_URL}/intake-queue`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-submit-token': SUBMIT_TOKEN },
+      body: JSON.stringify({ taslak }),
+    })
+    if (!r.ok) {
+      let detay = ''
+      try { detay = (await r.json()).hata || '' } catch { /* noop */ }
+      return { ok: false, hata: `Kuyruğa alınamadı (${r.status}${detay ? ': ' + detay : ''})` }
+    }
+    const data = await r.json()
+    return { ok: true, path: data.path, commit: data.commit }
+  } catch (e) {
+    return { ok: false, hata: `Ağ hatası: ${String(e?.message || e)}` }
+  }
+}

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { intakeArtifaktlariUret, taslakKaydet, idOner } from '../lib/intakeBuilder.js'
+import MateryalizeButton from '../components/MateryalizeButton.jsx'
 
 // #/baslat — operatör intake yüzeyi.
 // İki kip: fikir-var (somut fikir) | tohum (ilgi/kısıt/varlık tohumları).
@@ -116,11 +117,18 @@ export default function IntakeView() {
         </div>
 
         <div style={{ marginTop: 24 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 }}>
+            Materyalize et
+          </div>
+          <MateryalizeButton taslak={sonuc} />
+        </div>
+
+        <div style={{ marginTop: 22, paddingTop: 18, borderTop: '1px solid #e4e4e7' }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 }}>
-            Kalıcı materyalizasyon için JSON
+            Elle materyalize et (yedek yol)
           </div>
           <div style={{ fontSize: 12, color: '#71717a', marginBottom: 10 }}>
-            Taslak şu an localStorage'da görünür. Dosyalara yazmak için:
+            Yukarıdaki kuyruk çalışmazsa veya izleyici açık değilse, taslak JSON'ı elle dosyaya kaydedip çalıştır:
             <code style={{ display: 'block', marginTop: 5, padding: '6px 10px', background: '#f4f4f5', borderRadius: 6, fontSize: 11, fontFamily: 'ui-monospace, monospace', color: '#374151' }}>
               node scripts/intake-materialize.mjs &lt;taslak.json dosya yolu&gt;
             </code>
