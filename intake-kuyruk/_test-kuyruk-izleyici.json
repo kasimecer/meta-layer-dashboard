@@ -1,0 +1,30 @@
+{
+  "id": "_test-kuyruk-izleyici",
+  "projeKaydi": {
+    "id": "_test-kuyruk-izleyici",
+    "ad": "Kuyruk İzleyici Testi",
+    "durum": "fikir",
+    "faz": "planlama",
+    "rol": "solo",
+    "status": "aktif",
+    "efor": "?",
+    "deger": "?",
+    "zaman_son_aktivite": "2026-07-01",
+    "ozet": "Kuyruk izleyici uçtan-uca mekanik testi."
+  },
+  "cardsJson": {
+    "kartlar": [
+      {
+        "id": "_test-kuyruk-izleyici-k01",
+        "tip": "girdi-talebi",
+        "durum": "cevap-bekliyor",
+        "ozet": "Bir cümleyle netleştir: hedef kitle + çözülen sorun",
+        "detay": "**Başlangıç fikri:**\n\nKuyruk izleyici uçtan-uca mekanik testi.\n\n*Sonraki adım: premise kapısı için fikri netleştir.*",
+        "partner_cevap": null,
+        "olusturma": "2026-07-01T15:03:40.373Z",
+        "guncelleme": "2026-07-01T15:03:40.373Z"
+      }
+    ]
+  },
+  "intakeMd": "# Intake — Kuyruk İzleyici Testi\n**ID:** _test-kuyruk-izleyici\n**Giriş kipi:** fikir-var\n**Tarih:** 2026-07-01\n\n## Fikir\n\nKuyruk izleyici uçtan-uca mekanik testi."
+}
