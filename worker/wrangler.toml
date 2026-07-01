@@ -1,0 +1,20 @@
+# meta-layer-write — Cloudflare Worker yapılandırması.
+# Statik site (GH-Pages) bu Worker'ı ayrı endpoint olarak çağırır.
+#
+# [vars] = NON-SECRET, repoya girer. Owner/repo/branch/inbox-path burada (HARDCODE değil, tek yer).
+# Secret'ler BURAYA YAZILMAZ → `wrangler secret put GITHUB_TOKEN` vb. (bkz README.md).
+
+name = "meta-layer-write"
+main = "worker.js"
+compatibility_date = "2025-09-23"
+
+[vars]
+GH_OWNER = "kasimecer"
+GH_REPO = "meta-layer-dashboard"
+GH_BRANCH = "main"
+# Partner cevapları bu dosyaya APPEND edilir. Drive'daki kanonik inbox'tan AYRI bir
+# git-kanalı (seam): loop bunu uzlaştırıp projeler/<proje>/inbox.md'ye taşır.
+# Çok-proje olunca proje başına yol gerekebilir; v1 = tek dosya (Barış).
+INBOX_PATH = "partner-inbox/baris.md"
+# CORS + origin-allowlist. Virgülle çok-origin. Lokal test için localhost ekleyebilirsin.
+ALLOWED_ORIGIN = "https://kasimecer.github.io"

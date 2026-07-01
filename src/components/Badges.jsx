@@ -22,6 +22,21 @@ export function StatusBadge({ status }) {
   return <Pill bg={aktif ? '#dcfce7' : '#f4f4f5'} fg={aktif ? '#166534' : '#a1a1aa'}>{aktif ? '● aktif' : '○ duraklı'}</Pill>
 }
 
+export function TaslakBadge() {
+  return <Pill bg="#fef9c3" fg="#854d0e">✏ taslak</Pill>
+}
+
+// faz: 'planlama' | 'build' — registry/operator durum verisinden hesaplanır (bkz fazHesapla).
+export function FazBadge({ faz }) {
+  if (faz !== 'planlama' && faz !== 'build') return null
+  const planlama = faz === 'planlama'
+  return (
+    <Pill bg={planlama ? '#e0e7ff' : '#dcfce7'} fg={planlama ? '#4338ca' : '#166534'}>
+      {planlama ? '◐ Planlama' : '● Yapım'}
+    </Pill>
+  )
+}
+
 export function EtiketBadge({ label, value }) {
   const c = ETIKET_RENK[value] ?? { bg: '#f1f5f9', fg: '#94a3b8' }
   return (

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Card from '../components/Card.jsx'
-import { DurumBadge, StatusBadge, EtiketBadge } from '../components/Badges.jsx'
+import { DurumBadge, StatusBadge, EtiketBadge, TaslakBadge, FazBadge } from '../components/Badges.jsx'
+import { taslaklariOku, taslakSil, fazHesapla } from '../lib/intakeBuilder.js'
 
 // #/proje/<id> — OPERATÖR seviyesi. Partner-view'den FARKLI: jargon-saklama YOK, her şey görünür.
 // Kart yığını için slice-1 Card primitive'ini YENİDEN KULLANIR (onCevap YOK = read-only/izleme).
@@ -94,9 +95,20 @@ export default function ProjectView({ projeId = 'baris' }) {
   const [proje, setProje] = useState(undefined)   // undefined = yükleniyor, null = bulunamadı
   const [kartlar, setKartlar] = useState(null)
   const [operator, setOperator] = useState(null)
+  const [taslak, setTaslak] = useState(null)
 
   useEffect(() => {
-    setProje(undefined); setKartlar(null); setOperator(null)
+    setProje(undefined); setKartlar(null); setOperator(null); setTaslak(null)
+
+    // Önce localStorage taslakları kontrol et
+    const ls = taslaklariOku().find(t => t.id === projeId)
+    if (ls) {
+      setTaslak(ls)
+      setProje(ls.projeKaydi)
+      setKartlar(ls.cardsJson?.kartlar ?? [])
+      return
+    }
+
     fetch('./registry.json').then(r => r.ok ? r.json() : null).then(d => {
       const p = d ? (d.projeler ?? d).find(x => x.id === projeId) : null
       setProje(p ?? null)
@@ -109,20 +121,39 @@ export default function ProjectView({ projeId = 'baris' }) {
 
   if (proje === undefined) return <div style={{ padding: 24, color: '#71717a', fontSize: 14 }}>Yükleniyor…</div>
 
-  // registry'de yoksa operator.proje_meta yedek metadata olarak kullanılır
   const projeEtkin = proje ?? operator?.proje_meta ?? null
+  const faz = projeEtkin ? (projeEtkin.faz ?? fazHesapla(projeEtkin.durum)) : null
   const kartVar = kartlar && kartlar.length > 0
 
   return (
     <div>
       <a href="#/portfoy" style={{ fontSize: 12, color: '#6366f1', textDecoration: 'none' }}>← portföy</a>
 
+      {/* Taslak uyarı bandı */}
+      {taslak && (
+        <div style={{ marginTop: 12, padding: '10px 14px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ fontSize: 12.5, color: '#92400e' }}>
+            <strong>Taslak proje</strong> — sadece localStorage'da. Materyalize etmek için{' '}
+            <code style={{ fontSize: 11, fontFamily: 'ui-monospace, monospace', background: '#fef3c7', padding: '1px 5px', borderRadius: 4 }}>
+              node scripts/intake-materialize.mjs
+            </code> çalıştır.
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <a href="#/baslat" style={{ fontSize: 12, color: '#6366f1', textDecoration: 'none', fontWeight: 600 }}>Düzenle</a>
+            <button onClick={() => { taslakSil(projeId); window.location.hash = '#/portfoy' }} style={{
+              fontSize: 12, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, padding: 0,
+            }}>Taslağı sil</button>
+          </div>
+        </div>
+      )}
+
       {/* Operatör başlık: durum + rol + metrikler + operasyonel bağlam */}
-      <div style={{ marginTop: 10, background: '#fff', border: '1px solid #e4e4e7', borderRadius: 12, padding: '18px 20px' }}>
+      <div style={{ marginTop: 10, background: '#fff', border: `1px solid ${taslak ? '#fde68a' : '#e4e4e7'}`, borderRadius: 12, padding: '18px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
           <span style={{ fontSize: 17, fontWeight: 700 }}>{projeEtkin?.ad ?? projeId}</span>
-          {projeEtkin && <DurumBadge durum={projeEtkin.durum} />}
-          {projeEtkin?.status && <StatusBadge status={projeEtkin.status} />}
+          {faz && <FazBadge faz={faz} />}
+          {taslak ? <TaslakBadge /> : projeEtkin && <DurumBadge durum={projeEtkin.durum} />}
+          {!taslak && projeEtkin?.status && <StatusBadge status={projeEtkin.status} />}
         </div>
         {projeEtkin && (
           <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 10 }}>

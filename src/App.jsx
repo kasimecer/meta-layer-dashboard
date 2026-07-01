@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import IntakeView from './views/IntakeView.jsx'
 import PartnerView from './views/PartnerView.jsx'
 import PortfolioView from './views/PortfolioView.jsx'
 import ProjectView from './views/ProjectView.jsx'
@@ -14,9 +15,10 @@ function rota() {
 }
 
 const SEKMELER = [
-  { key: 'portfoy', label: 'Portföy', hash: '#/portfoy' },
-  { key: 'proje',   label: 'Proje',   hash: '#/proje/baris' },
-  { key: 'partner', label: 'Partner', hash: '#/partner/baris' },
+  { key: 'portfoy', label: 'Portföy',    hash: '#/portfoy' },
+  { key: 'proje',   label: 'Proje',      hash: '#/proje/baris' },
+  { key: 'partner', label: 'Partner',    hash: '#/partner/baris' },
+  { key: 'baslat',  label: '+ Yeni',     hash: '#/baslat' },
 ]
 
 export default function App() {
@@ -59,6 +61,7 @@ export default function App() {
 
       {r.view === 'portfoy' && <PortfolioView />}
       {r.view === 'proje'   && <ProjectView projeId={r.projeId} />}
+      {r.view === 'baslat'  && <IntakeView />}
     </div>
   )
 }

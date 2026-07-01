@@ -1,0 +1,7 @@
+# LOKAL geliştirme secret'ları — `wrangler dev` bunları .dev.vars'tan okur.
+# KOPYALA → .dev.vars (gitignored), GERÇEK değerleri DOLDUR. ASLA commit etme.
+# Prod'da bunlar `wrangler secret put` ile Cloudflare'e konur (repoya GİRMEZ).
+
+GITHUB_TOKEN=
+SUBMIT_TOKEN=
+OPERATOR_TOKEN=

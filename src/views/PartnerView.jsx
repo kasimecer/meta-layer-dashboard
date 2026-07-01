@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import Markdown from 'react-markdown'
 import Card from '../components/Card.jsx'
+import { FazBadge } from '../components/Badges.jsx'
 import { kartDogrula, gecisUygula } from '../lib/stateMachine.js'
 import { submitPartnerInput, CANLI } from '../lib/writePath.js'
+import { fazHesapla } from '../lib/intakeBuilder.js'
 
 // Simülasyon cevapları — yalnız baris; gerçek cevap değil, uçtan-uca test.
 const SIM_CEVAP = {
@@ -31,13 +33,14 @@ function MomentumBadge({ value }) {
   )
 }
 
-// ── Baris için mevcut Ozet bileşeni (değişmedi) ─────────────────────────────
-function Ozet({ data }) {
+// ── Baris için mevcut Ozet bileşeni ─────────────────────────────────────────
+function Ozet({ data, faz }) {
   const [open, setOpen] = useState(false)
   const { proje, tarih, momentum, son_ilerleme, sonraki_kritik_adim, bekleyen_insan_girdisi, partner_ozet, arsiv_link } = data
   return (
     <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,.06)', overflow: 'hidden' }}>
       <button onClick={() => partner_ozet && setOpen(o => !o)} aria-expanded={open} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '20px 24px', cursor: partner_ozet ? 'pointer' : 'default' }}>
+        {faz && <div style={{ marginBottom: 10 }}><FazBadge faz={faz} /></div>}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 18, fontWeight: 700, textTransform: 'capitalize' }}>{proje}</span>
           <MomentumBadge value={momentum} />
@@ -89,7 +92,7 @@ function AsamaAdim({ ad, durum }) {
   )
 }
 
-function ProjeHeader({ ozet, hepsiBitti }) {
+function ProjeHeader({ ozet, hepsiBitti, faz }) {
   const asamalar = ozet.asamalar ?? []
   const asamaIndeks = ozet.asama_indeks ?? 0
 
@@ -98,6 +101,9 @@ function ProjeHeader({ ozet, hepsiBitti }) {
       background: '#fff', border: '1px solid #e4e4e7', borderRadius: 14,
       padding: '24px 24px 20px', boxShadow: '0 1px 4px rgba(0,0,0,.06)',
     }}>
+      {/* Faz-rozeti — ilerleme şeridinin (asamalar) ÜSTÜNDE, bir bakışta planlama/yapım ayrımı */}
+      {faz && <div style={{ marginBottom: 12 }}><FazBadge faz={faz} /></div>}
+
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <h1 style={{ fontSize: 21, fontWeight: 700, color: '#18181b', margin: 0, letterSpacing: -0.3 }}>
           {ozet.proje}
@@ -193,6 +199,7 @@ export default function PartnerView({ projeId = 'baris' }) {
   const [hata, setHata] = useState(null)
   const [inboxLog, setInboxLog] = useState([])
   const [simAktif, setSimAktif] = useState(false)
+  const [durum, setDurum] = useState(null)   // faz-rozeti için; registry/operator'dan en-iyi-çaba okunur
 
   const isBaris = projeId === 'baris'
 
@@ -207,6 +214,10 @@ export default function PartnerView({ projeId = 'baris' }) {
         setOzet(c)
         setKartlar(liste)
       }).catch(e => setHata(String(e)))
+      // faz-rozeti kaynağı: registry.json (gerçek durum verisi) — en-iyi-çaba, başarısızsa rozet gizlenir.
+      fetch('./registry.json').then(r => r.ok ? r.json() : null)
+        .then(d => { const p = d ? (d.projeler ?? d).find(x => x.id === 'baris') : null; setDurum(p?.durum ?? null) })
+        .catch(() => setDurum(null))
     } else {
       fetch(`./cards-${projeId}.json`)
         .then(r => r.ok ? r.json() : Promise.reject(`cards-${projeId}.json yüklenemedi`))
@@ -220,6 +231,10 @@ export default function PartnerView({ projeId = 'baris' }) {
           setKartlar(liste)
         })
         .catch(e => setHata(String(e)))
+      // faz-rozeti kaynağı: operator-{id}.json proje_meta.durum (gerçek veri) — en-iyi-çaba.
+      fetch(`./operator-${projeId}.json`).then(r => r.ok ? r.json() : null)
+        .then(d => setDurum(d?.proje_meta?.durum ?? null))
+        .catch(() => setDurum(null))
     }
   }, [projeId, isBaris])
 
@@ -253,13 +268,14 @@ export default function PartnerView({ projeId = 'baris' }) {
   const bekleyenSayi = kartlar.filter(k => k.tip === 'girdi-talebi' && k.durum === 'cevap-bekliyor').length
   const toplamGirdiSayi = kartlar.filter(k => k.tip === 'girdi-talebi').length
   const hepsiBitti = bekleyenSayi === 0 && toplamGirdiSayi > 0
+  const faz = ozet?.faz ?? (durum ? fazHesapla(durum) : null)
 
   return (
     <div>
       {isBaris ? (
-        <Ozet data={ozet} />
+        <Ozet data={ozet} faz={faz} />
       ) : (
-        <ProjeHeader ozet={ozet} hepsiBitti={hepsiBitti} />
+        <ProjeHeader ozet={ozet} hepsiBitti={hepsiBitti} faz={faz} />
       )}
 
       {/* Simülasyon — yalnız baris, yalnız dev */}
