@@ -35,7 +35,29 @@ export async function taslakiMateryalizeEt(taslak, opts = {}) {
 
   const materyalizeSonuclari = []
 
-  // 1. public/registry.json
+  // 1. Kanonik registry (Drive: $META_DATA_ROOT/projeler/registry.json) — build-card-data.js
+  //    HER build'de bunu okuyup public/registry.json'ı BAŞTAN üretir. İntake projeleri yalnız
+  //    public/registry.json'a yazılırsa, sonraki bir build bu projeyi sessizce düşürür (build
+  //    kanonikten regenerate ettiği için intake kaydından habersizdir). Kalıcılık için BURAYA
+  //    da yazılır — idempotent + katkısal: id zaten varsa DOKUNULMAZ (kanonik her zaman kazanır,
+  //    çakışma/kopya yok; silinmiş bir kaydı diriltmez çünkü yalnız YENİ id'ler eklenir); mevcut
+  //    kayıtların sırası/alanları hiç değişmez, yalnız dizinin SONUNA ekleme yapılır.
+  const kanonikRegistryYol = join(META_DATA_ROOT, 'projeler', 'registry.json')
+  if (existsSync(kanonikRegistryYol)) {
+    const kanonik = oku(kanonikRegistryYol)
+    const kanonikProjeler = kanonik.projeler ?? []
+    if (kanonikProjeler.some(p => p.id === id)) {
+      materyalizeSonuclari.push(`kanonik registry.json'da (Drive) zaten var: ${id} — atlandı, kanonik kazanır.`)
+    } else {
+      const yeniKanonik = { ...kanonik, projeler: [...kanonikProjeler, projeKaydi] }
+      yaz(kanonikRegistryYol, yeniKanonik)
+      materyalizeSonuclari.push(`kanonik registry.json'a (Drive) eklendi: ${id}`)
+    }
+  } else {
+    materyalizeSonuclari.push('kanonik projeler/registry.json bulunamadı — kalıcı kayıt atlandı (yalnız public/registry.json güncellenecek).')
+  }
+
+  // 2. public/registry.json (repo — anlık görünürlük; sonraki build kanonikten regenerate eder)
   const registryYol = join(REPO_ROOT, 'public', 'registry.json')
   const registry = oku(registryYol)
   const projeler = registry.projeler ?? registry
@@ -49,7 +71,7 @@ export async function taslakiMateryalizeEt(taslak, opts = {}) {
     materyalizeSonuclari.push(`registry.json'a eklendi: ${id}`)
   }
 
-  // 2. public/cards-<id>.json
+  // 3. public/cards-<id>.json
   const cardsYol = join(REPO_ROOT, 'public', `cards-${id}.json`)
   if (existsSync(cardsYol)) {
     materyalizeSonuclari.push(`cards-${id}.json zaten var — atlandı.`)
@@ -58,7 +80,7 @@ export async function taslakiMateryalizeEt(taslak, opts = {}) {
     materyalizeSonuclari.push(`cards-${id}.json oluşturuldu (${cardsJson.kartlar?.length ?? 0} kart)`)
   }
 
-  // 3. $META_DATA_ROOT/projeler/<id>/intake.md
+  // 4. $META_DATA_ROOT/projeler/<id>/intake.md
   const nsYolu = join(META_DATA_ROOT, 'projeler', id)
   if (intakeMd) {
     mkdirSync(nsYolu, { recursive: true })
@@ -75,7 +97,7 @@ export async function taslakiMateryalizeEt(taslak, opts = {}) {
 
   for (const s of materyalizeSonuclari) log(s)
 
-  // 4. Planlama loop — istenmedikçe (loopAtla) her zaman tetiklenir.
+  // 5. Planlama loop — istenmedikçe (loopAtla) her zaman tetiklenir.
   if (loopAtla) {
     log('loopAtla=true — planlama loop tetiklenmedi.')
     return { id, materyalizeSonuclari, loopAtlandi: true }
