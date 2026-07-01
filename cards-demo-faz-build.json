@@ -1,0 +1,33 @@
+{
+  "proje": "Faz Örneği — Yapım",
+  "proje_id": "demo-faz-build",
+  "tarih": "2026-07-01",
+  "momentum": "build başladı",
+  "son_ilerleme": "5 aşamalı planlama tamamlandı (genesis → master-plan); build-task üretimi başladı.",
+  "sonraki_kritik_adim": "İlk build-task'ı tamamla, ikinci karta geç.",
+  "bekleyen_insan_girdisi": null,
+  "asamalar": ["Planlama", "Build-Onayı", "İnşa", "Canlı"],
+  "asama_indeks": 2,
+  "kartlar": [
+    {
+      "id": "demo-faz-build-k01",
+      "tip": "ilerleme",
+      "durum": "bitti",
+      "ozet": "Master-plan onaylandı",
+      "detay": "5 aşamalı planlama (genesis → master-plan) tamamlandı; build-onayı verildi.",
+      "partner_cevap": null,
+      "olusturma": "2026-06-30T09:00:00.000Z",
+      "guncelleme": "2026-06-30T09:00:00.000Z"
+    },
+    {
+      "id": "demo-faz-build-k02",
+      "tip": "build-task",
+      "durum": "yapiliyor",
+      "ozet": "İlk build adımı sürüyor — Tier 0 sayfa taslağı",
+      "detay": "Operatör panelinde build-board üzerinden takip edilebilir.",
+      "partner_cevap": null,
+      "olusturma": "2026-07-01T09:00:00.000Z",
+      "guncelleme": "2026-07-01T09:00:00.000Z"
+    }
+  ]
+}
