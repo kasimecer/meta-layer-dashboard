@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { submitIntakeQueue } from '../lib/writePath.js'
 
-// Taslak -> Worker kuyruğu (POST /intake-queue) -> yerel izleyici -> materyalize+pipeline.
+// Taslak -> Worker kuyruğu (POST /intake-queue) -> yerel izleyici -> materyalize (kayıt +
+// proje dosyaları). Pipeline'ı (genesis→master-plan) BAŞLATMAZ — bu insan tarafından ayrı
+// bir terminal komutuyla yapılır: node scripts/planlama-baslat.mjs <id>
 // Bkz worker/worker.js, scripts/intake-queue-watch.mjs, intake-kuyruk/README.md.
 // Worker BURADA materyalize ETMEZ; anlık bulut-sonucu YOK — makine+izleyici açık olmalı.
 // IntakeView (yeni taslak) ve ProjectView (taslak banner) tarafından paylaşılır.
@@ -26,7 +28,8 @@ export default function MateryalizeButton({ taslak }) {
         borderRadius: 8, fontSize: 12.5, color: '#166534', lineHeight: 1.55,
       }}>
         ✓ Kuyruğa alındı{detay ? ` (${detay})` : ''} — yerel izleyici (<code>node scripts/intake-queue-watch.mjs</code>)
-        makinende çalıştığında otomatik materyalize edip planlama pipeline'ını başlatacak.
+        makinende çalıştığında otomatik materyalize edecek (kayıt + proje dosyaları). Planlama
+        pipeline'ını başlatmak ayrı, elle bir adım: <code>node scripts/planlama-baslat.mjs</code>.
         İzleyici kapalıysa kuyrukta bekler; anlık bulut-materyalizasyonu DEĞİL.
       </div>
     )
@@ -42,8 +45,9 @@ export default function MateryalizeButton({ taslak }) {
         {durum === 'gonderiliyor' ? 'Kuyruğa alınıyor…' : 'Materyalize et →'}
       </button>
       <div style={{ marginTop: 6, fontSize: 11, color: '#a1a1aa', lineHeight: 1.45 }}>
-        Taslağı kuyruğa alır; makinende çalışan yerel izleyici bunu görünce materyalize edip
-        pipeline'ı (genesis→master-plan) çalıştırır. İzleyici kapalıyken anlık sonuç YOK.
+        Taslağı kuyruğa alır; makinende çalışan yerel izleyici bunu görünce materyalize eder
+        (kayıt + proje dosyaları). Planlama pipeline'ı (genesis→master-plan) otomatik başlamaz —
+        terminalden elle başlatılır. İzleyici kapalıyken anlık sonuç YOK.
       </div>
       {(durum === 'hata' || durum === 'mock') && (
         <div style={{

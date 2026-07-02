@@ -63,7 +63,8 @@ export async function submitPartnerInput({ projeId, kart, cevap }) {
  * Intake taslağını Worker üzerinden GitHub kuyruğuna yazar (intake-kuyruk/<id>.json).
  * Worker BURADA materyalize ETMEZ — yalnız git'e commit eder. Kullanıcının kendi
  * makinesinde çalışan scripts/intake-queue-watch.mjs bu dosyayı bulup YEREL materyalize
- * eder + planlama pipeline'ını (abonelik-auth ile) çalıştırır.
+ * eder (kayıt + proje dosyaları). Planlama pipeline'ını başlatmaz — bu insan tarafından
+ * ayrı, elle bir terminal komutuyla yapılır (node scripts/planlama-baslat.mjs <id>).
  * @returns {Promise<{ok:true, path:string, commit?:string} | {ok:false, hata:string, mock?:boolean}>}
  */
 export async function submitIntakeQueue({ taslak }) {

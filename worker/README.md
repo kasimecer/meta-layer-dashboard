@@ -5,8 +5,9 @@ Statik site (GH-Pages) **olduğu gibi kalır**. Bu Worker ayrı bir write/auth e
 - `POST /submit` — partner cevabını GitHub'daki inbox dosyasına APPEND eder (`SUBMIT_TOKEN` kapısı).
 - `POST /intake-queue` — intake taslağını `intake-kuyruk/<id>.json` olarak commit eder (`SUBMIT_TOKEN`
   kapısı). Worker burada **materyalize ETMEZ** — yalnız git'e yazar. Kullanıcının kendi makinesinde
-  çalışan `node scripts/intake-queue-watch.mjs` bu dosyayı bulup YEREL materyalize eder + planlama
-  pipeline'ını (abonelik-auth ile) çalıştırır. Bkz `intake-kuyruk/README.md`.
+  çalışan `node scripts/intake-queue-watch.mjs` bu dosyayı bulup YEREL materyalize eder (kayıt +
+  proje dosyaları). Planlama pipeline'ını başlatmaz — bu insan tarafından ayrı, elle bir terminal
+  komutuyla yapılır (`node scripts/planlama-baslat.mjs <id>`). Bkz `intake-kuyruk/README.md`.
 - `GET /operator` — `OPERATOR_TOKEN` kapısı (şimdilik **iskelet**: veriyi henüz servis etmez).
 - `GET /health` — canlılık testi.
 
@@ -74,10 +75,18 @@ node scripts/intake-queue-watch.mjs --once      # tek tur (test/cron için)
 ```
 
 İzleyici `git pull` yapar, `intake-kuyruk/*.json` bulur, `tools/intakeMateryalizeEt.mjs` ile
-YEREL materyalize edip planlama pipeline'ını (genesis→master-plan) çalıştırır, sonra dosyayı
+YEREL materyalize eder (registry kaydı + proje dosyaları diskte var olur), sonra dosyayı
 kuyruktan kaldırıp push eder. **Yalnız makine + bu process açıkken çalışır** — anlık/her-zaman-açık
 bir bulut-servisi değildir; kapatılırsa kayıt kuyrukta bekler. Elle materyalize etmek istersen
 yedek yol hâlâ çalışır: `node scripts/intake-materialize.mjs <taslak.json>`.
+
+İzleyici planlama pipeline'ını (genesis→premise→arastirma→strateji→master-plan) BAŞLATMAZ —
+materyalize etmek ile pipeline'ı başlatmak kasıtlı olarak ayrı iki iştir. Pipeline'ı
+başlatmak/devam ettirmek insan tarafından, ayrı bir terminal komutuyla yapılır:
+```bash
+node scripts/planlama-baslat.mjs            # bekleyen/kısmi/bloke/tamamlanmış projeleri listeler
+node scripts/planlama-baslat.mjs <id>       # o proje için pipeline'ı başlat/devam ettir
+```
 
 ---
 
