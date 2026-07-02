@@ -304,8 +304,14 @@ export function canliExecutorOlustur(nsYolu, projeConfig, opts = {}) {
 
   const ist = { cagrilar: 0, toplamMaliyet: 0, asamaMaliyetleri: {} }
 
-  async function executor(asama) {
-    const prompt = promptUret(asama, projeConfig, baglamlar)
+  // @param {string} asama
+  // @param {{ hedefDosya?: string, baglamlar?: object }} opts — loop sürüm-farkında yazım
+  //   hedefDosya: bu koşumun yazılacağı (sürümlü) yol; verilmezse eski sabit ad kullanılır.
+  //   baglamlar : üst aşamaların GÜNCEL sürüm içerikleri; verilirse önyüklenene tercih edilir
+  //               (geri-dönüş sonrası üst yeni sürüme geçtiğinde doğru bağlam için kritik).
+  async function executor(asama, opts = {}) {
+    const kullanilanBaglamlar = opts.baglamlar ?? baglamlar
+    const prompt = promptUret(asama, projeConfig, kullanilanBaglamlar)
     // Geçici hatalar (timeout/non-zero-exit/JSON-parse) sınırlı-retry ile kurtarılır;
     // zincir bir tekil-deneme hatasıyla ABORT olmaz. Tüm denemeler tükenirse net hata.
     const sonuc  = await claudeCalistirRetry(prompt, { model: 'claude-sonnet-4-6', zaman_asimi_ms, maxDeneme, log })
@@ -314,7 +320,7 @@ export function canliExecutorOlustur(nsYolu, projeConfig, opts = {}) {
     ist.toplamMaliyet              += sonuc.maliyet_usd ?? 0
     ist.asamaMaliyetleri[asama]    = sonuc.maliyet_usd
 
-    const dosyaYolu = join(nsYolu, ASAMA_DOSYALARI[asama])
+    const dosyaYolu = opts.hedefDosya ?? join(nsYolu, ASAMA_DOSYALARI[asama])
     guvenliYaz(dosyaYolu, sonuc.metin, nsYolu)
     baglamlar[asama] = sonuc.metin
 
