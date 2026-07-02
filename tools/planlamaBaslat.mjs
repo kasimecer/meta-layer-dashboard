@@ -9,6 +9,7 @@
 import { canliExecutorOlustur } from './canliExecutor.mjs'
 import { planlamaLoopV2Calistir } from './planlamaLoopV2.mjs'
 import { stateYukle, statePersist, geriAsamaya } from './planlamaDurumMakinesiV2.mjs'
+import { varsayilanSoruUretici } from './planlamaSorular.mjs'
 
 /**
  * Pipeline'ı bir adım işlet.
@@ -21,7 +22,9 @@ import { stateYukle, statePersist, geriAsamaya } from './planlamaDurumMakinesiV2
 export async function planlamaBaslat(nsYolu, projeId, projeConfig, opts = {}) {
   const { log = () => {}, mod = 'ileri' } = opts
   const { executor } = canliExecutorOlustur(nsYolu, projeConfig, { log })
-  return planlamaLoopV2Calistir(nsYolu, projeId, executor, { log, mod })
+  // Canlı akışta SORU–YANIT katmanı AÇIK (deterministik üretici). Ham loop'ta varsayılan
+  // KAPALI'dır (geriye-uyum); burada açıkça enjekte ediyoruz.
+  return planlamaLoopV2Calistir(nsYolu, projeId, executor, { log, mod, soruUretici: varsayilanSoruUretici })
 }
 
 /**

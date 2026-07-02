@@ -35,6 +35,30 @@ Kabul edilen etiket biçimleri:
   ✗ Hedef: 2026 yılına kadar 1.500 abone. ← 2026 (4 hane) etiketsiz
   ✗ Kutu fiyatı 350₺.                     ← etiket yok`
 
+// Bir önceki aşamada operatörün verdiği yanıtları BAĞLAYICI bağlam bloğuna çevir.
+// tuketim: loop'un ustYanitlariTuket çıktısı — { ust, surum, kayitlar, paket } veya boş.
+// Bu, "yanıtlar bir sonraki koşuma izlenebilir girdi olarak akar" (#4) yolunun metin ucudur.
+function yanitlarMetni(tuketim) {
+  if (!tuketim || tuketim.surum == null || !tuketim.kayitlar || !tuketim.paket) return ''
+  const soruHarita = new Map(tuketim.paket.sorular.map(s => [s.anahtar, s]))
+  const satirlar = []
+  for (const e of tuketim.kayitlar) {
+    const s = soruHarita.get(e.anahtar)
+    if (!s || s.tip === 'APPROVAL') continue
+    const konu = s.iddia ?? s.metin
+    if (e.atlandi === true) { satirlar.push(`- (ATLANDI, karar operatörce ertelendi) ${s.metin}${e.gerekce ? ` — gerekçe: ${e.gerekce}` : ''}`); continue }
+    if (s.tip === 'CHOICE') satirlar.push(`- SEÇİM: ${s.metin} → operatör seçti: «${e.secim}»`)
+    else if (s.tip === 'DATA-REQUEST') {
+      if (e.karar === 'veri') satirlar.push(`- VERİ (kaynaklı): «${konu}» → değer: ${e.deger}${e.kaynak ? `; kaynak: ${e.kaynak}` : ''}. Bunu [doğrulanmış:${e.kaynak ?? 'operatör'}] etiketiyle kullan.`)
+      else if (e.karar === 'tahmin') satirlar.push(`- TAHMİN (operatör-onaylı): «${konu}» → operatör tahmini onayladı. [tahmin-doğrulanacak:operatör-onaylı] etiketiyle kullan.`)
+      else if (e.karar === 'dusur') satirlar.push(`- DÜŞÜR: «${konu}» → bu iddiayı ÇIKAR, bu aşamada KULLANMA.`)
+    }
+    else if (s.tip === 'FREE-TEXT') satirlar.push(`- BAĞLAM: ${e.metin}`)
+  }
+  if (!satirlar.length) return ''
+  return `\n\nOPERATÖR YANITLARI (önceki aşamada verildi — BAĞLAYICI girdi; bu aşamada uygula):\n${satirlar.join('\n')}\n`
+}
+
 function promptUret(asama, proje, baglamlar) {
   const { ad, aciklama } = proje
   const projeBaslik = `PROJE: ${ad} — ${aciklama}`
@@ -311,7 +335,8 @@ export function canliExecutorOlustur(nsYolu, projeConfig, opts = {}) {
   //               (geri-dönüş sonrası üst yeni sürüme geçtiğinde doğru bağlam için kritik).
   async function executor(asama, opts = {}) {
     const kullanilanBaglamlar = opts.baglamlar ?? baglamlar
-    const prompt = promptUret(asama, projeConfig, kullanilanBaglamlar)
+    // Operatör yanıtları (üst aşamadan tüketilen) prompt'a BAĞLAYICI bağlam olarak eklenir.
+    const prompt = promptUret(asama, projeConfig, kullanilanBaglamlar) + yanitlarMetni(opts.yanitlar)
     // Geçici hatalar (timeout/non-zero-exit/JSON-parse) sınırlı-retry ile kurtarılır;
     // zincir bir tekil-deneme hatasıyla ABORT olmaz. Tüm denemeler tükenirse net hata.
     const sonuc  = await claudeCalistirRetry(prompt, { model: 'claude-sonnet-4-6', zaman_asimi_ms, maxDeneme, log })
