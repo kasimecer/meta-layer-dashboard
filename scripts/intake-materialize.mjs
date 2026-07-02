@@ -1,17 +1,18 @@
 #!/usr/bin/env node
 // CLI giriş noktası — elle çağırma (yedek yol). Ortak mantık tools/intakeMateryalizeEt.mjs'de;
 // scripts/intake-queue-watch.mjs (Worker-kuyruğu → yerel izleyici) da AYNI mantığı kullanır.
-// Kullanım: node scripts/intake-materialize.mjs <taslak.json> [--no-loop]
-//   --no-loop: yalnız materyalize et, canlı planlama loop'unu tetikleme.
+// Kullanım: node scripts/intake-materialize.mjs <taslak.json>
+//
+// Bu komut YALNIZ materyalize eder — planlama pipeline'ını BAŞLATMAZ (kasıtlı ayrım).
+// Pipeline'ı başlatmak/devam ettirmek için: node scripts/planlama-baslat.mjs <id>
 
 import { readFileSync, existsSync } from 'fs'
 import { resolve } from 'path'
 import { taslakiMateryalizeEt } from '../tools/intakeMateryalizeEt.mjs'
 
-const args = process.argv.slice(2).filter(a => a !== '--no-loop')
-const loopAtla = process.argv.includes('--no-loop')
+const args = process.argv.slice(2)
 if (!args[0]) {
-  console.error('Kullanım: node scripts/intake-materialize.mjs <taslak.json> [--no-loop]')
+  console.error('Kullanım: node scripts/intake-materialize.mjs <taslak.json>')
   process.exit(1)
 }
 
@@ -24,22 +25,9 @@ if (!existsSync(taslakYol)) {
 const taslak = JSON.parse(readFileSync(taslakYol, 'utf8'))
 
 try {
-  const sonuc = await taslakiMateryalizeEt(taslak, { loopAtla })
+  const sonuc = await taslakiMateryalizeEt(taslak)
   console.log(`\nMateryalizasyon tamamlandı: ${sonuc.id}`)
-
-  if (!sonuc.loopAtlandi) {
-    const { loopSonucu } = sonuc
-    console.log('')
-    if (loopSonucu.tamamlandi) {
-      console.log(`✓ Planlama loop TAMAMLANDI — aktif_asama: ${loopSonucu.state.aktif_asama}`)
-    } else {
-      console.log(`✗ Planlama loop DURDU/BLOKE — aktif_asama: ${loopSonucu.state.aktif_asama}`)
-      console.log(`  blok_nedeni: ${loopSonucu.state.asamalar[loopSonucu.state.aktif_asama]?.blok_nedeni ?? '(yok)'}`)
-    }
-    console.log(`  executor çağrı sayısı: ${loopSonucu.executorCagriSayisi}`)
-    console.log(`  toplam maliyet: $${loopSonucu.maliyet.toplam.toFixed(4)}`)
-    if (!loopSonucu.tamamlandi) process.exit(1)
-  }
+  console.log(`\nPlanlama pipeline'ını başlatmak için: node scripts/planlama-baslat.mjs ${sonuc.id}`)
 } catch (e) {
   console.error(`HATA: ${e.message}`)
   process.exit(1)

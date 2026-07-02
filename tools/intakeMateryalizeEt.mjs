@@ -1,13 +1,14 @@
-// Intake taslağını dosya sistemine yazar + (istenmedikçe) planlama loop'unu tetikler.
+// Intake taslağını dosya sistemine yazar — YALNIZ materyalize eder.
 // TEK ortak mantık — scripts/intake-materialize.mjs (elle CLI) ve
 // scripts/intake-queue-watch.mjs (Worker-kuyruğundan yerel izleyici) bunu BİREBİR paylaşır.
-// Buradaki davranış değişmez: registry/cards/intake.md → canliExecutor+planlamaLoopV2.
+// BİLEREK planlama pipeline'ını TETİKLEMEZ — bu iki iş kasıtlı olarak ayrıdır: kaydı
+// diskte/registry'de var etmek, planlama koşumunu başlatmaktan bağımsızdır. Pipeline'ı
+// başlatmak insan tarafından açıkça, ayrı bir adımda yapılır (bkz scripts/planlama-baslat.mjs
+// + tools/planlamaBaslat.mjs).
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs'
 import { join, resolve } from 'path'
 import { META_DATA_ROOT } from '../scripts/config.js'
-import { canliExecutorOlustur } from './canliExecutor.mjs'
-import { planlamaLoopV2Calistir } from './planlamaLoopV2.mjs'
 
 const REPO_ROOT = resolve(new URL('.', import.meta.url).pathname, '..')
 
@@ -17,11 +18,11 @@ function yazMetin(yol, metin) { writeFileSync(yol, metin, 'utf8') }
 
 /**
  * @param {{id, projeKaydi, cardsJson, intakeMd}} taslak
- * @param {{ loopAtla?: boolean, log?: (s:string)=>void }} opts
- * @returns {{ id, materyalizeSonuclari: string[], loopAtlandi: boolean, loopSonucu?: object }}
+ * @param {{ log?: (s:string)=>void }} opts
+ * @returns {{ id, materyalizeSonuclari: string[] }}
  */
 export async function taslakiMateryalizeEt(taslak, opts = {}) {
-  const { loopAtla = false, log = (s) => console.log(s) } = opts
+  const { log = (s) => console.log(s) } = opts
   const { id, projeKaydi, cardsJson, intakeMd } = taslak || {}
 
   if (!id || !projeKaydi || !cardsJson) {
@@ -97,16 +98,5 @@ export async function taslakiMateryalizeEt(taslak, opts = {}) {
 
   for (const s of materyalizeSonuclari) log(s)
 
-  // 5. Planlama loop — istenmedikçe (loopAtla) her zaman tetiklenir.
-  if (loopAtla) {
-    log('loopAtla=true — planlama loop tetiklenmedi.')
-    return { id, materyalizeSonuclari, loopAtlandi: true }
-  }
-
-  const projeConfig = { id, ad: projeKaydi.ad, aciklama: projeKaydi.ozet }
-  log(`▶ Planlama loop tetikleniyor: ${nsYolu}`)
-  const { executor } = canliExecutorOlustur(nsYolu, projeConfig, { log })
-  const loopSonucu = await planlamaLoopV2Calistir(nsYolu, id, executor, { log })
-
-  return { id, materyalizeSonuclari, loopAtlandi: false, loopSonucu }
+  return { id, materyalizeSonuclari }
 }

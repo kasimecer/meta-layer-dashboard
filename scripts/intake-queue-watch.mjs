@@ -3,9 +3,19 @@
 //
 // Akış: tarayıcı (IntakeView) -> Worker POST /intake-queue -> Worker GITHUB_TOKEN ile
 // intake-kuyruk/<id>.json'ı repo'ya (main) commit eder -> BU SCRIPT periyodik `git pull`
-// yapıp yeni dosyaları bulur -> tools/intakeMateryalizeEt.mjs ile YEREL materyalize+loop
-// çalıştırır (abonelik-auth burada, bu makinede) -> işlenen kuyruk dosyasını `git rm` +
-// commit + push ile temizler.
+// yapıp yeni dosyaları bulur -> tools/intakeMateryalizeEt.mjs ile YEREL materyalize eder ->
+// işlenen kuyruk dosyasını `git rm` + commit + push ile temizler.
+//
+// BİLEREK planlama pipeline'ını BAŞLATMAZ. Materyalize etmek (kaydı diskte/registry'de var
+// etmek) ile planlama koşumunu başlatmak kasıtlı olarak ayrı iki iştir — bu izleyici yalnız
+// ilkini yapar. Pipeline'ı başlatmak/devam ettirmek insan tarafından açıkça, ayrı bir
+// terminal komutuyla yapılır: node scripts/planlama-baslat.mjs <id>
+//
+// Kuyruk-temizleme kuralı: bir öğe kuyruktan YALNIZ materyalizasyon BAŞARILI olduğunda
+// kaldırılır. Planlama pipeline'ının başlamış/tamamlanmış/bloke olmuş olmasıyla HİÇBİR
+// ilişkisi yoktur (pipeline artık burada hiç çalışmıyor). Materyalizasyon başarısızsa
+// (ör. bozuk JSON, path-traversal reddi, dosya-sistemi hatası) öğe kuyrukta kalır, bir
+// sonraki turda tekrar denenir.
 //
 // NOT: Bu script yalnız BU MAKİNE + BU PROCESS çalışırken kuyruğu işler. Anlık/her-zaman-açık
 // bir bulut-servisi DEĞİL — kapatılırsa kuyruk olduğu gibi bekler, sonraki çalıştırmada işlenir.
@@ -24,7 +34,6 @@ const KUYRUK_DIR = join(REPO_ROOT, 'intake-kuyruk')
 
 const args = process.argv.slice(2)
 const tekSeferlik = args.includes('--once')
-const loopAtla = args.includes('--no-loop')   // test/hata-ayıklama için — üretimde KULLANMA
 const araliksnArg = args.find(a => a.startsWith('--interval-sn='))
 const araliksn = araliksnArg ? Number(araliksnArg.split('=')[1]) : 45
 
@@ -72,22 +81,16 @@ async function birTurCalistir() {
 
     let sonuc
     try {
-      sonuc = await taslakiMateryalizeEt(taslak, { loopAtla, log: (s) => log(`  ${s}`) })
+      sonuc = await taslakiMateryalizeEt(taslak, { log: (s) => log(`  ${s}`) })
     } catch (e) {
       log(`  ✗ materyalize hatası: ${e.message} — kuyruk dosyası SİLİNMEDİ, sonraki turda tekrar denenecek.`)
       continue
     }
 
-    if (sonuc.loopSonucu?.tamamlandi) {
-      log(`  ✓ ${sonuc.id} materyalize edildi + planlama pipeline TAMAMLANDI`)
-    } else if (sonuc.loopAtlandi) {
-      log(`  ✓ ${sonuc.id} materyalize edildi (loop tetiklenmedi)`)
-    } else {
-      log(`  ⚠ ${sonuc.id} materyalize edildi ama pipeline DURDU/BLOKE (aktif_asama: ${sonuc.loopSonucu?.state?.aktif_asama}, neden: ${sonuc.loopSonucu?.state?.asamalar?.[sonuc.loopSonucu.state.aktif_asama]?.blok_nedeni ?? '?'})`)
-    }
+    log(`  ✓ ${sonuc.id} materyalize edildi (planlama pipeline'ı BAŞLATILMADI — bkz: node scripts/planlama-baslat.mjs ${sonuc.id})`)
 
-    // İşlendi (başarılı ya da bloke — ikisi de "kuyruktan çıkar", çünkü blok da insan
-    // müdahalesi bekleyen bir SONUÇ, yeniden-kuyruklama değil) — dosyayı kaldır + push et.
+    // Materyalizasyon başarılı → kuyruktan kaldır + push et. (Pipeline burada hiç
+    // çalışmadığı için "bloke" gibi bir ara durum yok — başarı tek çıktı.)
     try {
       rmSync(yol)
       git('add', join('intake-kuyruk', f))
@@ -101,6 +104,7 @@ async function birTurCalistir() {
 }
 
 log(`intake-queue-watch başladı — ${tekSeferlik ? 'tek-seferlik (--once)' : `her ${araliksn}s'de bir tur`}`)
+log('NOT: yalnız materyalize eder; planlama pipeline\'ını BAŞLATMAZ. Başlatmak için: node scripts/planlama-baslat.mjs <id>')
 log('NOT: yalnız bu makine + bu process çalışırken kuyruğu işler; kapatılırsa kuyruk bekler.')
 
 if (tekSeferlik) {

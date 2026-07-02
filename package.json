@@ -10,7 +10,8 @@
     "build": "npm run build-data && npm run verify && vite build",
     "preview": "vite preview",
     "deploy": "npm run build && gh-pages -d dist -b gh-pages",
-    "intake-watch": "node scripts/intake-queue-watch.mjs"
+    "intake-watch": "node scripts/intake-queue-watch.mjs",
+    "planlama-baslat": "node scripts/planlama-baslat.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
