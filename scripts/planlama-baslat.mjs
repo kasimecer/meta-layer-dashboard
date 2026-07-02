@@ -1,31 +1,37 @@
 #!/usr/bin/env node
 // Planlama pipeline'ını (genesis→premise→arastirma→strateji→master-plan) İNSAN eliyle,
-// açık bir komutla başlatan/devam ettiren tek yer. Materyalizasyondan (intake-materialize.mjs,
+// açık komutlarla ADIM ADIM ilerleten tek yer. Materyalizasyondan (intake-materialize.mjs,
 // intake-queue-watch.mjs) BİLEREK ayrı — hiçbir kod yolu bu scripti kendiliğinden çağırmaz.
 //
-// planlamaLoopV2Calistir idempotenttir (zaten "gecti" aşamaları atlar), bu yüzden AYNI komut
-// hem ilk-başlatma hem yarıda-kalanı-devam-ettirme için kullanılır: proje daha önce hiç
-// başlamadıysa genesis'ten başlar; bir aşama BLOKE ise olduğu yerde durur (kapıyı geçmesi için
-// önce prompt/kapı düzeltmesi gerekir); tamamlanmışsa 0 executor çağrısıyla anında biter.
+// ONAY-KAPILI MODEL (bir-koşum-bir-karar): her çağrı EN ÇOK bir aşama koşturur, yapısal
+// kapısını uygular, sonra aşama SINIRINDA DURUR ve kontrolü insana verir. İnsan çıktıyı
+// (Drive'daki .md) inceler, gerekirse ELLE düzenler, sonra tekrar çağırarak ilerletir —
+// ya da --geri ile daha erken bir aşamaya döner. Çoklu-aşama oto-ilerleme YOKTUR.
 //
 // Kullanım:
-//   node scripts/planlama-baslat.mjs                 # bekleyen/kısmi/bloke projeleri listeler
-//   node scripts/planlama-baslat.mjs <id>             # o proje için pipeline'ı başlat/devam ettir
+//   node scripts/planlama-baslat.mjs                    # projeleri + durumlarını listeler
+//   node scripts/planlama-baslat.mjs <id>               # sıradaki tek aşamayı koştur / onayla-ilerle
+//   node scripts/planlama-baslat.mjs <id> --geri <asama> # sıhhatli geri-dönüş (yeniden-açar)
+//   node scripts/planlama-baslat.mjs <id> --tut          # bayat/yeniden-açık aşamayı olduğu-gibi kabul et
 
 import { readFileSync, existsSync } from 'fs'
-import { join } from 'path'
+import { join, relative } from 'path'
 import { META_DATA_ROOT } from './config.js'
-import { planlamaBaslat } from '../tools/planlamaBaslat.mjs'
-import { ASAMA_SIRASI } from '../tools/planlamaDurumMakinesiV2.mjs'
+import { planlamaBaslat, planlamaGeri } from '../tools/planlamaBaslat.mjs'
+import {
+  ASAMA_SIRASI, GERCEK_ASAMALAR, stateYukle, bayatAsamalar, bayatMi, ustAsama,
+} from '../tools/planlamaDurumMakinesiV2.mjs'
 
 const KANONIK_REGISTRY = join(META_DATA_ROOT, 'projeler', 'registry.json')
 const PUBLIC_REGISTRY  = new URL('../public/registry.json', import.meta.url).pathname
 
 function oku(yol) { return JSON.parse(readFileSync(yol, 'utf8')) }
+function nsYoluOf(id) { return join(META_DATA_ROOT, 'projeler', id) }
+function gorPath(yol) { return yol ? relative(process.cwd(), yol) : '(yok)' }
+function KOMUT(id, ek = '') { return `node scripts/planlama-baslat.mjs ${id}${ek}` }
 
 function projeleriOku() {
-  // Kanonik (Drive) esastır; yoksa repo public kopyasına düş (yalnız görünürlük için, bkz
-  // tools/intakeMateryalizeEt.mjs'deki aynı düşme mantığı).
+  // Kanonik (Drive) esastır; yoksa repo public kopyasına düş (yalnız görünürlük için).
   if (existsSync(KANONIK_REGISTRY)) {
     const r = oku(KANONIK_REGISTRY)
     return r.projeler ?? []
@@ -37,22 +43,37 @@ function projeleriOku() {
   return []
 }
 
-function durumOzetiCikar(nsYolu) {
+// ── Listeleme: onay-bekliyor + bayat bilgisini de yüzeye çıkarır ──────────────
+function durumOzetiCikar(id) {
+  const nsYolu = nsYoluOf(id)
   const durumYolu = join(nsYolu, 'planlama-durum.json')
   if (!existsSync(durumYolu)) return { etiket: 'başlamadı', detay: '' }
 
-  const state = oku(durumYolu)
-  if (state.aktif_asama === 'tamamlandi') return { etiket: 'tamamlandı', detay: '' }
+  const state = stateYukle(nsYolu, id)
+  const bayatlar = bayatAsamalar(state)
+  const bayatEk = bayatlar.length ? `  ⟂ bayat: ${bayatlar.join(', ')}` : ''
 
-  const gectiSayisi = ASAMA_SIRASI
-    .filter(a => a !== 'tamamlandi')
-    .filter(a => state.asamalar?.[a]?.durum === 'gecti').length
-
-  const asamaState = state.asamalar?.[state.aktif_asama]
-  if (asamaState?.durum === 'donduruldu') {
-    return { etiket: 'BLOKE', detay: `${state.aktif_asama} — ${asamaState.blok_nedeni ?? '(neden bilinmiyor)'}` }
+  if (state.aktif_asama === 'tamamlandi') {
+    return { etiket: 'tamamlandı', detay: bayatEk.trim() ? `(bayat var: ${bayatlar.join(', ')})` : '' }
   }
-  return { etiket: 'kısmi', detay: `${gectiSayisi}/${ASAMA_SIRASI.length - 1} aşama geçti — sıradaki: ${state.aktif_asama}` }
+
+  const A = state.aktif_asama
+  const As = state.asamalar[A]
+  const gectiSayisi = GERCEK_ASAMALAR.filter(a => state.asamalar?.[a]?.durum === 'gecti').length
+
+  if (As?.durum === 'donduruldu') {
+    return { etiket: 'BLOKE', detay: `${A} — ${As.blok_nedeni ?? '(neden bilinmiyor)'}${bayatEk}` }
+  }
+  if (As?.durum === 'onay-bekliyor') {
+    const sonraki = ASAMA_SIRASI[ASAMA_SIRASI.indexOf(A) + 1]
+    return { etiket: 'ONAY BEKLİYOR', detay: `${A} bitti — sıradaki: ${sonraki}${bayatEk}` }
+  }
+  if (As?.durum === 'gecti' && bayatMi(state, A)) {
+    return { etiket: 'BAYAT KARAR', detay: `${A} (yeniden-koş: düz çağrı / olduğu-gibi: --tut)${bayatEk}` }
+  }
+  const yenidenAcik = (As?.surum ?? 0) >= 1 && As?.durum === 'bekliyor'
+  const not = yenidenAcik ? ' (yeniden-açık — koşuma hazır)' : ''
+  return { etiket: 'kısmi', detay: `${gectiSayisi}/${GERCEK_ASAMALAR.length} aşama geçti — sıradaki: ${A}${not}${bayatEk}` }
 }
 
 function listele() {
@@ -63,52 +84,157 @@ function listele() {
   }
   console.log(`${projeler.length} proje — planlama durumu:\n`)
   for (const p of projeler) {
-    const nsYolu = join(META_DATA_ROOT, 'projeler', p.id)
-    const { etiket, detay } = durumOzetiCikar(nsYolu)
-    const satir = `  ${p.id.padEnd(28)} [${etiket}]`
+    const { etiket, detay } = durumOzetiCikar(p.id)
+    const satir = `  ${p.id.padEnd(30)} [${etiket}]`
     console.log(detay ? `${satir} ${detay}` : satir)
   }
-  console.log('\nBaşlatmak/devam ettirmek için: node scripts/planlama-baslat.mjs <id>')
+  console.log('\nSıradaki tek aşamayı koştur / onayla-ilerle : ' + KOMUT('<id>'))
+  console.log('Daha erken bir aşamaya geri dön            : ' + KOMUT('<id>', ' --geri <asama>'))
+  console.log('Bayat aşamayı olduğu-gibi kabul et         : ' + KOMUT('<id>', ' --tut'))
 }
 
-async function baslat(id) {
+// ── Durum raporu (her durakta net Türkçe + tam komutlar) ──────────────────────
+function seceneklerYaz(id) {
+  console.log('\n  Seçenekler:')
+  console.log(`    • Devam (onayla + sıradakini koştur): ${KOMUT(id)}`)
+  console.log(`    • Geri dön (daha erken aşama)        : ${KOMUT(id, ' --geri <asama>')}`)
+  console.log(`      geçerli hedefler                   : ${GERCEK_ASAMALAR.join(' · ')}`)
+}
+
+function raporYaz(id, sonuc) {
+  const state = sonuc.state
+  console.log('')
+  switch (sonuc.durdu) {
+    case 'tamamlandi': {
+      console.log(`✓ Planlama pipeline TAMAMLANDI — ${id}`)
+      for (const a of GERCEK_ASAMALAR) {
+        const s = state.asamalar[a]
+        console.log(`    ${a.padEnd(12)} sürüm ${s.surum}  → ${gorPath(s.cikti_pointer)}`)
+      }
+      const bayatlar = bayatAsamalar(state)
+      if (bayatlar.length) console.log(`  ⚠ bayat aşama(lar) var: ${bayatlar.join(', ')}`)
+      break
+    }
+    case 'onay-bekliyor': {
+      const a = sonuc.bekleyenOnay
+      const s = state.asamalar[a]
+      const sonraki = ASAMA_SIRASI[ASAMA_SIRASI.indexOf(a) + 1]
+      console.log(`■ AŞAMA BİTTİ, ONAY BEKLİYOR — ${a}  (proje: ${id})`)
+      console.log(`  Yapısal kapı  : GEÇTİ`)
+      console.log(`  Çıktı (sürüm ${s.surum}): ${gorPath(s.cikti_pointer)}`)
+      console.log(`  Sıradaki aşama: ${sonraki}`)
+      console.log(`\n  İnceleyin (gerekirse .md'yi ELLE düzenleyin), sonra:`)
+      console.log(`    • Onayla + ${sonraki} aşamasını koştur: ${KOMUT(id)}`)
+      console.log(`      (yeniden çağırınca ${a} önce mevcut yapısal kapıdan YENİDEN geçirilir;`)
+      console.log(`       el-düzenlemeniz kapıyı bozduysa ilerlemez, dondurur.)`)
+      console.log(`    • Daha erken bir aşamaya geri dön     : ${KOMUT(id, ' --geri <asama>')}`)
+      break
+    }
+    case 'bayat-karar': {
+      const a = sonuc.bayatAsama
+      const s = state.asamalar[a]
+      const ust = ustAsama(a)
+      console.log(`◧ BAYAT AŞAMA — KARAR BEKLİYOR — ${a}  (proje: ${id})`)
+      console.log(`  Neden bayat   : üst aşama (${ust}) yeni sürüme geçti; ${a} eski sürüme göre inşa edilmişti`)
+      console.log(`  Mevcut çıktı (sürüm ${s.surum}, korunuyor): ${gorPath(s.cikti_pointer)}`)
+      console.log(`\n  Bu aşama için SEÇİN (biri):`)
+      console.log(`    • Yeniden koş (yeni sürüm üret)      : ${KOMUT(id)}`)
+      console.log(`    • Olduğu gibi kabul et (LLM yok)     : ${KOMUT(id, ' --tut')}`)
+      console.log(`    • Daha da geri dön                   : ${KOMUT(id, ' --geri <asama>')}`)
+      break
+    }
+    case 'kosum-gerekli': {
+      const a = sonuc.sonrakiAsama
+      console.log(`▷ SIRADAKİ AŞAMA KOŞUMA HAZIR — ${a}  (proje: ${id})`)
+      console.log(`    • Koştur: ${KOMUT(id)}`)
+      break
+    }
+    case 'donduruldu':
+    default: {
+      const a = state.aktif_asama
+      const s = state.asamalar[a]
+      console.log(`✗ BLOKE — ${a}  (proje: ${id})`)
+      console.log(`  blok_nedeni: ${s?.blok_nedeni ?? '(yok)'}`)
+      console.log(`  Çıktı      : ${gorPath(s?.cikti_pointer)}`)
+      console.log(`\n  Çıktıyı (.md) düzeltip tekrar çağırın; yapısal kapı yeniden denenir:`)
+      console.log(`    • Yeniden dene: ${KOMUT(id)}`)
+      console.log(`    • Geri dön    : ${KOMUT(id, ' --geri <asama>')}`)
+      break
+    }
+  }
+  console.log(`\n  Maliyet (bu çağrı): $${sonuc.maliyet.toplam.toFixed(4)} | executor çağrısı: ${sonuc.executorCagriSayisi}`)
+}
+
+// ── Eylemler ──────────────────────────────────────────────────────────────────
+function projeConfigOf(id) {
   const projeler = projeleriOku()
-  const projeKaydi = projeler.find(p => p.id === id)
-  if (!projeKaydi) {
+  const kayit = projeler.find(p => p.id === id)
+  if (!kayit) {
     console.error(`HATA: proje registry'de bulunamadı: ${id}`)
     console.error('Önce materyalize edilmeli: node scripts/intake-materialize.mjs <taslak.json>')
     process.exit(1)
   }
+  return { id, ad: kayit.ad, aciklama: kayit.ozet }
+}
 
-  const nsYolu = join(META_DATA_ROOT, 'projeler', id)
-  const projeConfig = { id, ad: projeKaydi.ad, aciklama: projeKaydi.ozet }
-
-  console.log(`▶ Planlama pipeline'ı başlatılıyor/devam ettiriliyor: ${id}`)
+async function baslat(id, mod) {
+  const projeConfig = projeConfigOf(id)
+  const nsYolu = nsYoluOf(id)
+  const modEtiket = mod === 'tut' ? 'OLDUĞU-GİBİ-KABUL (--tut)' : 'ileri (bir aşama)'
+  console.log(`▶ Planlama — ${id}  [${modEtiket}]`)
   console.log(`  Namespace: ${nsYolu}`)
   console.log(`  Model: claude-sonnet-4-6 | Auth: abonelik OAuth | --safe-mode\n`)
 
-  const sonuc = await planlamaBaslat(nsYolu, id, projeConfig, { log: (s) => console.log(s) })
-
-  console.log('')
-  if (sonuc.tamamlandi) {
-    console.log(`✓ Planlama pipeline TAMAMLANDI — aktif_asama: ${sonuc.state.aktif_asama}`)
-  } else {
-    const asama = sonuc.state.aktif_asama
-    console.log(`✗ Planlama pipeline DURDU/BLOKE — aktif_asama: ${asama}`)
-    console.log(`  blok_nedeni: ${sonuc.state.asamalar[asama]?.blok_nedeni ?? '(yok)'}`)
-  }
-  console.log(`  executor çağrı sayısı: ${sonuc.executorCagriSayisi}`)
-  console.log(`  toplam maliyet: $${sonuc.maliyet.toplam.toFixed(4)}`)
-  if (!sonuc.tamamlandi) process.exit(1)
+  const sonuc = await planlamaBaslat(nsYolu, id, projeConfig, { mod, log: (s) => console.log(s) })
+  raporYaz(id, sonuc)
+  // Bloke/karar-bekleyen durumda non-zero: otomasyon fark etsin (ama bu İNSAN akışı).
+  if (sonuc.durdu === 'donduruldu') process.exit(1)
 }
 
-const [id] = process.argv.slice(2)
+function geriYap(id, hedef) {
+  projeConfigOf(id) // registry doğrulaması
+  const nsYolu = nsYoluOf(id)
+  let state
+  try {
+    state = planlamaGeri(nsYolu, id, hedef) // geçersizse throw → state DEĞİŞMEZ
+  } catch (e) {
+    console.error(`✗ GERİ-DÖNÜŞ REDDEDİLDİ: ${e.message}`)
+    console.error('  (Hiçbir dosya/state değiştirilmedi.)')
+    process.exit(1)
+  }
+  const s = state.asamalar[hedef]
+  console.log(`↩ GERİ DÖNÜLDÜ — ${hedef} yeniden açıldı  (proje: ${id})`)
+  console.log(`  Mevcut çıktı KORUNDU (sürüm ${s.surum}): ${gorPath(s.cikti_pointer)}`)
+  console.log(`  Not: sonraki koşum YENİ bir sürüm dosyası yazar (önceki sürümler silinmez).`)
+  console.log(`       ${hedef} yeniden koşup sürümü artınca alt aşamalar BAYAT olur; her biri`)
+  console.log(`       için ayrı ayrı karar verirsiniz (yeniden-koş / --tut).`)
+  console.log(`\n  Şimdi ${hedef} aşamasını yeniden koştur: ${KOMUT(id)}`)
+}
+
+// ── Argüman ayrıştırma ────────────────────────────────────────────────────────
+const argv = process.argv.slice(2)
+let id = null
+let geriHedef = null
+let tut = false
+for (let i = 0; i < argv.length; i++) {
+  const a = argv[i]
+  if (a === '--geri') { geriHedef = argv[++i] ?? null }
+  else if (a === '--tut') { tut = true }
+  else if (!a.startsWith('--') && id === null) { id = a }
+}
 
 try {
   if (!id) {
+    if (geriHedef || tut) {
+      console.error('HATA: --geri/--tut için proje id gerekli. Kullanım: ' + KOMUT('<id>', ' --geri <asama> | --tut'))
+      process.exit(1)
+    }
     listele()
+  } else if (geriHedef !== null) {
+    if (tut) { console.error('HATA: --geri ve --tut aynı anda kullanılamaz.'); process.exit(1) }
+    geriYap(id, geriHedef)
   } else {
-    await baslat(id)
+    await baslat(id, tut ? 'tut' : 'ileri')
   }
 } catch (e) {
   console.error(`HATA: ${e.message}`)
