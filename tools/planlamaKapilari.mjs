@@ -175,3 +175,19 @@ export const KAPILAR = {
   strateji:     kapiStrateji,
   'master-plan': kapiMasterPlan,
 }
+
+// Bir aşamanın EFEKTİF yapısal kapısı: aşamaya özgü kapı (KAPILAR) VE tüm-aşama
+// etiketsiz-sayı kontrolü (ciplakSayiVarMi) BİRLİKTE. planlama loop'u koşum sırasında
+// bu iki kontrolü uyguluyordu; artık TEK yer burası — hem ilk koşum-kapısı hem de
+// onay anındaki YENİDEN-DOĞRULAMA aynı kriteri kullanır (kapı zayıflatılamaz).
+// El-düzenlemesi sonrası dosya tekrar bu fonksiyondan geçirilir.
+export function kapidanGecerMi(asama, icerik) {
+  const kapi = KAPILAR[asama]
+  if (!kapi) throw new Error(`Kapı tanımlı değil: ${asama}`)
+  const kapiSonuc = kapi(icerik)
+  if (!kapiSonuc.gecti) return { gecti: false, neden: kapiSonuc.neden }
+  if (ciplakSayiVarMi(icerik)) {
+    return { gecti: false, neden: `${asama}: etiketsiz çıplak sayı/figür tespit edildi` }
+  }
+  return { gecti: true }
+}
