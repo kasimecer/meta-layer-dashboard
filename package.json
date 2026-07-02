@@ -11,7 +11,10 @@
     "preview": "vite preview",
     "deploy": "npm run build && gh-pages -d dist -b gh-pages",
     "intake-watch": "node scripts/intake-queue-watch.mjs",
-    "planlama-baslat": "node scripts/planlama-baslat.mjs"
+    "planlama-baslat": "node scripts/planlama-baslat.mjs",
+    "planlama-test": "node scripts/planlama-test-runner.mjs",
+    "planlama-soru-test": "node scripts/planlama-soru-test-runner.mjs",
+    "planlama-soru-demo": "node scripts/planlama-soru-demo.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
