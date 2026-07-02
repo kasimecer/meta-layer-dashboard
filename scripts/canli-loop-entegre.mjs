@@ -1,7 +1,15 @@
 #!/usr/bin/env node
-// Entegrasyon testi: state machine v2 + canli executor → _demo-entegre namespace.
-// İki koşum: (1) tam canlı üretim genesis→tamamlandi, (2) idempotency re-koşum.
-// Çalıştırma: node scripts/canli-loop-entegre.mjs
+// ⚠ SÜPERSEDE / ESKİMİŞ PİLOT — çalıştırılabilir referans değildir.
+// Bu betik, planlamaLoopV2Calistir'in TEK çağrıda genesis→tamamlandi koştuğu ESKİ
+// (otonom, çoklu-aşama) modele göre yazılmıştı. Motor artık ONAY-KAPILI ve
+// BİR-KOŞUM-BİR-KARAR: tek çağrı en çok BİR aşama koşturup sınırda durur; dolayısıyla
+// aşağıdaki "ilk koşum → sonuc1.tamamlandi" beklentisi ARTIK GEÇERSİZDİR (ilk çağrı
+// genesis'i koşup 'onay-bekliyor'da durur). Aşamalar-arası insan-onayı bilerek eklendi.
+// Canlı akış için tek doğru giriş: scripts/planlama-baslat.mjs (adım adım çağır).
+// Not: bu betik meta-kanal.md'ye YAZAR ve canlı LLM harcar — olduğu gibi KOŞTURMAYIN.
+//
+// Entegrasyon testi (TARİHSEL): state machine v2 + canli executor → _demo-entegre namespace.
+// Çalıştırma (yalnız arşiv amaçlı): node scripts/canli-loop-entegre.mjs
 
 import { join } from 'path'
 import { appendFileSync } from 'fs'
