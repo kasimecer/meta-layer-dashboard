@@ -21,6 +21,9 @@ import { planlamaBaslat, planlamaGeri } from '../tools/planlamaBaslat.mjs'
 import {
   ASAMA_SIRASI, GERCEK_ASAMALAR, stateYukle, bayatAsamalar, bayatMi, ustAsama,
 } from '../tools/planlamaDurumMakinesiV2.mjs'
+import {
+  sorulariOku, yanitlariHamOku, yanitButunluk, acikSorular, atlananlar, atlaYaz, yanitDosyaAdi,
+} from '../tools/planlamaSorular.mjs'
 
 const KANONIK_REGISTRY = join(META_DATA_ROOT, 'projeler', 'registry.json')
 const PUBLIC_REGISTRY  = new URL('../public/registry.json', import.meta.url).pathname
@@ -43,7 +46,25 @@ function projeleriOku() {
   return []
 }
 
-// ── Listeleme: onay-bekliyor + bayat bilgisini de yüzeye çıkarır ──────────────
+// ── Açık-soru durumu (READ-ONLY, MODELSİZ) — aktif aşamanın sorular artefaktından ──
+// Dönüş: null (soru katmanı yok) veya { asama, paket, acik, atlanan, butunluk, neden? }.
+function acikSoruDurum(nsYolu, state) {
+  const A = state.aktif_asama
+  if (A === 'tamamlandi') return null
+  const ss = state.asamalar?.[A]?.sorular_surum
+  if (ss == null) return null
+  const paket = sorulariOku(nsYolu, A, ss)
+  if (!paket) return null
+  const substantive = paket.sorular.filter(s => s.tip !== 'APPROVAL')
+  if (substantive.length === 0) return { asama: A, paket, acik: [], atlanan: [], butunluk: 'gecerli' }
+  const but = yanitButunluk(paket, yanitlariHamOku(nsYolu, A, ss))
+  if (but.durum === 'gecerli') {
+    return { asama: A, paket, acik: acikSorular(paket, but.yanitlar), atlanan: atlananlar(paket, but.yanitlar), butunluk: 'gecerli' }
+  }
+  return { asama: A, paket, acik: substantive, atlanan: [], butunluk: but.durum, neden: but.neden }
+}
+
+// ── Listeleme: onay-bekliyor + bayat + AÇIK SORULAR bilgisini yüzeye çıkarır ──────
 function durumOzetiCikar(id) {
   const nsYolu = nsYoluOf(id)
   const durumYolu = join(nsYolu, 'planlama-durum.json')
@@ -63,6 +84,12 @@ function durumOzetiCikar(id) {
 
   if (As?.durum === 'donduruldu') {
     return { etiket: 'BLOKE', detay: `${A} — ${As.blok_nedeni ?? '(neden bilinmiyor)'}${bayatEk}` }
+  }
+  // AÇIK SORULAR — operatörü bekleyen terminal yapılacaklar (onay-bekliyor’un üstünde önceliklidir).
+  const asd = acikSoruDurum(nsYolu, state)
+  if (As?.durum === 'onay-bekliyor' && asd && (asd.acik.length > 0 || asd.butunluk !== 'gecerli')) {
+    const bozukEk = asd.butunluk !== 'gecerli' ? ' (yanıt BOZUK — yeniden yayında)' : ''
+    return { etiket: 'AÇIK SORULAR', detay: `${A} — ${asd.acik.length} açık soru bekliyor${bozukEk}${bayatEk}` }
   }
   if (As?.durum === 'onay-bekliyor') {
     const sonraki = ASAMA_SIRASI[ASAMA_SIRASI.indexOf(A) + 1]
@@ -128,6 +155,39 @@ function raporYaz(id, sonuc) {
       console.log(`      (yeniden çağırınca ${a} önce mevcut yapısal kapıdan YENİDEN geçirilir;`)
       console.log(`       el-düzenlemeniz kapıyı bozduysa ilerlemez, dondurur.)`)
       console.log(`    • Daha erken bir aşamaya geri dön     : ${KOMUT(id, ' --geri <asama>')}`)
+      break
+    }
+    case 'sorular-acik': {
+      const a = sonuc.bekleyenOnay
+      const ss = sonuc.sorularSurum
+      const yanitYol = join(nsYoluOf(id), yanitDosyaAdi(a, ss))
+      console.log(`◧ AÇIK SORULAR — ${a}  (proje: ${id})  [${sonuc.acikSorular.length} açık]`)
+      if (sonuc.butunlukHatasi) {
+        console.log(`  ⚠ Yanıt artefaktı BOZUK: ${sonuc.butunlukHatasi}`)
+        console.log(`    → Sorular yeniden yayınlandı; geçerli bir yanıt dosyası yazana dek İLERLENMEZ.`)
+      }
+      console.log(`  Yanıt dosyası (elle düzenleyin — sürüm ${ss}): ${gorPath(yanitYol)}`)
+      console.log(`  Soru artefaktı: ${gorPath(join(nsYoluOf(id), `${a}${(ss ?? 1) <= 1 ? '' : '-v' + ss}-sorular.json`))}`)
+      console.log(`\n  Yanıtlanacak sorular (Türkçe; APPROVAL = bu komutu tekrar çalıştırmak):`)
+      for (const q of sonuc.acikSorular) {
+        console.log(`\n  • [${q.tip}] ${q.metin}`)
+        console.log(`      anahtar: ${q.anahtar}`)
+        if (q.tip === 'CHOICE') {
+          console.log(`      seçenekler (öneri İLK): ${q.secenekler.map((o, i) => (i === 0 ? `«${o}»` : o)).join('  |  ')}`)
+          console.log(`      yanıt kaydı: { "anahtar": "${q.anahtar}", "secim": "<seçenek metni>" }`)
+        } else if (q.tip === 'DATA-REQUEST') {
+          console.log(`      seçenekler: ${q.secenekler.join('  |  ')}`)
+          console.log(`      yanıt kaydı: { "anahtar": "${q.anahtar}", "karar": "veri|tahmin|dusur", "deger": "...", "kaynak": "..." }`)
+        } else if (q.tip === 'FREE-TEXT') {
+          console.log(`      yanıt kaydı: { "anahtar": "${q.anahtar}", "metin": "..." }`)
+        }
+        console.log(`      atla (açık komut): ${KOMUT(id, ` --atla ${q.anahtar}`)}`)
+      }
+      if (sonuc.ertelenenSorular?.length) {
+        console.log(`\n  Ertelenen (bloklamaz, görünür): ${sonuc.ertelenenSorular.map(q => `${q.tip}:${q.anahtar}`).join(', ')}`)
+      }
+      console.log(`\n  Yanıt dosyasını yazın, sonra onaylayıp ilerleyin: ${KOMUT(id)}`)
+      console.log(`  Bir soruyu açıkça atlamak için         : ${KOMUT(id, ' --atla <anahtar> [--gerekce "…"]')}`)
       break
     }
     case 'bayat-karar': {
@@ -211,25 +271,57 @@ function geriYap(id, hedef) {
   console.log(`\n  Şimdi ${hedef} aşamasını yeniden koştur: ${KOMUT(id)}`)
 }
 
+// AÇIK ATLAMA — bir soruyu YALNIZ bu açık komutla (veya doğrudan yanıt dosyasında
+// atlandi:true ile) atlarsınız; sessiz atlama YOK. İzlenebilir (yanıt dosyasına yazılır).
+function atlaYap(id, anahtar, gerekce) {
+  projeConfigOf(id) // registry doğrulaması
+  const nsYolu = nsYoluOf(id)
+  const asd = acikSoruDurum(nsYolu, stateYukle(nsYolu, id))
+  if (!asd) {
+    console.error(`✗ ATLAMA REDDEDİLDİ: aktif aşamada sorular artefaktı yok (atlanacak soru yok).`)
+    process.exit(1)
+  }
+  let yol
+  try {
+    yol = atlaYaz(nsYolu, asd.paket, anahtar, gerekce) // geçersiz anahtar → throw
+  } catch (e) {
+    console.error(`✗ ATLAMA REDDEDİLDİ: ${e.message}`)
+    process.exit(1)
+  }
+  console.log(`⤼ ATLANDI — ${anahtar}  (aşama: ${asd.asama}, proje: ${id})`)
+  if (gerekce) console.log(`  gerekçe: ${gerekce}`)
+  console.log(`  Kaydedildi (izlenebilir, raporda görünür): ${gorPath(yol)}`)
+  const kalan = acikSoruDurum(nsYolu, stateYukle(nsYolu, id))
+  console.log(`  Kalan açık soru: ${kalan?.acik.length ?? 0}`)
+  console.log(`\n  Devam (onayla + ilerle): ${KOMUT(id)}`)
+}
+
 // ── Argüman ayrıştırma ────────────────────────────────────────────────────────
 const argv = process.argv.slice(2)
 let id = null
 let geriHedef = null
 let tut = false
+let atlaAnahtar = null
+let gerekce = null
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i]
   if (a === '--geri') { geriHedef = argv[++i] ?? null }
   else if (a === '--tut') { tut = true }
+  else if (a === '--atla') { atlaAnahtar = argv[++i] ?? null }
+  else if (a === '--gerekce') { gerekce = argv[++i] ?? null }
   else if (!a.startsWith('--') && id === null) { id = a }
 }
 
 try {
   if (!id) {
-    if (geriHedef || tut) {
-      console.error('HATA: --geri/--tut için proje id gerekli. Kullanım: ' + KOMUT('<id>', ' --geri <asama> | --tut'))
+    if (geriHedef || tut || atlaAnahtar) {
+      console.error('HATA: --geri/--tut/--atla için proje id gerekli. Kullanım: ' + KOMUT('<id>', ' --geri <asama> | --tut | --atla <anahtar>'))
       process.exit(1)
     }
     listele()
+  } else if (atlaAnahtar !== null) {
+    if (geriHedef || tut) { console.error('HATA: --atla; --geri/--tut ile birlikte kullanılamaz.'); process.exit(1) }
+    atlaYap(id, atlaAnahtar, gerekce)
   } else if (geriHedef !== null) {
     if (tut) { console.error('HATA: --geri ve --tut aynı anda kullanılamaz.'); process.exit(1) }
     geriYap(id, geriHedef)
