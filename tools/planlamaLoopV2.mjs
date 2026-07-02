@@ -26,6 +26,10 @@ import {
   GERCEK_ASAMALAR, stateYukle, statePersist, ilerlet, bayatMi, ustAsama, asamaDosyaAdi,
 } from './planlamaDurumMakinesiV2.mjs'
 import { kapidanGecerMi } from './planlamaKapilari.mjs'
+import {
+  sorulariYaz, sorulariOku, yanitlariHamOku, yanitButunluk, acikSorular,
+  oncekiYanitlariOku, enSonYanitliOncekiSurum,
+} from './planlamaSorular.mjs'
 
 const SON_ASAMA = GERCEK_ASAMALAR[GERCEK_ASAMALAR.length - 1] // 'master-plan'
 
@@ -47,6 +51,11 @@ function icerikOku(yol) {
 export async function planlamaLoopV2Calistir(nsYolu, projeId, executor, {
   log = (s) => process.stdout.write(s + '\n'),
   mod = 'ileri',
+  // Soru üretici (deterministik, MODELSİZ). null → soru katmanı KAPALI: kapı birebir
+  // eski davranış (geriye-uyum; eski projeler ve ham-loop testleri). planlamaBaslat bunu
+  // varsayilanSoruUretici ile AÇAR. Bir aşama koşup yapısal kapıdan geçince çağrılır:
+  //   soruUretici(asama, icerik, { projeId, surum, oncekiYanitlar }) → sorular paketi.
+  soruUretici = null,
 } = {}) {
   const state = stateYukle(nsYolu, projeId)
   const maliyet = { toplam: 0, asamalar: {} }
@@ -54,18 +63,26 @@ export async function planlamaLoopV2Calistir(nsYolu, projeId, executor, {
   let onayVerildi = false
   let kostuAsama = null
 
-  function sonucDon({ durdu, bekleyenOnay = null, bayatAsama = null, sonrakiAsama = null }) {
+  function sonucDon({
+    durdu, bekleyenOnay = null, bayatAsama = null, sonrakiAsama = null,
+    acikSorularListesi = [], sorularSurum = null, ertelenenSorular = [], butunlukHatasi = null,
+  }) {
     return {
       state,
       donduruldu: durdu === 'donduruldu',
       tamamlandi: durdu === 'tamamlandi',
       maliyet,
       executorCagriSayisi,
-      durdu,                 // 'tamamlandi'|'onay-bekliyor'|'donduruldu'|'bayat-karar'|'kosum-gerekli'
-      bekleyenOnay,          // onay bekleyen aşama (durdu==='onay-bekliyor')
+      durdu,                 // 'tamamlandi'|'onay-bekliyor'|'sorular-acik'|'donduruldu'|'bayat-karar'|'kosum-gerekli'
+      bekleyenOnay,          // onay bekleyen aşama (durdu==='onay-bekliyor' | 'sorular-acik')
       bayatAsama,            // karar bekleyen bayat aşama (durdu==='bayat-karar')
       sonrakiAsama,          // koşuma hazır sıradaki aşama (durdu==='kosum-gerekli')
       kostuAsama,            // bu invokasyonda koşan aşama (varsa)
+      // SORU–YANIT payload'u (durdu==='sorular-acik' veya 'onay-bekliyor'da doludur):
+      acikSorular: acikSorularListesi, // operatörü bekleyen açık sorular (APPROVAL hariç)
+      sorularSurum,                    // aktif aşamanın sorular artefaktı sürümü
+      ertelenenSorular,                // ana sete sığmayan görünür ertelenen adaylar
+      butunlukHatasi,                  // yanıt artefaktı bozuk/kurcalanmışsa neden (blok + yeniden-yayın)
       mod,
     }
   }
@@ -81,6 +98,76 @@ export async function planlamaLoopV2Calistir(nsYolu, projeId, executor, {
     return b
   }
 
+  // ── SORU–YANIT yardımcıları (hepsi MODELSİZ; yalnız dosya okur/yazar) ──────────
+
+  // Bir aşamanın AÇIK-SORU durumu: bu ONAY-NOKTASI değerlendiricisidir ve HEM koşum
+  // sonrası ilk durakta HEM de yeniden-çağırmada aynı kaynaktır (kapı tek; çatal YOK).
+  //   engelli=true ⟺ paket var + substantive soru(lar) açık VEYA yanıt bütünlüğü bozuk.
+  //   paket yoksa (soru katmanı kapalı / eski proje) → engelli=false → birebir eski kapı.
+  function acikDurum(asama) {
+    const as = state.asamalar[asama]
+    const ss = as.sorular_surum
+    const bos = { engelli: false, acik: [], sorularSurum: ss ?? null, ertelenen: [], butunlukHatasi: null, paketVar: false }
+    if (ss == null) return bos
+    const paket = sorulariOku(nsYolu, asama, ss)
+    if (!paket) return bos
+    const substantive = paket.sorular.filter(s => s.tip !== 'APPROVAL')
+    const ertelenen = paket.ertelenen ?? []
+    if (substantive.length === 0) {
+      return { engelli: false, acik: [], sorularSurum: ss, ertelenen, butunlukHatasi: null, paketVar: true }
+    }
+    const but = yanitButunluk(paket, yanitlariHamOku(nsYolu, asama, ss))
+    if (but.durum === 'gecerli') {
+      const acik = acikSorular(paket, but.yanitlar)
+      return { engelli: acik.length > 0, acik, sorularSurum: ss, ertelenen, butunlukHatasi: null, paketVar: true }
+    }
+    // 'yok' (yanıt dosyası yok) veya 'bozuk' (şema/sürüm/imza/kurcalama) → BLOK + yeniden-yayın:
+    // tüm substantive sorular AÇIK sayılır; bozuk yanıt TÜKETİLMEZ.
+    return {
+      engelli: true, acik: substantive, sorularSurum: ss, ertelenen,
+      butunlukHatasi: but.durum === 'bozuk' ? but.neden : null, paketVar: true,
+    }
+  }
+
+  // Onay-noktası durağı için standart sonuç (koşum-sonrası + yeniden-çağırma-blok ortak).
+  function onayNoktasiDon(asama, d) {
+    return sonucDon({
+      durdu: d.engelli ? 'sorular-acik' : 'onay-bekliyor',
+      bekleyenOnay: asama,
+      acikSorularListesi: d.acik,
+      sorularSurum: d.sorularSurum,
+      ertelenenSorular: d.ertelenen,
+      butunlukHatasi: d.butunlukHatasi,
+    })
+  }
+
+  // Üst aşamanın (varsa) GEÇERLİ yanıtlarını TÜKET: sürüm + yanıt kayıtlarını döndür.
+  // Yalnız üstün sorular artefaktı + bütünlüğü GEÇERLİ yanıtı varsa tüketilir (aksi null).
+  // Loop üst onayı 0-açık-soruyla geçirmeden alta inmez → buraya gelindiğinde yanıt geçerli.
+  function ustYanitlariTuket(asama) {
+    const ust = ustAsama(asama)
+    if (!ust) return { ust: null, surum: null, kayitlar: null, paket: null }
+    const ss = state.asamalar[ust]?.sorular_surum
+    if (ss == null) return { ust, surum: null, kayitlar: null, paket: null }
+    const paket = sorulariOku(nsYolu, ust, ss)
+    if (!paket) return { ust, surum: null, kayitlar: null, paket: null }
+    const but = yanitButunluk(paket, yanitlariHamOku(nsYolu, ust, ss))
+    if (but.durum !== 'gecerli') return { ust, surum: null, kayitlar: null, paket: null }
+    return { ust, surum: ss, kayitlar: but.yanitlar, paket }
+  }
+
+  // Aşama çıktısından sorular paketini üret + sürümlü yaz. surum≥2 (—geri v++) ise bir
+  // önceki sürümün yanıtları ÖN-DOLGU olarak iliştirilir (öneri; asla oto-tüketilmez).
+  function sorulariUretVeYaz(asama, surum, icerik) {
+    if (!soruUretici) return null
+    // Ön-dolgu kaynağı = YANITI OLAN en son önceki sürüm (yanıtsız/başarısız ara sürümleri atla).
+    const kaynakSurum = surum >= 2 ? enSonYanitliOncekiSurum(nsYolu, asama, surum - 1) : null
+    const oncekiYanitlar = kaynakSurum ? oncekiYanitlariOku(nsYolu, asama, kaynakSurum) : null
+    const paket = soruUretici(asama, icerik, { projeId, surum, oncekiYanitlar })
+    sorulariYaz(nsYolu, paket)
+    return paket
+  }
+
   // Bir aşamayı KOŞTUR: sürümlü yaz, defter tut, kapıla. TEK executor çağrısı burada.
   async function asamaKostur(asama) {
     const as = state.asamalar[asama]
@@ -89,14 +176,20 @@ export async function planlamaLoopV2Calistir(nsYolu, projeId, executor, {
     const baglamlar = baglamlarKur()
     const ust = ustAsama(asama)
 
-    log(`EXECUTE ${asama} (sürüm ${yeniSurum} → ${asamaDosyaAdi(asama, yeniSurum)})`)
+    // PROVENANS + TÜKETİM: üstün GEÇERLİ yanıtları (varsa) bu koşuma besle ve hangi yanıt
+    // sürümünü tükettiğini state'e yaz (izlenebilirlik #5). MODELSİZ (yalnız dosya okur).
+    const tuketim = ustYanitlariTuket(asama)
+    as.tuketilen_ust_yanit_surum = tuketim.surum
+
+    log(`EXECUTE ${asama} (sürüm ${yeniSurum} → ${asamaDosyaAdi(asama, yeniSurum)})` +
+        (tuketim.surum != null ? ` [üst yanıt v${tuketim.surum} tüketiliyor]` : ''))
     as.durum = 'kosuyor'
     statePersist(nsYolu, state)
 
     let sonuc
     try {
       executorCagriSayisi++
-      sonuc = await executor(asama, { hedefDosya, baglamlar })
+      sonuc = await executor(asama, { hedefDosya, baglamlar, yanitlar: tuketim })
     } catch (e) {
       log(`HATA ${asama}: ${e.message}`)
       as.durum = 'donduruldu'
@@ -131,8 +224,15 @@ export async function planlamaLoopV2Calistir(nsYolu, projeId, executor, {
 
     as.kapi_sonuc = 'gecti'
     as.blok_nedeni = null
+
+    // SORU ÜRETİMİ (deterministik, MODELSİZ) — her aşama koşumu, çıktısıyla birlikte
+    // sürümlü bir sorular artefaktı üretir. Bu tek ek executor çağrısı DEĞİLDİR (soruUretici
+    // model çağırmaz) → "bir-koşum-bir-executor-çağrısı" sözleşmesi bozulmaz.
+    const paket = sorulariUretVeYaz(asama, yeniSurum, sonuc.icerik)
+    as.sorular_surum = paket ? yeniSurum : null
+
     if (asama === SON_ASAMA) {
-      // Son aşama geçti → tamamla (son aşamadan SONRA onay kapısı YOK).
+      // Son aşama geçti → tamamla (son aşamadan SONRA onay kapısı YOK; artefakt yine üretildi).
       as.durum = 'gecti'
       ilerlet(state) // → 'tamamlandi'
       statePersist(nsYolu, state)
@@ -141,8 +241,12 @@ export async function planlamaLoopV2Calistir(nsYolu, projeId, executor, {
     }
     as.durum = 'onay-bekliyor'
     statePersist(nsYolu, state)
-    log(`GATE ${asama} -> gecti; ONAY BEKLİYOR${sureStr}${maliyetStr}`)
-    return sonucDon({ durdu: 'onay-bekliyor', bekleyenOnay: asama })
+    // Koşum-sonrası ilk durak: taze koşumda yanıt dosyası yoktur → substantive soru varsa
+    // 'sorular-acik', yoksa (yalnız-APPROVAL) 'onay-bekliyor' (birebir eski kapı).
+    const d = acikDurum(asama)
+    const soruStr = paket ? ` [${paket.sorular.length} soru${d.acik.length ? `, ${d.acik.length} açık` : ''}${paket.ertelenen?.length ? `, ${paket.ertelenen.length} ertelenen` : ''}]` : ''
+    log(`GATE ${asama} -> gecti; ${d.engelli ? 'SORULAR AÇIK' : 'ONAY BEKLİYOR'}${soruStr}${sureStr}${maliyetStr}`)
+    return onayNoktasiDon(asama, d)
   }
 
   // ── mod='tut' (OLDUĞU-GİBİ-KABUL) ────────────────────────────────────────────
@@ -205,7 +309,7 @@ export async function planlamaLoopV2Calistir(nsYolu, projeId, executor, {
         return sonucDon({ durdu: 'bayat-karar', bayatAsama: A })
       }
       if (As.durum === 'onay-bekliyor') {
-        return sonucDon({ durdu: 'onay-bekliyor', bekleyenOnay: A })
+        return onayNoktasiDon(A, acikDurum(A))
       }
       if (As.durum === 'donduruldu') {
         return sonucDon({ durdu: 'donduruldu' })
@@ -232,9 +336,14 @@ export async function planlamaLoopV2Calistir(nsYolu, projeId, executor, {
           As.durum = 'onay-bekliyor'
           As.kapi_sonuc = 'gecti'
           As.blok_nedeni = null
+          // Kurtarılan (elle düzeltilmiş) çıktı için de sorular üret (koşum değil ama aşama
+          // yine bir onay-noktasına geldi). Mevcut sürüm; MODELSİZ.
+          const paket = sorulariUretVeYaz(A, As.surum ?? 1, icerik)
+          As.sorular_surum = paket ? (As.surum ?? 1) : null
           statePersist(nsYolu, state)
-          log(`KURTARMA ${A} -> yapısal kapı yeniden GEÇTİ; ONAY BEKLİYOR`)
-          return sonucDon({ durdu: 'onay-bekliyor', bekleyenOnay: A })
+          const d = acikDurum(A)
+          log(`KURTARMA ${A} -> yapısal kapı yeniden GEÇTİ; ${d.engelli ? 'SORULAR AÇIK' : 'ONAY BEKLİYOR'}`)
+          return onayNoktasiDon(A, d)
         }
         As.blok_nedeni = g.neden
         statePersist(nsYolu, state)
@@ -242,8 +351,17 @@ export async function planlamaLoopV2Calistir(nsYolu, projeId, executor, {
         return sonucDon({ durdu: 'donduruldu' })
       }
 
-      // Onay bekliyor → yeniden-doğrula; geçerse ONAY (ilerlet), değilse DONDUR.
+      // Onay bekliyor → önce SORU KAPISI, sonra yapısal yeniden-doğrulama; ikisi de geçerse
+      // ONAY (ilerlet). Bu invokasyon = APPROVAL jesti; ama substantive soru(lar) açıksa
+      // (veya yanıt bütünlüğü bozuksa) İLERLEME — bloke et, executor'a DOKUNMA (MODELSİZ).
       if (As.durum === 'onay-bekliyor') {
+        const d = acikDurum(A)
+        if (d.engelli) {
+          statePersist(nsYolu, state) // durum değişmedi; savunmacı persist
+          const hataStr = d.butunlukHatasi ? ` (yanıt bütünlüğü BOZUK: ${d.butunlukHatasi} — sorular yeniden yayınlandı)` : ''
+          log(`SORULAR AÇIK ${A} — ${d.acik.length} açık soru; ilerlenmedi${hataStr}`)
+          return onayNoktasiDon(A, d)
+        }
         const icerik = icerikOku(As.cikti_pointer)
         const g = icerik == null
           ? { gecti: false, neden: `çıktı dosyası bulunamadı: ${As.cikti_pointer ?? 'yok'}` }

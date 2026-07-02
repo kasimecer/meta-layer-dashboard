@@ -44,6 +44,9 @@ function bosAsama() {
     blok_nedeni: null,
     surum: 0,                     // üretilen güncel çıktı sürümü (0 = hiç üretilmedi)
     kabul_edilen_ust_surum: null, // bu aşamanın inşa/kabul edildiği üst-aşama sürümü
+    // SORU–YANIT katmanı (additive; eski dosyalar normalizeState ile null'lanır → geriye-uyumlu):
+    sorular_surum: null,             // bu koşumun sorular artefaktı sürümü (soru yoksa null)
+    tuketilen_ust_yanit_surum: null, // bu aşama son koştuğunda TÜKETTİĞİ üst-aşama yanıt sürümü (izlenebilirlik)
   }
 }
 
