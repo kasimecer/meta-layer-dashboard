@@ -21,9 +21,8 @@ import { planlamaBaslat, planlamaGeri } from '../tools/planlamaBaslat.mjs'
 import {
   ASAMA_SIRASI, GERCEK_ASAMALAR, stateYukle, bayatAsamalar, bayatMi, ustAsama,
 } from '../tools/planlamaDurumMakinesiV2.mjs'
-import {
-  sorulariOku, yanitlariHamOku, yanitButunluk, acikSorular, atlananlar, atlaYaz, yanitDosyaAdi,
-} from '../tools/planlamaSorular.mjs'
+import { atlaYaz, yanitDosyaAdi } from '../tools/planlamaSorular.mjs'
+import { acikSoruDurum } from '../tools/planlamaDurumOzeti.mjs'
 
 const KANONIK_REGISTRY = join(META_DATA_ROOT, 'projeler', 'registry.json')
 const PUBLIC_REGISTRY  = new URL('../public/registry.json', import.meta.url).pathname
@@ -44,24 +43,6 @@ function projeleriOku() {
     return r.projeler ?? r
   }
   return []
-}
-
-// ── Açık-soru durumu (READ-ONLY, MODELSİZ) — aktif aşamanın sorular artefaktından ──
-// Dönüş: null (soru katmanı yok) veya { asama, paket, acik, atlanan, butunluk, neden? }.
-function acikSoruDurum(nsYolu, state) {
-  const A = state.aktif_asama
-  if (A === 'tamamlandi') return null
-  const ss = state.asamalar?.[A]?.sorular_surum
-  if (ss == null) return null
-  const paket = sorulariOku(nsYolu, A, ss)
-  if (!paket) return null
-  const substantive = paket.sorular.filter(s => s.tip !== 'APPROVAL')
-  if (substantive.length === 0) return { asama: A, paket, acik: [], atlanan: [], butunluk: 'gecerli' }
-  const but = yanitButunluk(paket, yanitlariHamOku(nsYolu, A, ss))
-  if (but.durum === 'gecerli') {
-    return { asama: A, paket, acik: acikSorular(paket, but.yanitlar), atlanan: atlananlar(paket, but.yanitlar), butunluk: 'gecerli' }
-  }
-  return { asama: A, paket, acik: substantive, atlanan: [], butunluk: but.durum, neden: but.neden }
 }
 
 // ── Listeleme: onay-bekliyor + bayat + AÇIK SORULAR bilgisini yüzeye çıkarır ──────
