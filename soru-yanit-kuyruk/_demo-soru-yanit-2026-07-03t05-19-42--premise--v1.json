@@ -1,0 +1,18 @@
+{
+  "asama": "premise",
+  "surum": 1,
+  "soruImza": "68b2d4c09b3c99c5",
+  "yanitlar": [
+    {
+      "anahtar": "veri:sektor-anketleri-ve-coworking-operator-raporlari",
+      "karar": "veri",
+      "deger": "yaklaşık %62 doluluk",
+      "kaynak": "operatör-saha-anketi-2026"
+    },
+    {
+      "anahtar": "serbest:premise-baglam",
+      "metin": "Pilot bölge İstanbul Levent/Maslak ofis koridoru ile sınırlı tutulsun."
+    }
+  ],
+  "projeId": "_demo-soru-yanit-2026-07-03t05-19-42"
+}
