@@ -127,9 +127,19 @@ function kapiFnKur(nsYolu, state, mp) {
   return (bolumId, icerik) => {
     const bs = mp.bolumler[bolumId]
     const efektifIddialar = iddialariCozumle(nsYolu, bolumId, bs, iddialariCikar(icerik))
+    // İLK-GEÇİŞ (henüz bu birim için sorular_surum YOK): birimKostur bu kapı çağrısını
+    // SORU PAKETİ ÜRETİLMEDEN ÖNCE yapar (bkz planlamaBirimMotoru.mjs birimKostur — kapiFn
+    // önce, sorulariUretVeYaz SONRA). Bu ANDA henüz hiçbir acik-soru YANITLANAMAMIŞ olabilir —
+    // minDogrulandi/sifirAcikGerekli'yi BURADA zorlamak, dürüstçe acik-soru yazan bir bölümü
+    // KALICI OLARAK tıkar (soru paketi hiç doğmadan reddedilir → yanıtlanacak bir DATA-REQUEST
+    // asla oluşmaz). Bu iki yeterlilik kontrolü, bir soru paketi VAR OLDUKTAN SONRAKİ
+    // doğrulamaya (onay-bekliyor re-check / donduruldu-kurtarma sonrası) ERTELENİR — bkz
+    // bolumKapidanGecerMi'nin baglam.ilkGecisMi kullanımı.
+    const ilkGecisMi = bs?.sorular_surum == null
     const baglam = {
       gercekKaynaklar,
       efektifIddialar,
+      ilkGecisMi,
       ...(bolumId === 'provenans-ek' ? provenansVerisiTopla(nsYolu, state, mp) : {}),
     }
     return bolumKapidanGecerMi(bolumId, icerik, baglam)

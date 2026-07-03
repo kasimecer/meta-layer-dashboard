@@ -109,20 +109,28 @@ export function bolumKapidanGecerMi(bolumId, icerik, baglam = null) {
   // minDogrulandi/sifirAcikGerekli EFEKTİF statüyle sayılır (baglam.efektifIddialar
   // verilmişse) — yanıtlanmış bir acik-soru (karar=veri/tahmin) artık HAM etiket ne olursa
   // olsun doğrulanmış/tahmin sayılır; baglam yoksa (ör. doğrudan-çağrı testleri) HAM sayıma düşer.
+  //
+  // İKİSİ DE İLK-GEÇİŞTE (baglam.ilkGecisMi) ATLANIR: bu iki kontrol YETERLİLİK kontrolüdür —
+  // yalnızca bir soru paketi VAR OLUP (potansiyel olarak) YANITLANDIKTAN SONRA anlamlıdır. İlk
+  // geçişte zorlanırlarsa, dürüstçe acik-soru yazan bir bölüm hiçbir DATA-REQUEST'in DOĞMADIĞI
+  // kalıcı bir tıkanığa düşer (kapı, soru paketi üretiminden ÖNCE çalışır — bkz birimKostur).
+  // Govde/grounding kontrolleri (yukarıda) İLK GEÇİŞTE DE tam uygulanır — yalnız bu ikisi ertelenir.
   const iddialar = baglam?.efektifIddialar ?? iddialarHam
   const efektifTipOf = (i) => i.efektifTip ?? i.tip
 
-  if (tanim.minDogrulandi > 0) {
-    const n = iddialar.filter(i => efektifTipOf(i) === 'dogrulandi').length
-    if (n < tanim.minDogrulandi) {
-      return { gecti: false, neden: `${bolumId}: yeterli doğrulanmış iddia yok (bulunan: ${n}, gereken: ≥${tanim.minDogrulandi})` }
+  if (!baglam?.ilkGecisMi) {
+    if (tanim.minDogrulandi > 0) {
+      const n = iddialar.filter(i => efektifTipOf(i) === 'dogrulandi').length
+      if (n < tanim.minDogrulandi) {
+        return { gecti: false, neden: `${bolumId}: yeterli doğrulanmış iddia yok (bulunan: ${n}, gereken: ≥${tanim.minDogrulandi})` }
+      }
     }
-  }
 
-  if (tanim.sifirAcikGerekli) {
-    const acikSayisi = iddialar.filter(i => efektifTipOf(i) === 'acik-soru').length
-    if (acikSayisi > 0) {
-      return { gecti: false, neden: `${bolumId}: bu bölüm yerel sıfır-açık şartı taşıyor ama ${acikSayisi} açık-soru etiketi var` }
+    if (tanim.sifirAcikGerekli) {
+      const acikSayisi = iddialar.filter(i => efektifTipOf(i) === 'acik-soru').length
+      if (acikSayisi > 0) {
+        return { gecti: false, neden: `${bolumId}: bu bölüm yerel sıfır-açık şartı taşıyor ama ${acikSayisi} açık-soru etiketi var` }
+      }
     }
   }
 

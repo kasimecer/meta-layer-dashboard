@@ -342,6 +342,28 @@ bolum('GR — Grounding: kaynak-gerçeklik + acik-soru → DATA-REQUEST + efekti
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+bolum('OG — Sıralama düzeltmesi: yeterlilik kontrolleri İLK-GEÇİŞTE ertelenir (GERÇEK model koşumunda bulundu)')
+{
+  // birimKostur kapiFn'i SORU PAKETİ ÜRETİLMEDEN ÖNCE çağırır (bkz planlamaBirimMotoru.mjs).
+  // minDogrulandi/sifirAcikGerekli'yi İLK GEÇİŞTE zorlamak, dürüstçe acik-soru yazan bir bölümü
+  // HİÇBİR DATA-REQUEST doğmadan kalıcı olarak tıkar — çünkü kapı, soru üretiminden ÖNCE
+  // reddeder. baglam.ilkGecisMi bu iki kontrolü yalnızca bir soru paketi VAR OLDUKTAN SONRAKİ
+  // doğrulamaya erteler.
+  const gercekKaynaklar = new Set(['sektor-raporu-2026'])
+
+  const gIlk = bolumKapidanGecerMi('pazar-analizi', BOZUK_BOLUM.pazarAnaliziAcikSoru, { gercekKaynaklar, ilkGecisMi: true })
+  ok('OG: İLK geçişte ÇÖZÜLMEMİŞ acik-soru KAPIYI GEÇİRİR (yeterlilik kontrolü ertelenir, soru paketi doğabilsin)', gIlk.gecti)
+
+  const gOnay = bolumKapidanGecerMi('pazar-analizi', BOZUK_BOLUM.pazarAnaliziAcikSoru, { gercekKaynaklar, ilkGecisMi: false })
+  ok('OG: onay-anı re-doğrulamada (ilkGecisMi=false) AYNI çözülmemiş acik-soru REDDEDİLİR', !gOnay.gecti)
+
+  // Govde/grounding kontrolleri İLK GEÇİŞTE DE tam uygulanır — yalnız yeterlilik (minDogrulandi/
+  // sifirAcikGerekli) ertelenir. Fabrikasyon kaynak ilk geçişte de REDDEDİLMELİ.
+  const gFakeIlk = bolumKapidanGecerMi('pazar-analizi', BOZUK_BOLUM.pazarAnaliziUydurmaKaynak, { gercekKaynaklar, ilkGecisMi: true })
+  ok('OG: İLK geçişte de grounding (uydurma kaynak) REDDİ tam uygulanır (ertelenen yalnız yeterlilik)', !gFakeIlk.gecti)
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 bolum('L — Geriye-uyumluluk: opt-in KAPALIYKEN eski master-plan davranışı BİREBİR')
 {
   const { ns, id } = yeniNs('legacy')
