@@ -17,12 +17,25 @@
 import { readFileSync, existsSync } from 'fs'
 import { join, relative } from 'path'
 import { META_DATA_ROOT } from './config.js'
-import { planlamaBaslat, planlamaGeri } from '../tools/planlamaBaslat.mjs'
+import { planlamaBaslat, planlamaGeri, planlamaBolumeGeri } from '../tools/planlamaBaslat.mjs'
 import {
   ASAMA_SIRASI, GERCEK_ASAMALAR, stateYukle, bayatAsamalar, bayatMi, ustAsama,
 } from '../tools/planlamaDurumMakinesiV2.mjs'
 import { atlaYaz, yanitDosyaAdi } from '../tools/planlamaSorular.mjs'
 import { acikSoruDurum } from '../tools/planlamaDurumOzeti.mjs'
+import { BOLUM_SIRASI } from '../tools/planlamaBolumTanimlari.mjs'
+import { aktifBolumBilgisi } from '../tools/planlamaBolumLoop.mjs'
+
+// Bir birim-id'nin (aşama VEYA master-plan bölümü) state-nesnesini + üstünü çözer — sonuc.
+// bekleyenOnay/bayatAsama artık İKİ granülerlikten biri olabilir (bkz tools/planlamaBolumLoop.mjs).
+function birimStateOf(state, id) {
+  return GERCEK_ASAMALAR.includes(id) ? state.asamalar[id] : state.asamalar['master-plan']?.bolumler?.[id]
+}
+function birimUstAdi(id) {
+  if (GERCEK_ASAMALAR.includes(id)) return ustAsama(id)
+  const i = BOLUM_SIRASI.indexOf(id)
+  return i > 0 ? BOLUM_SIRASI[i - 1] : null
+}
 
 const KANONIK_REGISTRY = join(META_DATA_ROOT, 'projeler', 'registry.json')
 const PUBLIC_REGISTRY  = new URL('../public/registry.json', import.meta.url).pathname
@@ -125,9 +138,11 @@ function raporYaz(id, sonuc) {
     }
     case 'onay-bekliyor': {
       const a = sonuc.bekleyenOnay
-      const s = state.asamalar[a]
-      const sonraki = ASAMA_SIRASI[ASAMA_SIRASI.indexOf(a) + 1]
-      console.log(`■ AŞAMA BİTTİ, ONAY BEKLİYOR — ${a}  (proje: ${id})`)
+      const s = birimStateOf(state, a)
+      const sonraki = GERCEK_ASAMALAR.includes(a)
+        ? ASAMA_SIRASI[ASAMA_SIRASI.indexOf(a) + 1]
+        : (BOLUM_SIRASI[BOLUM_SIRASI.indexOf(a) + 1] ?? '(nihai master-plan onayı)')
+      console.log(`■ ${GERCEK_ASAMALAR.includes(a) ? 'AŞAMA' : 'BÖLÜM'} BİTTİ, ONAY BEKLİYOR — ${a}  (proje: ${id})`)
       console.log(`  Yapısal kapı  : GEÇTİ`)
       console.log(`  Çıktı (sürüm ${s.surum}): ${gorPath(s.cikti_pointer)}`)
       console.log(`  Sıradaki aşama: ${sonraki}`)
@@ -173,9 +188,9 @@ function raporYaz(id, sonuc) {
     }
     case 'bayat-karar': {
       const a = sonuc.bayatAsama
-      const s = state.asamalar[a]
-      const ust = ustAsama(a)
-      console.log(`◧ BAYAT AŞAMA — KARAR BEKLİYOR — ${a}  (proje: ${id})`)
+      const s = birimStateOf(state, a)
+      const ust = birimUstAdi(a)
+      console.log(`◧ BAYAT ${GERCEK_ASAMALAR.includes(a) ? 'AŞAMA' : 'BÖLÜM'} — KARAR BEKLİYOR — ${a}  (proje: ${id})`)
       console.log(`  Neden bayat   : üst aşama (${ust}) yeni sürüme geçti; ${a} eski sürüme göre inşa edilmişti`)
       console.log(`  Mevcut çıktı (sürüm ${s.surum}, korunuyor): ${gorPath(s.cikti_pointer)}`)
       console.log(`\n  Bu aşama için SEÇİN (biri):`)
@@ -192,14 +207,32 @@ function raporYaz(id, sonuc) {
     }
     case 'donduruldu':
     default: {
-      const a = state.aktif_asama
-      const s = state.asamalar[a]
+      // Master-plan bölüm-yürüyüşünde blok üç şekilde olabilir: (a) tek bir bölümün KENDİ
+      // kapısı reddetti (aktifBolumBilgisi onu bulur), (b) Layer-2 (tüm-plan) kontrolü
+      // başarısız (konteynerin kendi blok_nedeni'nde durur, hiçbir bölüm bireysel bloke
+      // DEĞİLDİR), (c) sıradan bir aşama bloke (eski davranış, state.aktif_asama zaten doğru).
+      const mp = state.asamalar['master-plan']
+      const bilgi = aktifBolumBilgisi(state)
+      let a, blokNedeni, ciktiPointer
+      if (state.aktif_asama === 'master-plan' && mp?.blok_nedeni && mp.blok_nedeni.startsWith('Layer-2')) {
+        a = 'master-plan (tüm-plan Layer-2 kontrolü)'
+        blokNedeni = mp.blok_nedeni
+        ciktiPointer = null
+      } else if (bilgi) {
+        a = bilgi.bolumId
+        blokNedeni = bilgi.bolumler[bilgi.bolumId]?.blok_nedeni
+        ciktiPointer = bilgi.bolumler[bilgi.bolumId]?.cikti_pointer
+      } else {
+        a = state.aktif_asama
+        blokNedeni = state.asamalar[a]?.blok_nedeni
+        ciktiPointer = state.asamalar[a]?.cikti_pointer
+      }
       console.log(`✗ BLOKE — ${a}  (proje: ${id})`)
-      console.log(`  blok_nedeni: ${s?.blok_nedeni ?? '(yok)'}`)
-      console.log(`  Çıktı      : ${gorPath(s?.cikti_pointer)}`)
+      console.log(`  blok_nedeni: ${blokNedeni ?? '(yok)'}`)
+      console.log(`  Çıktı      : ${gorPath(ciktiPointer)}`)
       console.log(`\n  Çıktıyı (.md) düzeltip tekrar çağırın; yapısal kapı yeniden denenir:`)
       console.log(`    • Yeniden dene: ${KOMUT(id)}`)
-      console.log(`    • Geri dön    : ${KOMUT(id, ' --geri <asama>')}`)
+      console.log(`    • Geri dön    : ${KOMUT(id, ' --geri <asama-veya-bölüm-id>')}`)
       break
     }
   }
@@ -235,21 +268,27 @@ async function baslat(id, mod) {
 function geriYap(id, hedef) {
   projeConfigOf(id) // registry doğrulaması
   const nsYolu = nsYoluOf(id)
+  // hedef, master-plan'ın 14 bölümü + provenans-ekinden biriyse bölüm-seviyesi geri-dönüşe
+  // (aynı birimGeriDon çekirdeği, ayrı sarmalayıcı) yönlendirilir; aksi halde eski aşama-yolu.
+  const bolumHedefMi = BOLUM_SIRASI.includes(hedef)
   let state
   try {
-    state = planlamaGeri(nsYolu, id, hedef) // geçersizse throw → state DEĞİŞMEZ
+    state = bolumHedefMi ? planlamaBolumeGeri(nsYolu, id, hedef) : planlamaGeri(nsYolu, id, hedef) // geçersizse throw → state DEĞİŞMEZ
   } catch (e) {
     console.error(`✗ GERİ-DÖNÜŞ REDDEDİLDİ: ${e.message}`)
     console.error('  (Hiçbir dosya/state değiştirilmedi.)')
     process.exit(1)
   }
-  const s = state.asamalar[hedef]
-  console.log(`↩ GERİ DÖNÜLDÜ — ${hedef} yeniden açıldı  (proje: ${id})`)
+  const s = bolumHedefMi ? state.asamalar['master-plan'].bolumler[hedef] : state.asamalar[hedef]
+  const birimEtiket = bolumHedefMi ? `master-plan bölümü "${hedef}"` : hedef
+  console.log(`↩ GERİ DÖNÜLDÜ — ${birimEtiket} yeniden açıldı  (proje: ${id})`)
   console.log(`  Mevcut çıktı KORUNDU (sürüm ${s.surum}): ${gorPath(s.cikti_pointer)}`)
   console.log(`  Not: sonraki koşum YENİ bir sürüm dosyası yazar (önceki sürümler silinmez).`)
-  console.log(`       ${hedef} yeniden koşup sürümü artınca alt aşamalar BAYAT olur; her biri`)
-  console.log(`       için ayrı ayrı karar verirsiniz (yeniden-koş / --tut).`)
-  console.log(`\n  Şimdi ${hedef} aşamasını yeniden koştur: ${KOMUT(id)}`)
+  if (!bolumHedefMi) {
+    console.log(`       ${hedef} yeniden koşup sürümü artınca alt aşamalar BAYAT olur; her biri`)
+    console.log(`       için ayrı ayrı karar verirsiniz (yeniden-koş / --tut).`)
+  }
+  console.log(`\n  Şimdi ${hedef} ${bolumHedefMi ? 'bölümünü' : 'aşamasını'} yeniden koştur: ${KOMUT(id)}`)
 }
 
 // AÇIK ATLAMA — bir soruyu YALNIZ bu açık komutla (veya doğrudan yanıt dosyasında

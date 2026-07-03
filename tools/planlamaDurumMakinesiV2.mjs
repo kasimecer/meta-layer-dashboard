@@ -17,17 +17,19 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { join, dirname } from 'path'
+import {
+  birimUst, birimIlerlet, birimIlerletHedefle, birimBayatMi, birimlerBayat, birimGeriDon,
+} from './planlamaBirimMotoru.mjs'
 
 export const ASAMA_SIRASI = ['genesis', 'premise', 'arastirma', 'strateji', 'master-plan', 'tamamlandi']
 export const GERCEK_ASAMALAR = ASAMA_SIRASI.filter(a => a !== 'tamamlandi')
 export const DURUMLAR = ['bekliyor', 'kosuyor', 'onay-bekliyor', 'gecti', 'donduruldu']
 export const SEMA_SURUM = 2
 
-// Üst (bir önceki gerçek) aşama; genesis için null (kökün üstü yok).
+// Üst (bir önceki gerçek) aşama; genesis için null (kökün üstü yok). İnce sarmalayıcı —
+// genel mantık tools/planlamaBirimMotoru.mjs'de (master-plan bölümleri de AYNI mantığı kullanır).
 export function ustAsama(asama) {
-  const i = GERCEK_ASAMALAR.indexOf(asama)
-  if (i <= 0) return null
-  return GERCEK_ASAMALAR[i - 1]
+  return birimUst(GERCEK_ASAMALAR, asama)
 }
 
 // Bir aşama sürümü için çıktı dosya adı. İlk sürüm eski şemayla aynı ("genesis.md");
@@ -36,7 +38,7 @@ export function asamaDosyaAdi(asama, surum) {
   return (surum ?? 0) <= 1 ? `${asama}.md` : `${asama}-v${surum}.md`
 }
 
-function bosAsama() {
+export function bosAsama() {
   return {
     durum: 'bekliyor',
     cikti_pointer: null,
@@ -102,47 +104,28 @@ export function statePersist(nsYolu, state) {
   writeFileSync(dosya, JSON.stringify(state, null, 2), 'utf8')
 }
 
-// Sıralı ilerleme: aktif_asama → bir sonraki. Atlama/geri-gitme yasak (yalnız +1).
+// Sıralı ilerleme: aktif_asama → bir sonraki. Atlama/geri-gitme yasak (yalnız +1). İnce
+// sarmalayıcı — genel mantık tools/planlamaBirimMotoru.mjs'de. NOT: ASAMA_SIRASI (terminal
+// 'tamamlandi' dahil) kullanılır, GERCEK_ASAMALAR değil — davranış birebir korunur.
 export function ilerlet(state) {
-  const idx = ASAMA_SIRASI.indexOf(state.aktif_asama)
-  if (idx === -1) throw new Error(`Bilinmeyen aktif_asama: ${state.aktif_asama}`)
-  if (idx + 1 >= ASAMA_SIRASI.length) throw new Error(`ilerlet: zaten tamamlandi`)
-  state.aktif_asama = ASAMA_SIRASI[idx + 1]
-  return state
+  return birimIlerlet(ASAMA_SIRASI, state, 'aktif_asama')
 }
 
 // İLERİ geçiş koruması — yalnız bir sonraki adım geçerli. Atlama VE ham (yaptırımsız)
 // geri-gitme REDDEDİLİR. Sıhhatli geri-dönüş için geriAsamaya() kullanılır (ayrı sınıf).
 export function ilerletHedefle(state, hedef) {
-  const mevcutIdx = ASAMA_SIRASI.indexOf(state.aktif_asama)
-  const hedefIdx  = ASAMA_SIRASI.indexOf(hedef)
-  if (mevcutIdx === -1) throw new Error(`Bilinmeyen aktif_asama: ${state.aktif_asama}`)
-  if (hedefIdx  === -1) throw new Error(`Bilinmeyen hedef: ${hedef}`)
-  if (hedefIdx !== mevcutIdx + 1) {
-    throw new Error(
-      `ilerlet reddedildi: ${state.aktif_asama} → ${hedef} (atlamak/ham geri gitmek yasak; ` +
-      `beklenen: ${ASAMA_SIRASI[mevcutIdx + 1]}; geri dönüş için geriAsamaya kullan)`
-    )
-  }
-  state.aktif_asama = hedef
-  return state
+  return birimIlerletHedefle(ASAMA_SIRASI, state, 'aktif_asama', hedef)
 }
 
 // Bir aşama BAYAT mı? — kabul ettiği üst sürüm, üstün güncel sürümünden eski mi?
 // Yalnız TAMAMLANMIŞ (gecti, surum≥1) aşamalar bayatlayabilir. genesis'in üstü yok.
 export function bayatMi(state, asama) {
-  const ust = ustAsama(asama)
-  if (!ust) return false
-  const s = state.asamalar[asama]
-  if (!s || s.durum !== 'gecti' || (s.surum ?? 0) < 1) return false
-  const kabul = s.kabul_edilen_ust_surum ?? 0
-  const ustSurum = state.asamalar[ust]?.surum ?? 0
-  return kabul < ustSurum
+  return birimBayatMi(GERCEK_ASAMALAR, state.asamalar, asama)
 }
 
 // Tüm bayat aşamaların listesi (durum/listeleme için).
 export function bayatAsamalar(state) {
-  return GERCEK_ASAMALAR.filter(a => bayatMi(state, a))
+  return birimlerBayat(GERCEK_ASAMALAR, state.asamalar)
 }
 
 // SIHHATLİ GERİ-DÖNÜŞ (yaptırımlı) — yalnız DAHA ERKEN + TAMAMLANMIŞ çıktısı olan bir
@@ -150,30 +133,8 @@ export function bayatAsamalar(state) {
 // hedef HATA fırlatır ve state'i DEĞİŞTİRMEZ (çağıran hata durumunda persist etmemeli).
 // Hedef aşamayı yeniden-açar (durum='bekliyor'); mevcut surum/cikti_pointer KORUNUR
 // (çıktı SİLİNMEZ/ÜZERİNE-YAZILMAZ) — sonraki koşum yeni bir sürüm dosyası yazar. Alt
-// aşamalara DOKUNULMAZ; hedef yeniden koşup surum'u artınca doğal olarak bayatlar.
+// aşamalara DOKUNULMAZ; hedef yeniden koşup surum'u artınca doğal olarak bayatlar. İnce
+// sarmalayıcı — genel mantık tools/planlamaBirimMotoru.mjs'de.
 export function geriAsamaya(state, hedef) {
-  const hedefIdx = GERCEK_ASAMALAR.indexOf(hedef)
-  if (hedefIdx === -1) {
-    throw new Error(`geri reddedildi: bilinmeyen aşama "${hedef}" (geçerli: ${GERCEK_ASAMALAR.join(', ')})`)
-  }
-  const hedefState = state.asamalar[hedef]
-  if (!hedefState || hedefState.durum !== 'gecti' || (hedefState.surum ?? 0) < 1) {
-    throw new Error(`geri reddedildi: "${hedef}" aşamasının tamamlanmış çıktısı yok (yalnız tamamlanmış aşamaya geri dönülür)`)
-  }
-  // Mevcut konum: tamamlandi ise son gerçek aşamadan sonrası (hepsi geride).
-  const mevcutIdx = state.aktif_asama === 'tamamlandi'
-    ? GERCEK_ASAMALAR.length
-    : GERCEK_ASAMALAR.indexOf(state.aktif_asama)
-  if (hedefIdx >= mevcutIdx) {
-    throw new Error(
-      `geri reddedildi: "${hedef}" ileri/eşit konumda — yalnız DAHA ERKEN aşamaya dönülür ` +
-      `(mevcut: ${state.aktif_asama})`
-    )
-  }
-  // Yeniden-aç: sonraki koşum yeni sürüm yazacak. Çıktı/sürüm korunur.
-  hedefState.durum = 'bekliyor'
-  hedefState.kapi_sonuc = null
-  hedefState.blok_nedeni = null
-  state.aktif_asama = hedef
-  return state
+  return birimGeriDon(GERCEK_ASAMALAR, state.asamalar, state, 'aktif_asama', hedef, 'tamamlandi')
 }

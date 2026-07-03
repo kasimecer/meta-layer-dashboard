@@ -7,22 +7,45 @@
 // konvansiyonu); her iki çağıran da yalnız bu saf modülden okur.
 
 import { sorulariOku, yanitlariHamOku, yanitButunluk, acikSorular, atlananlar } from './planlamaSorular.mjs'
+import { aktifBolumBilgisi } from './planlamaBolumLoop.mjs'
 
-// Aktif aşamanın sorular artefaktından açık-soru durumu.
-// Dönüş: null (soru katmanı yok — eski proje veya henüz üretilmedi) veya
+// Genel çekirdek — bir BİRİMİN (aşama VEYA master-plan bölümü) sorular artefaktından açık-soru
+// durumu. birimState = state.asamalar[birimId] VEYA bir bölümün kendi state-nesnesi (AYNI şekil:
+// sorular_surum alanı olan herhangi bir birim). Dönüş: null veya
 //   { asama, paket, acik, atlanan, butunluk: 'gecerli'|'yok'|'bozuk', neden? }
+function acikSoruDurumJenerik(nsYolu, birimId, birimState) {
+  const ss = birimState?.sorular_surum
+  if (ss == null) return null
+  const paket = sorulariOku(nsYolu, birimId, ss)
+  if (!paket) return null
+  const substantive = paket.sorular.filter(s => s.tip !== 'APPROVAL')
+  if (substantive.length === 0) return { asama: birimId, paket, acik: [], atlanan: [], butunluk: 'gecerli' }
+  const but = yanitButunluk(paket, yanitlariHamOku(nsYolu, birimId, ss))
+  if (but.durum === 'gecerli') {
+    return { asama: birimId, paket, acik: acikSorular(paket, but.yanitlar), atlanan: atlananlar(paket, but.yanitlar), butunluk: 'gecerli' }
+  }
+  return { asama: birimId, paket, acik: substantive, atlanan: [], butunluk: but.durum, neden: but.neden }
+}
+
+// Aktif aşamanın sorular artefaktından açık-soru durumu — CLI (scripts/planlama-baslat.mjs) VE
+// tarayıcı (scripts/build-card-data.js) AYNI fonksiyonu çağırır, "aynı olguda hemfikir" garantisi
+// buradan gelir. Master-plan bölüm-yürüyüşü SÜRERKEN (aktifBolumBilgisi != null) aktif BÖLÜMÜN
+// soru-durumuna DELEGE eder — aksi halde outer master-plan.sorular_surum (henüz null / walk
+// bitmiş-nihai-onay) her zamanki gibi okunur. Dönüş şekli DEĞİŞMEDİ; yalnız EKLENEN `bolum`
+// alanı (null = aşama-seviyesi, aksi halde bölüm id'si) hangi granülerlikte olduğumuzu gösterir —
+// SAF EKLEME (mevcut tüketiciler bu alanı görmezden gelebilir).
 export function acikSoruDurum(nsYolu, state) {
   const A = state.aktif_asama
   if (A === 'tamamlandi') return null
-  const ss = state.asamalar?.[A]?.sorular_surum
-  if (ss == null) return null
-  const paket = sorulariOku(nsYolu, A, ss)
-  if (!paket) return null
-  const substantive = paket.sorular.filter(s => s.tip !== 'APPROVAL')
-  if (substantive.length === 0) return { asama: A, paket, acik: [], atlanan: [], butunluk: 'gecerli' }
-  const but = yanitButunluk(paket, yanitlariHamOku(nsYolu, A, ss))
-  if (but.durum === 'gecerli') {
-    return { asama: A, paket, acik: acikSorular(paket, but.yanitlar), atlanan: atlananlar(paket, but.yanitlar), butunluk: 'gecerli' }
+
+  if (A === 'master-plan') {
+    const bilgi = aktifBolumBilgisi(state)
+    if (bilgi) {
+      const sonuc = acikSoruDurumJenerik(nsYolu, bilgi.bolumId, bilgi.bolumler[bilgi.bolumId])
+      return sonuc ? { ...sonuc, bolum: bilgi.bolumId } : null
+    }
   }
-  return { asama: A, paket, acik: substantive, atlanan: [], butunluk: but.durum, neden: but.neden }
+
+  const sonuc = acikSoruDurumJenerik(nsYolu, A, state.asamalar?.[A])
+  return sonuc ? { ...sonuc, bolum: null } : null
 }

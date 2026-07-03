@@ -26,10 +26,8 @@ import {
   GERCEK_ASAMALAR, stateYukle, statePersist, ilerlet, bayatMi, ustAsama, asamaDosyaAdi,
 } from './planlamaDurumMakinesiV2.mjs'
 import { kapidanGecerMi } from './planlamaKapilari.mjs'
-import {
-  sorulariYaz, sorulariOku, yanitlariHamOku, yanitButunluk, acikSorular,
-  oncekiYanitlariOku, enSonYanitliOncekiSurum,
-} from './planlamaSorular.mjs'
+import { birimKostur, birimUstYanitTuket, birimSorulariUretVeYaz, birimAcikDurum } from './planlamaBirimMotoru.mjs'
+import { bolumLoopCalistir } from './planlamaBolumLoop.mjs'
 
 const SON_ASAMA = GERCEK_ASAMALAR[GERCEK_ASAMALAR.length - 1] // 'master-plan'
 
@@ -56,12 +54,19 @@ export async function planlamaLoopV2Calistir(nsYolu, projeId, executor, {
   // varsayilanSoruUretici ile AÇAR. Bir aşama koşup yapısal kapıdan geçince çağrılır:
   //   soruUretici(asama, icerik, { projeId, surum, oncekiYanitlar }) → sorular paketi.
   soruUretici = null,
+  // OPT-IN (varsayılan null = KAPALI): master-plan'ı 14 bölüm + provenans-eki olarak yürüten
+  // bölüm-yürüyüşünü AÇAR. Yalnız planlamaBaslat.mjs (gerçek CLI) bunu BOLUM_TANIMLARI ile
+  // verir — bu tamamen ELLE opt-in olduğu için hiçbir mevcut çağıran (planlama-test-runner.mjs,
+  // planlama-soru-test-runner.mjs dahil) bunu geçirmez ve eski master-plan davranışı (tek-geçiş,
+  // SON_ASAMA'da onay-kapısı OLMADAN doğrudan tamamlanma) BİREBİR korunur. Değer: bir waterlık
+  // (yalnız varlığı önemli) — bkz tools/planlamaBolumLoop.mjs.
+  masterPlanBolumleri = null,
 } = {}) {
   const state = stateYukle(nsYolu, projeId)
   const maliyet = { toplam: 0, asamalar: {} }
-  let executorCagriSayisi = 0
+  const executorSayaci = { n: 0 }
+  const kostuTutucu = { birim: null }
   let onayVerildi = false
-  let kostuAsama = null
 
   function sonucDon({
     durdu, bekleyenOnay = null, bayatAsama = null, sonrakiAsama = null,
@@ -72,12 +77,12 @@ export async function planlamaLoopV2Calistir(nsYolu, projeId, executor, {
       donduruldu: durdu === 'donduruldu',
       tamamlandi: durdu === 'tamamlandi',
       maliyet,
-      executorCagriSayisi,
+      executorCagriSayisi: executorSayaci.n,
       durdu,                 // 'tamamlandi'|'onay-bekliyor'|'sorular-acik'|'donduruldu'|'bayat-karar'|'kosum-gerekli'
       bekleyenOnay,          // onay bekleyen aşama (durdu==='onay-bekliyor' | 'sorular-acik')
       bayatAsama,            // karar bekleyen bayat aşama (durdu==='bayat-karar')
       sonrakiAsama,          // koşuma hazır sıradaki aşama (durdu==='kosum-gerekli')
-      kostuAsama,            // bu invokasyonda koşan aşama (varsa)
+      kostuAsama: kostuTutucu.birim, // bu invokasyonda koşan aşama/bölüm (varsa)
       // SORU–YANIT payload'u (durdu==='sorular-acik' veya 'onay-bekliyor'da doludur):
       acikSorular: acikSorularListesi, // operatörü bekleyen açık sorular (APPROVAL hariç)
       sorularSurum,                    // aktif aşamanın sorular artefaktı sürümü
@@ -104,29 +109,9 @@ export async function planlamaLoopV2Calistir(nsYolu, projeId, executor, {
   // sonrası ilk durakta HEM de yeniden-çağırmada aynı kaynaktır (kapı tek; çatal YOK).
   //   engelli=true ⟺ paket var + substantive soru(lar) açık VEYA yanıt bütünlüğü bozuk.
   //   paket yoksa (soru katmanı kapalı / eski proje) → engelli=false → birebir eski kapı.
+  // İnce sarmalayıcı — genel mantık tools/planlamaBirimMotoru.mjs'de (bölüm-seviyesi ile PAYLAŞILIR).
   function acikDurum(asama) {
-    const as = state.asamalar[asama]
-    const ss = as.sorular_surum
-    const bos = { engelli: false, acik: [], sorularSurum: ss ?? null, ertelenen: [], butunlukHatasi: null, paketVar: false }
-    if (ss == null) return bos
-    const paket = sorulariOku(nsYolu, asama, ss)
-    if (!paket) return bos
-    const substantive = paket.sorular.filter(s => s.tip !== 'APPROVAL')
-    const ertelenen = paket.ertelenen ?? []
-    if (substantive.length === 0) {
-      return { engelli: false, acik: [], sorularSurum: ss, ertelenen, butunlukHatasi: null, paketVar: true }
-    }
-    const but = yanitButunluk(paket, yanitlariHamOku(nsYolu, asama, ss))
-    if (but.durum === 'gecerli') {
-      const acik = acikSorular(paket, but.yanitlar)
-      return { engelli: acik.length > 0, acik, sorularSurum: ss, ertelenen, butunlukHatasi: null, paketVar: true }
-    }
-    // 'yok' (yanıt dosyası yok) veya 'bozuk' (şema/sürüm/imza/kurcalama) → BLOK + yeniden-yayın:
-    // tüm substantive sorular AÇIK sayılır; bozuk yanıt TÜKETİLMEZ.
-    return {
-      engelli: true, acik: substantive, sorularSurum: ss, ertelenen,
-      butunlukHatasi: but.durum === 'bozuk' ? but.neden : null, paketVar: true,
-    }
+    return birimAcikDurum(nsYolu, state.asamalar, asama)
   }
 
   // Onay-noktası durağı için standart sonuç (koşum-sonrası + yeniden-çağırma-blok ortak).
@@ -144,109 +129,44 @@ export async function planlamaLoopV2Calistir(nsYolu, projeId, executor, {
   // Üst aşamanın (varsa) GEÇERLİ yanıtlarını TÜKET: sürüm + yanıt kayıtlarını döndür.
   // Yalnız üstün sorular artefaktı + bütünlüğü GEÇERLİ yanıtı varsa tüketilir (aksi null).
   // Loop üst onayı 0-açık-soruyla geçirmeden alta inmez → buraya gelindiğinde yanıt geçerli.
+  // İnce sarmalayıcı — genel mantık tools/planlamaBirimMotoru.mjs'de.
   function ustYanitlariTuket(asama) {
-    const ust = ustAsama(asama)
-    if (!ust) return { ust: null, surum: null, kayitlar: null, paket: null }
-    const ss = state.asamalar[ust]?.sorular_surum
-    if (ss == null) return { ust, surum: null, kayitlar: null, paket: null }
-    const paket = sorulariOku(nsYolu, ust, ss)
-    if (!paket) return { ust, surum: null, kayitlar: null, paket: null }
-    const but = yanitButunluk(paket, yanitlariHamOku(nsYolu, ust, ss))
-    if (but.durum !== 'gecerli') return { ust, surum: null, kayitlar: null, paket: null }
-    return { ust, surum: ss, kayitlar: but.yanitlar, paket }
+    return birimUstYanitTuket(nsYolu, state.asamalar, ustAsama(asama))
   }
 
   // Aşama çıktısından sorular paketini üret + sürümlü yaz. surum≥2 (—geri v++) ise bir
   // önceki sürümün yanıtları ÖN-DOLGU olarak iliştirilir (öneri; asla oto-tüketilmez).
+  // İnce sarmalayıcı — genel mantık tools/planlamaBirimMotoru.mjs'de.
   function sorulariUretVeYaz(asama, surum, icerik) {
-    if (!soruUretici) return null
-    // Ön-dolgu kaynağı = YANITI OLAN en son önceki sürüm (yanıtsız/başarısız ara sürümleri atla).
-    const kaynakSurum = surum >= 2 ? enSonYanitliOncekiSurum(nsYolu, asama, surum - 1) : null
-    const oncekiYanitlar = kaynakSurum ? oncekiYanitlariOku(nsYolu, asama, kaynakSurum) : null
-    const paket = soruUretici(asama, icerik, { projeId, surum, oncekiYanitlar })
-    sorulariYaz(nsYolu, paket)
-    return paket
+    return birimSorulariUretVeYaz(nsYolu, soruUretici, asama, surum, icerik, projeId)
   }
 
-  // Bir aşamayı KOŞTUR: sürümlü yaz, defter tut, kapıla. TEK executor çağrısı burada.
+  // Bir aşamayı KOŞTUR — birimKostur'un (tools/planlamaBirimMotoru.mjs) ince sarmalayıcısı.
+  // Davranış BİREBİR korunur: SON_ASAMA (master-plan) geçince onay-kapısı OLMADAN doğrudan
+  // tamamlanır — MEĞER Kİ masterPlanBolumleri opt-in AÇIK olsun (o zaman bu fonksiyona hiç
+  // GİRİLMEZ, bkz ileriMod'daki bölüm-yürüyüşü dispatch'i).
   async function asamaKostur(asama) {
-    const as = state.asamalar[asama]
-    const yeniSurum = (as.surum ?? 0) + 1
-    const hedefDosya = join(nsYolu, asamaDosyaAdi(asama, yeniSurum))
-    const baglamlar = baglamlarKur()
-    const ust = ustAsama(asama)
-
-    // PROVENANS + TÜKETİM: üstün GEÇERLİ yanıtları (varsa) bu koşuma besle ve hangi yanıt
-    // sürümünü tükettiğini state'e yaz (izlenebilirlik #5). MODELSİZ (yalnız dosya okur).
-    const tuketim = ustYanitlariTuket(asama)
-    as.tuketilen_ust_yanit_surum = tuketim.surum
-
-    log(`EXECUTE ${asama} (sürüm ${yeniSurum} → ${asamaDosyaAdi(asama, yeniSurum)})` +
-        (tuketim.surum != null ? ` [üst yanıt v${tuketim.surum} tüketiliyor]` : ''))
-    as.durum = 'kosuyor'
-    statePersist(nsYolu, state)
-
-    let sonuc
-    try {
-      executorCagriSayisi++
-      sonuc = await executor(asama, { hedefDosya, baglamlar, yanitlar: tuketim })
-    } catch (e) {
-      log(`HATA ${asama}: ${e.message}`)
-      as.durum = 'donduruldu'
-      as.blok_nedeni = `executor hatası: ${e.message.slice(0, 200)}`
-      statePersist(nsYolu, state)
-      return sonucDon({ durdu: 'donduruldu' })
-    }
-    kostuAsama = asama
-
-    // Sürüm defteri — AÇIK (dizin listesinden değil, state'ten).
-    as.surum = yeniSurum
-    as.cikti_pointer = sonuc.cikti_pointer ?? hedefDosya
-    as.kabul_edilen_ust_surum = ust ? (state.asamalar[ust].surum ?? 0) : null
-
-    if (sonuc.maliyet_usd != null) {
-      maliyet.asamalar[asama] = sonuc.maliyet_usd
-      maliyet.toplam += sonuc.maliyet_usd
-    }
-    const sureStr    = sonuc.sure_ms    != null ? ` ${(sonuc.sure_ms / 1000).toFixed(1)}s` : ''
-    const maliyetStr = sonuc.maliyet_usd != null ? ` $${sonuc.maliyet_usd.toFixed(4)}`      : ''
-
-    // KAPI — çalıştırma-kapısı ve onay-yeniden-doğrulaması AYNI fonksiyon (zayıflatma yok).
-    const g = kapidanGecerMi(asama, sonuc.icerik)
-    if (!g.gecti) {
-      log(`GATE ${asama} -> donduruldu (${g.neden})`)
-      as.durum = 'donduruldu'
-      as.kapi_sonuc = 'reddedildi'
-      as.blok_nedeni = g.neden
-      statePersist(nsYolu, state)
-      return sonucDon({ durdu: 'donduruldu' })
-    }
-
-    as.kapi_sonuc = 'gecti'
-    as.blok_nedeni = null
-
-    // SORU ÜRETİMİ (deterministik, MODELSİZ) — her aşama koşumu, çıktısıyla birlikte
-    // sürümlü bir sorular artefaktı üretir. Bu tek ek executor çağrısı DEĞİLDİR (soruUretici
-    // model çağırmaz) → "bir-koşum-bir-executor-çağrısı" sözleşmesi bozulmaz.
-    const paket = sorulariUretVeYaz(asama, yeniSurum, sonuc.icerik)
-    as.sorular_surum = paket ? yeniSurum : null
-
-    if (asama === SON_ASAMA) {
-      // Son aşama geçti → tamamla (son aşamadan SONRA onay kapısı YOK; artefakt yine üretildi).
-      as.durum = 'gecti'
-      ilerlet(state) // → 'tamamlandi'
-      statePersist(nsYolu, state)
-      log(`GATE ${asama} -> gecti (SON AŞAMA)${sureStr}${maliyetStr}`)
-      return sonucDon({ durdu: 'tamamlandi' })
-    }
-    as.durum = 'onay-bekliyor'
-    statePersist(nsYolu, state)
-    // Koşum-sonrası ilk durak: taze koşumda yanıt dosyası yoktur → substantive soru varsa
-    // 'sorular-acik', yoksa (yalnız-APPROVAL) 'onay-bekliyor' (birebir eski kapı).
-    const d = acikDurum(asama)
-    const soruStr = paket ? ` [${paket.sorular.length} soru${d.acik.length ? `, ${d.acik.length} açık` : ''}${paket.ertelenen?.length ? `, ${paket.ertelenen.length} ertelenen` : ''}]` : ''
-    log(`GATE ${asama} -> gecti; ${d.engelli ? 'SORULAR AÇIK' : 'ONAY BEKLİYOR'}${soruStr}${sureStr}${maliyetStr}`)
-    return onayNoktasiDon(asama, d)
+    return birimKostur(asama, {
+      sira: GERCEK_ASAMALAR,
+      birimler: state.asamalar,
+      nsYolu, projeId,
+      dosyaAdiFn: asamaDosyaAdi,
+      kapiFn: kapidanGecerMi,
+      executorFn: executor,
+      soruUretici,
+      baglamlar: baglamlarKur(),
+      log, maliyet, executorSayaci, kostuTutucu,
+      statePersistFn: () => statePersist(nsYolu, state),
+      sonucDonFn: sonucDon,
+      onSonBirimTamamlandi: ({ as, birimId, sureStr, maliyetStr }) => {
+        // Eski davranış BİREBİR: son aşamadan SONRA onay kapısı YOK, doğrudan tamamla.
+        as.durum = 'gecti'
+        ilerlet(state) // → 'tamamlandi'
+        statePersist(nsYolu, state)
+        log(`GATE ${birimId} -> gecti (SON AŞAMA)${sureStr}${maliyetStr}`)
+        return sonucDon({ durdu: 'tamamlandi' })
+      },
+    })
   }
 
   // ── mod='tut' (OLDUĞU-GİBİ-KABUL) ────────────────────────────────────────────
@@ -254,6 +174,13 @@ export async function planlamaLoopV2Calistir(nsYolu, projeId, executor, {
     const A = state.aktif_asama
     if (A === 'tamamlandi') {
       throw new Error('tut: pipeline tamamlanmış — tutulacak aktif aşama yok')
+    }
+    if (A === SON_ASAMA && masterPlanBolumleri) {
+      throw new Error(
+        `tut: master-plan bölüm-yürüyüşünde desteklenmiyor (yeni 4-etiket sözlüğü eski kapıyla ` +
+        `uyumsuz olurdu) — ilgili bölüme "--geri <bölüm-id>" ile dön, orada normal koşum veya ` +
+        `bölüm-seviyesi onay uygula`
+      )
     }
     const As = state.asamalar[A]
     const bayat = As.durum === 'gecti' && bayatMi(state, A)
@@ -324,6 +251,17 @@ export async function planlamaLoopV2Calistir(nsYolu, projeId, executor, {
     while (true) {
       const A = state.aktif_asama
       if (A === 'tamamlandi') return sonucDon({ durdu: 'tamamlandi' })
+
+      // Master-plan BÖLÜM-YÜRÜYÜŞÜ opt-in AÇIKKEN: bu birimin TÜM yaşam-döngüsü (bekliyor/
+      // kosuyor/onay-bekliyor) planlamaBolumLoop.mjs'e devredilir — asla aşağıdaki genel
+      // durum/kapı yoluna (yeni 4-etiket sözlüğü eskisiyle uyumsuz olurdu) düşmez. Opt-in
+      // KAPALIYKEN bu blok hiç çalışmaz — aşağıdaki mevcut kod birebir eskisi gibi işler.
+      if (A === SON_ASAMA && masterPlanBolumleri) {
+        return await bolumLoopCalistir(nsYolu, projeId, state, {
+          executor, log, maliyet, executorSayaci, kostuTutucu, soruUretici, sonucDonFn: sonucDon,
+        })
+      }
+
       const As = state.asamalar[A]
 
       // Dondurulmuş → yeniden-doğrula (elle düzeltme kurtarma yolu).

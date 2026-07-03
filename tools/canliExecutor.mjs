@@ -6,6 +6,7 @@
 import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { claudeCalistirRetry, guvenliYaz } from './canliYurutucu.mjs'
+import { TUM_BOLUMLER_ISARETI } from './planlamaBolumTanimlari.mjs'
 
 const ASAMA_DOSYALARI = {
   genesis:        'genesis.md',
@@ -310,6 +311,97 @@ Belgenin başına veya sonuna yorum/açıklama EKLEME. Sadece belge içeriği.`
   }
 }
 
+// master-plan bölümlerinin İDDİA-STATÜSÜ kuralı — planlamaIddiaDurumu.mjs'deki 4 etiketin
+// prompt-metni karşılığı. 13 asıl bölüme (özet-yönetici + provenans-ek HARİÇ) uygulanır.
+const IDDIA_KURALI = `\
+İDDİA-STATÜSÜ İÇİN ZORUNLU KURAL — ihlal → bölüm kapıdan geri döner:
+Başlık/tablo-ayracı/boş satır DIŞINDAKİ HER içerik satırı şu 4 etiketten TAM BİRİNİ taşımalı
+(tablo VERİ satırları DAHİL — bir hücredeki iddia da aynı satırda etiket taşımalı):
+  [dogrulandi:<kaynak-adı>]                    — kaynağa dayalı, doğrulanmış
+  [operator-beyan:<soru-anahtari>]             — operatörün kendi kararı (bir soru yanıtından)
+  [operator-onayli-tahmin:<soru-anahtari>]     — operatörün açıkça kabul ettiği tahmin
+  [acik-soru:<soru-anahtari-veya-konu>]        — henüz çözülmemiş
+
+Etiketsiz satır BIRAKMA; statüsü belirsizse [acik-soru:...] kullan, SESSİZCE atlama.`
+
+// Bölüm tanımının ustBaglamAnahtarlari'na göre bağlam-blokları kur (TUM_BOLUMLER_ISARETI ⟹
+// o ana kadarki TÜM diğer bölümler/aşamalar — baglamlar objesinde ne varsa).
+function bolumBaglamBlogu(bolumTanim, baglamlar) {
+  const bloklar = []
+  const eklenen = new Set()
+  for (const anahtar of bolumTanim.ustBaglamAnahtarlari) {
+    if (anahtar === TUM_BOLUMLER_ISARETI) {
+      for (const [k, icerik] of Object.entries(baglamlar)) {
+        if (icerik != null && !eklenen.has(k)) { bloklar.push(`<${k}>\n${icerik}\n</${k}>`); eklenen.add(k) }
+      }
+      continue
+    }
+    if (eklenen.has(anahtar)) continue
+    const icerik = baglamlar[anahtar]
+    if (icerik != null) { bloklar.push(`<${anahtar}>\n${icerik}\n</${anahtar}>`); eklenen.add(anahtar) }
+  }
+  return bloklar.join('\n')
+}
+
+// Master-plan BÖLÜM prompt'u — promptUret'in KARDEŞİ (switch-case'e EKLENMEZ). 14 bölüm + ek
+// için VERİDEN (BOLUM_TANIMLARI) üretilir; 14 kez elle yazılmaz. promptUret'in 5 case'i
+// TAMAMEN DOKUNULMADAN kalır.
+export function promptUretBolum(bolumId, proje, baglamlar, bolumTanim) {
+  const { ad, aciklama } = proje
+  const projeBaslik = `PROJE: ${ad} — ${aciklama}`
+  const baglamBlogu = bolumBaglamBlogu(bolumTanim, baglamlar)
+
+  if (bolumTanim.mekanik) {
+    // Provenans-eki: mekanik biçimlendirme — veri planlamaBolumLoop.mjs tarafından
+    // baglamlar.__provenansVerisi içine ÖNCEDEN yapılandırılmış olarak konur.
+    const veri = baglamlar.__provenansVerisi ?? { tumIddialar: [], tumAtlananlar: [] }
+    return `\
+${bolumTanim.hedefAciklama} Türkçe yaz.
+
+${projeBaslik}
+
+TOPLANMIŞ İDDİALAR (kaynak/soru-referansı + statü) — JSON:
+${JSON.stringify(veri.tumIddialar, null, 2)}
+
+ATLANAN SORULAR — JSON:
+${JSON.stringify(veri.tumAtlananlar, null, 2)}
+
+GÖREV: Yukarıdaki veriyi "${bolumTanim.etiket}" başlığı altında okunaklı bir listeye çevir — her
+iddia için kaynak/soru-referansı + statüsünü göster; her atlanan soruyu ayrı bir alt-listede
+göster. YENİ İDDİA ÜRETME/UYDURMA — yalnız verilen veriyi sadakatle biçimlendir.
+Belgenin başına veya sonuna yorum/açıklama EKLEME. Sadece belge içeriği.`
+  }
+
+  if (bolumTanim.iddiaMuaf) {
+    return `\
+${bolumTanim.hedefAciklama} Türkçe yaz.
+
+${projeBaslik}
+
+BAĞLAM — tüm diğer bölümler:
+${baglamBlogu}
+
+GÖREV: "${bolumTanim.etiket}" başlığı altında 4-6 paragraflık nitel bir sentez yaz. HİÇBİR
+köşeli-parantez statü etiketi KULLANMA, HİÇBİR sayı/figür YAZMA (yeniden ifade edilmiş olsa
+bile) — yalnız düz-yazı sentez. Yukarıdaki bölümlere GÖNDERME yap ama sayı/rakam TEKRARLAMA.
+Belgenin başına veya sonuna yorum/açıklama EKLEME. Sadece belge içeriği.`
+  }
+
+  return `\
+${bolumTanim.etiket} bölümü — master-plan'ın bir alt-bölümü. Türkçe yaz.
+
+${projeBaslik}
+
+BAĞLAM:
+${baglamBlogu || '(bu bölüm için özel üst bağlam yok — proje geneline dayan)'}
+
+GÖREV: ${bolumTanim.hedefAciklama}
+
+${IDDIA_KURALI}
+
+Belgenin başına veya sonuna yorum/açıklama EKLEME. Sadece "${bolumTanim.etiket}" başlıklı bölüm içeriği.`
+}
+
 /**
  * @param {string} nsYolu — namespace dizini (scope-lock sınırı)
  * @param {{ id, ad, aciklama }} projeConfig
@@ -336,7 +428,11 @@ export function canliExecutorOlustur(nsYolu, projeConfig, opts = {}) {
   async function executor(asama, opts = {}) {
     const kullanilanBaglamlar = opts.baglamlar ?? baglamlar
     // Operatör yanıtları (üst aşamadan tüketilen) prompt'a BAĞLAYICI bağlam olarak eklenir.
-    const prompt = promptUret(asama, projeConfig, kullanilanBaglamlar) + yanitlarMetni(opts.yanitlar)
+    // opts.bolumTanim verilmişse (master-plan bölüm-yürüyüşü) promptUretBolum'a dispatch et —
+    // promptUret'in 5 case'i DOKUNULMADAN kalır.
+    const prompt = opts.bolumTanim
+      ? promptUretBolum(asama, projeConfig, kullanilanBaglamlar, opts.bolumTanim) + yanitlarMetni(opts.yanitlar)
+      : promptUret(asama, projeConfig, kullanilanBaglamlar) + yanitlarMetni(opts.yanitlar)
     // Geçici hatalar (timeout/non-zero-exit/JSON-parse) sınırlı-retry ile kurtarılır;
     // zincir bir tekil-deneme hatasıyla ABORT olmaz. Tüm denemeler tükenirse net hata.
     const sonuc  = await claudeCalistirRetry(prompt, { model: 'claude-sonnet-4-6', zaman_asimi_ms, maxDeneme, log })

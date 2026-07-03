@@ -10,6 +10,8 @@ import { canliExecutorOlustur } from './canliExecutor.mjs'
 import { planlamaLoopV2Calistir } from './planlamaLoopV2.mjs'
 import { stateYukle, statePersist, geriAsamaya } from './planlamaDurumMakinesiV2.mjs'
 import { varsayilanSoruUretici } from './planlamaSorular.mjs'
+import { BOLUM_TANIMLARI } from './planlamaBolumTanimlari.mjs'
+import { bolumeGeriDon } from './planlamaBolumLoop.mjs'
 
 /**
  * Pipeline'ı bir adım işlet.
@@ -23,8 +25,12 @@ export async function planlamaBaslat(nsYolu, projeId, projeConfig, opts = {}) {
   const { log = () => {}, mod = 'ileri' } = opts
   const { executor } = canliExecutorOlustur(nsYolu, projeConfig, { log })
   // Canlı akışta SORU–YANIT katmanı AÇIK (deterministik üretici). Ham loop'ta varsayılan
-  // KAPALI'dır (geriye-uyum); burada açıkça enjekte ediyoruz.
-  return planlamaLoopV2Calistir(nsYolu, projeId, executor, { log, mod, soruUretici: varsayilanSoruUretici })
+  // KAPALI'dır (geriye-uyum); burada açıkça enjekte ediyoruz. Aynı şekilde master-plan
+  // BÖLÜM-YÜRÜYÜŞÜ de yalnız GERÇEK CLI'da (burada) açılır — BOLUM_TANIMLARI'nın varlığı
+  // opt-in'in kendisidir (bkz tools/planlamaLoopV2.mjs'deki masterPlanBolumleri).
+  return planlamaLoopV2Calistir(nsYolu, projeId, executor, {
+    log, mod, soruUretici: varsayilanSoruUretici, masterPlanBolumleri: BOLUM_TANIMLARI,
+  })
 }
 
 /**
@@ -35,6 +41,19 @@ export async function planlamaBaslat(nsYolu, projeId, projeConfig, opts = {}) {
 export function planlamaGeri(nsYolu, projeId, hedef) {
   const state = stateYukle(nsYolu, projeId)
   geriAsamaya(state, hedef) // geçersizse throw — aşağıdaki persist'e ULAŞILMAZ (state değişmez)
+  statePersist(nsYolu, state)
+  return state
+}
+
+/**
+ * SIHHATLİ BÖLÜM GERİ-DÖNÜŞÜ: master-plan'ın 14 bölümü + provenans-eki İÇİNDE bir bölüme geri
+ * döner (planlamaGeri'nin bölüm-seviyesi eşi — aynı birimGeriDon çekirdeğini kullanır).
+ * Geçersiz hedefte veya walk henüz başlamadıysa HATA fırlatır, state DEĞİŞMEZ.
+ * @returns {object} — güncellenmiş state
+ */
+export function planlamaBolumeGeri(nsYolu, projeId, hedefBolumId) {
+  const state = stateYukle(nsYolu, projeId)
+  bolumeGeriDon(state, hedefBolumId) // geçersizse throw — persist'e ULAŞILMAZ
   statePersist(nsYolu, state)
   return state
 }
