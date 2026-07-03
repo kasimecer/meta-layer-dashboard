@@ -1,0 +1,17 @@
+{
+  "asama": "genesis",
+  "surum": 1,
+  "soruImza": "b4297e67213fb06b",
+  "yanitlar": [
+    {
+      "anahtar": "secim:aday",
+      "secim": "Mikro-Lokasyon Optimizasyonu"
+    },
+    {
+      "anahtar": "serbest:genesis-baglam",
+      "atlandi": true,
+      "gerekce": "demo: bu aşamada eklenecek ek bağlam yok"
+    }
+  ],
+  "projeId": "_demo-soru-yanit-2026-07-03t05-19-42"
+}
