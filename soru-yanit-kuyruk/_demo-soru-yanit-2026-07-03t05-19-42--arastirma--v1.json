@@ -1,0 +1,36 @@
+{
+  "asama": "arastirma",
+  "surum": 1,
+  "soruImza": "4913aff04d89b84f",
+  "yanitlar": [
+    {
+      "anahtar": "veri:euromonitor-tr-2023",
+      "karar": "veri",
+      "deger": "yaklaşık 480 milyon TL",
+      "kaynak": "Euromonitor TR 2023 raporu (operatör erişimi)"
+    },
+    {
+      "anahtar": "veri:ibisworld-interior-plantscaping-2024",
+      "karar": "tahmin"
+    },
+    {
+      "anahtar": "veri:jll-i-stanbul-ofis-raporu-2024",
+      "karar": "dusur"
+    },
+    {
+      "anahtar": "veri:cbre-i-stanbul-2024",
+      "karar": "veri",
+      "deger": "İstanbul ofis dolulukta yıllık %8 büyüme",
+      "kaynak": "CBRE İstanbul 2024"
+    },
+    {
+      "anahtar": "veri:well-building-institute-2024",
+      "karar": "tahmin"
+    },
+    {
+      "anahtar": "veri:statista-tr-saas-2024",
+      "karar": "dusur"
+    }
+  ],
+  "projeId": "_demo-soru-yanit-2026-07-03t05-19-42"
+}
