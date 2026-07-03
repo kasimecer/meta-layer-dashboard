@@ -8,6 +8,15 @@ Statik site (GH-Pages) **olduğu gibi kalır**. Bu Worker ayrı bir write/auth e
   çalışan `node scripts/intake-queue-watch.mjs` bu dosyayı bulup YEREL materyalize eder (kayıt +
   proje dosyaları). Planlama pipeline'ını başlatmaz — bu insan tarafından ayrı, elle bir terminal
   komutuyla yapılır (`node scripts/planlama-baslat.mjs <id>`). Bkz `intake-kuyruk/README.md`.
+- `POST /soru-yanit-queue` — planlama sorularına operatör yanıtını
+  `soru-yanit-kuyruk/<projeId>--<asama>--v<surum>.json` olarak commit eder (`SUBMIT_TOKEN`
+  kapısı, aynı token). Worker burada **yanıt artefaktına YAZMAZ** / sürüm-tazeliği ya da
+  bütünlük **DEĞERLENDİRMEZ** — yalnız git'e yazar (sığ doğrulama: alan varlığı + `asama`
+  whitelist + `surum` tam-sayı). Kullanıcının kendi makinesinde çalışan
+  `node scripts/soru-yanit-queue-watch.mjs` bu dosyayı bulup gerçek sürüm/imza tazeliğini
+  denetler ve YEREL yanıt artefaktına yazar. Planlama pipeline'ını başlatmaz/ilerletmez — bu
+  insan tarafından ayrı, elle bir terminal komutuyla yapılır (`node scripts/planlama-baslat.mjs
+  <id>`). Bkz `soru-yanit-kuyruk/README.md`.
 - `GET /operator` — `OPERATOR_TOKEN` kapısı (şimdilik **iskelet**: veriyi henüz servis etmez).
 - `GET /health` — canlılık testi.
 
@@ -87,6 +96,32 @@ başlatmak/devam ettirmek insan tarafından, ayrı bir terminal komutuyla yapıl
 node scripts/planlama-baslat.mjs            # bekleyen/kısmi/bloke/tamamlanmış projeleri listeler
 node scripts/planlama-baslat.mjs <id>       # o proje için pipeline'ı başlat/devam ettir
 ```
+
+---
+
+## Soru-yanıt kuyruğu izleyici (yerel yanıt-artefaktı yazımı)
+
+`.env`'de `VITE_WORKER_URL`/`VITE_SUBMIT_TOKEN` doluysa `#/sorular/<id>` ekranındaki yanıt
+formu operatörün cevaplarını `POST /soru-yanit-queue` ile kuyruğa alır. Bunu işlemek için
+makinende izleyiciyi çalıştır:
+
+```bash
+node scripts/soru-yanit-queue-watch.mjs            # her 45s'de bir kontrol eder, açık kalır
+node scripts/soru-yanit-queue-watch.mjs --once      # tek tur (test/cron için)
+```
+
+İzleyici `git pull` yapar, `soru-yanit-kuyruk/*.json` bulur, HER gönderim için gerçek
+GÜNCEL soru sürümünü (`planlama-durum.json`'dan, gönderimdeki değeri DEĞİL) okuyup sürüm/imza
+tazeliğini denetler: eşleşirse `tools/planlamaSorular.mjs`'in kendi `yanitKaydet`/`atlaYaz`
+fonksiyonlarıyla YEREL yanıt artefaktına yazar; eşleşmezse (bayat/kurcalanmış/defekt) gönderimi
+SESSİZCE atmaz — `soru-yanit-kuyruk/reddedilen/`e taşır ve yüksek sesle loglar. İşlenen/reddedilen
+her öğe kuyruktan kaldırılıp push edilir. **Yalnız makine + bu process açıkken çalışır** —
+kapatılırsa gönderim kuyrukta bekler.
+
+İzleyici planlama pipeline'ını BAŞLATMAZ/İLERLETMEZ — yanıt artefaktına yazmak ile pipeline'ı
+ilerletmek kasıtlı olarak ayrı iki iştir. Pipeline'ı ilerletmek insan tarafından, ayrı bir
+terminal komutuyla yapılır: `node scripts/planlama-baslat.mjs <id>`. Bkz
+`soru-yanit-kuyruk/README.md`.
 
 ---
 

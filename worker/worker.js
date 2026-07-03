@@ -1,15 +1,19 @@
 // meta-layer-write — TEK standalone Cloudflare Worker.
-// Üç iş taşır: (1) yazma-yolu    POST /submit        (partner cevabı → GitHub inbox dosyası)
-//              (2) intake-kuyruğu POST /intake-queue  (taslak → GitHub kuyruk dosyası; yerel
-//                  izleyici (scripts/intake-queue-watch.mjs) bunu görüp materyalize+loop koşar)
-//              (3) auth temeli    GET  /operator       (OPERATOR_TOKEN kapısı — şimdilik iskelet)
+// Dört iş taşır: (1) yazma-yolu    POST /submit             (partner cevabı → GitHub inbox dosyası)
+//                (2) intake-kuyruğu POST /intake-queue       (taslak → GitHub kuyruk dosyası; yerel
+//                    izleyici (scripts/intake-queue-watch.mjs) bunu görüp materyalize+loop koşar)
+//                (3) soru-yanıt-kuyruğu POST /soru-yanit-queue (planlama sorularına operatör yanıtı →
+//                    GitHub kuyruk dosyası; yerel izleyici (scripts/soru-yanit-queue-watch.mjs) bunu
+//                    görüp planlama SORU–YANIT artefaktına yazar — pipeline'ı BAŞLATMAZ/İLERLETMEZ)
+//                (4) auth temeli    GET  /operator            (OPERATOR_TOKEN kapısı — şimdilik iskelet)
 //
 // GH-Pages statik kalır (RE-HOST YOK). Statik site bu Worker'ı ayrı origin'den çağırır → CORS şart.
 // Worker HİÇBİR ZAMAN `claude` çalıştırmaz / pipeline'a dokunmaz — yalnız git'e yazar. Abonelik-auth
 // gerektiren tüm iş (materyalize + planlama pipeline) YEREL izleyicide, kullanıcının makinesinde kalır.
 //
 // Yapılandırma (wrangler [vars], HARDCODE YOK):
-//   GH_OWNER, GH_REPO, GH_BRANCH, INBOX_PATH, INTAKE_QUEUE_PATH, ALLOWED_ORIGIN (virgülle çok-origin)
+//   GH_OWNER, GH_REPO, GH_BRANCH, INBOX_PATH, INTAKE_QUEUE_PATH, SORU_YANIT_QUEUE_PATH,
+//   ALLOWED_ORIGIN (virgülle çok-origin)
 // Secret (wrangler secret put — repoya GİRMEZ):
 //   GITHUB_TOKEN (server-side, GERÇEK) · SUBMIT_TOKEN (client'ta görünür, hafif kapı) · OPERATOR_TOKEN (server-side, GERÇEK)
 
@@ -35,6 +39,9 @@ export default {
       }
       if (url.pathname === '/intake-queue' && request.method === 'POST') {
         return await handleIntakeQueue(request, env, origin)
+      }
+      if (url.pathname === '/soru-yanit-queue' && request.method === 'POST') {
+        return await handleSoruYanitQueue(request, env, origin)
       }
       if (url.pathname === '/operator' && request.method === 'GET') {
         return await handleOperator(request, env, origin, url)
@@ -127,6 +134,65 @@ async function handleIntakeQueue(request, env, origin) {
   const kuyrukYol = `${kuyrukDizin}/${id}.json`
 
   const sonuc = await putGithubJsonFile(gh, kuyrukYol, taslak, `intake-app: kuyruk (${id})`)
+  if (!sonuc.ok) return json({ ok: false, hata: sonuc.hata }, sonuc.status || 502, origin, env)
+
+  return json({ ok: true, commit: sonuc.commit, path: kuyrukYol }, 200, origin, env)
+}
+
+// ============================================================
+// POST /soru-yanit-queue — planlama sorularına operatör yanıtını kuyruğa yazar
+// body: { gonderim: { projeId, asama, surum, soruImza, yanitlar } } · header: x-submit-token
+// Worker BURADA yanıt artefaktına YAZMAZ / kapı/bütünlük/bayatlık DEĞERLENDİRMEZ — yalnız
+// git'e commit eder. Gerçek doğrulama (sürüm/imza tazeliği, tip-özgü yanıt şekli, tüm-ya-da-
+// hiç uygulama) scripts/soru-yanit-queue-watch.mjs'de, kullanıcının kendi makinesinde koşar.
+// Doğrulama burada BİLEREK sığ (varlık/tip/whitelist) — derin anlam kontrolü izleyicinin işi
+// (bkz worker.js dosya başı yorumu; "Worker = saf git-yazma rölesi").
+// ============================================================
+const GECERLI_ASAMALAR = new Set(['genesis', 'premise', 'arastirma', 'strateji', 'master-plan'])
+
+async function handleSoruYanitQueue(request, env, origin) {
+  if (origin && !originAllowed(origin, env)) {
+    return json({ ok: false, hata: 'origin reddedildi' }, 403, origin, env)
+  }
+  const token = request.headers.get('x-submit-token') || bearer(request)
+  if (!env.SUBMIT_TOKEN || !safeEqual(token, env.SUBMIT_TOKEN)) {
+    return json({ ok: false, hata: 'yetkisiz' }, 401, origin, env)
+  }
+
+  let body
+  try { body = await request.json() } catch { return json({ ok: false, hata: 'geçersiz json' }, 400, origin, env) }
+
+  const gonderim = body?.gonderim
+  const projeId   = String(gonderim?.projeId || '').trim()
+  const asama     = String(gonderim?.asama || '').trim()
+  const surum     = gonderim?.surum
+  const soruImza  = String(gonderim?.soruImza || '').trim()
+  const yanitlar  = gonderim?.yanitlar
+
+  if (!projeId || !asama || !soruImza || !Array.isArray(yanitlar) || yanitlar.length === 0) {
+    return json({ ok: false, hata: 'eksik alan (projeId/asama/soruImza/yanitlar)' }, 400, origin, env)
+  }
+  // Path-traversal koruması: aynı slug kuralı intake-kuyruğu ile — _demo-*/_test-* izinli.
+  if (!/^[a-z0-9_][a-z0-9_-]{0,80}$/.test(projeId)) {
+    return json({ ok: false, hata: 'geçersiz projeId biçimi' }, 400, origin, env)
+  }
+  if (!GECERLI_ASAMALAR.has(asama)) {
+    return json({ ok: false, hata: 'geçersiz asama' }, 400, origin, env)
+  }
+  if (!Number.isInteger(surum) || surum < 1) {
+    return json({ ok: false, hata: 'geçersiz surum (pozitif tam sayı olmalı)' }, 400, origin, env)
+  }
+  // Hafif boyut/temizlik koruması (abuse / dev kazası) — intake-kuyruğu ile aynı sınır.
+  const boyut = JSON.stringify(gonderim).length
+  if (boyut > 200_000) return json({ ok: false, hata: 'gönderim çok büyük' }, 413, origin, env)
+
+  const gh = ghConfig(env)
+  if (!gh.token) return json({ ok: false, hata: 'GITHUB_TOKEN ayarlı değil' }, 500, origin, env)
+
+  const kuyrukDizin = String(env.SORU_YANIT_QUEUE_PATH || 'soru-yanit-kuyruk').replace(/\/$/, '')
+  const kuyrukYol = `${kuyrukDizin}/${projeId}--${asama}--v${surum}.json`
+
+  const sonuc = await putGithubJsonFile(gh, kuyrukYol, gonderim, `soru-yanit-app: kuyruk (${projeId}/${asama} v${surum})`)
   if (!sonuc.ok) return json({ ok: false, hata: sonuc.hata }, sonuc.status || 502, origin, env)
 
   return json({ ok: true, commit: sonuc.commit, path: kuyrukYol }, 200, origin, env)
