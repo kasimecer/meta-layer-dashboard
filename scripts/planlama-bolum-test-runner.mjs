@@ -144,6 +144,19 @@ bolum('T — İddia-statüsü: etiketsiz satır mekanik olarak REDDEDİLİR')
   const g2 = bolumKapidanGecerMi('urun-tanimi', BOZUK_BOLUM.etiketsizSatir)
   ok('T: etiketsiz satır taşıyan içerik REDDEDİLİR', !g2.gecti)
   ok('T: red nedeni "statüsüz iddia" + satır numarasını işaret eder', /statüsüz iddia \(satır \d+\)/.test(g2.neden ?? ''))
+
+  // Regresyon (GERÇEK model koşumunda bulundu): tablo BAŞLIK satırı (kolon adları, ayıraçtan
+  // hemen önce) bir iddia DEĞİLDİR — etiket taşıması BEKLENMEMELİ. Yalnız VERİ satırları etiketli
+  // olmak zorunda.
+  const tabloIcerik = `# Ürün/Hizmet Tanımı (MVP) — Test Projesi
+
+| Boyut | Tanım |
+|-------|-------|
+| Kapsam | MVP kapsamı tek bir varyanttır. [operator-beyan:mvp-sinir] |
+| Yol Haritası | İkinci varyant pilot sonrası eklenir. [operator-beyan:yol-haritasi] |
+`
+  const g3 = bolumKapidanGecerMi('urun-tanimi', tabloIcerik)
+  ok('T: tablo BAŞLIK satırı (kolon adları) etiketsiz olsa da kapıdan GEÇER (iddia değildir)', g3.gecti)
 }
 
 // ════════════════════════════════════════════════════════════════════════════

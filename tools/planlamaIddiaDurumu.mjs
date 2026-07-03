@@ -52,8 +52,20 @@ function anlamliMi(satir) {
   return temiz.length >= 5
 }
 
+// Bir satır tablo BAŞLIĞI mı (kolon adları)? Standart markdown tablo şekli: başlık satırı,
+// hemen ardından ayıraç (|---|---|), sonra veri satırları. Ayıraçtan HEMEN ÖNCEKİ tablo-şekilli
+// satır başlıktır — kolon adı bir iddia DEĞİLDİR, etiket taşıması BEKLENMEZ (tabloVeriSatirSayisi
+// [planlamaKapilari.mjs] ile AYNI ilişkiyi ters yönden kullanır: o ayıraçtan SONRAsını "veri" sayar,
+// bu ayıraçtan HEMEN ÖNCEsini "başlık" sayar).
+function tabloBasligiMi(satirlar, i) {
+  if (!/^\s*\|.*\|\s*$/.test(satirlar[i])) return false
+  const sonraki = satirlar[i + 1]
+  return sonraki != null && TABLO_AYIRAC_DESENI.test(sonraki)
+}
+
 // İlk statüsüz (etiketsiz) içerik satırını bul — yoksa null. ciplakSayiVarMi'nin satır-bazlı
-// tarama biçimiyle AYNI (boş/başlık/tablo-ayracı/salt-dekoratif atlanır; tablo VERİ satırı atlanmaz).
+// tarama biçimiyle AYNI (boş/başlık/tablo-ayracı/tablo-başlığı/salt-dekoratif atlanır; tablo
+// VERİ satırı atlanmaz).
 export function statususuzSatirBul(icerik) {
   const satirlar = String(icerik ?? '').split('\n')
   for (let i = 0; i < satirlar.length; i++) {
@@ -61,6 +73,7 @@ export function statususuzSatirBul(icerik) {
     if (!satir.trim()) continue
     if (/^\s*#/.test(satir)) continue
     if (TABLO_AYIRAC_DESENI.test(satir)) continue
+    if (tabloBasligiMi(satirlar, i)) continue
     if (!anlamliMi(satir)) continue
     if (!new RegExp(IDDIA_ETIKET_KAYNAK).test(satir)) return { satirNo: i + 1, satir: satir.trim() }
   }
