@@ -21,7 +21,7 @@ import { planlamaLoopV2Calistir } from '../tools/planlamaLoopV2.mjs'
 import { boslukState, statePersist, stateYukle, asamaDosyaAdi } from '../tools/planlamaDurumMakinesiV2.mjs'
 import { BOLUM_SIRASI, BOLUM_TANIMLARI } from '../tools/planlamaBolumTanimlari.mjs'
 import { bolumKapidanGecerMi } from '../tools/planlamaBolumKapilari.mjs'
-import { bolumeGeriDon } from '../tools/planlamaBolumLoop.mjs'
+import { bolumeGeriDon, provenansEkRenderla } from '../tools/planlamaBolumLoop.mjs'
 import { iddialariCikar, iddialariCozumle } from '../tools/planlamaIddiaDurumu.mjs'
 import { dataRequestAdaylari, varsayilanSoruUretici, yanitKaydet, sorulariYaz, sorulariOku } from '../tools/planlamaSorular.mjs'
 import { FIKSTUR } from './planlama-test-fikstur.mjs'
@@ -60,23 +60,22 @@ function dortAsamaTamamlaSeed(ns, id) {
   return state
 }
 
-// provenans-ek MEKANİK bölümü için: gerçek promptUretBolum'un yaptığı gibi, verilen
-// __provenansVerisi'ni sadakatle (her param'ı literal içeren) biçimlendirir — coverage
-// kapısının GERÇEKTEN geçmesi için (mock, ama gerçek kapı mantığına karşı sınanıyor).
-function provenansEkOlustur(veri) {
-  const satirlar = ['# Provenans Eki — Test Projesi', '']
-  for (const i of (veri?.tumIddialar ?? [])) satirlar.push(`- ${i.tip}: ${i.param} (bölüm: ${i.bolumId})`)
-  for (const a of (veri?.tumAtlananlar ?? [])) satirlar.push(`- ATLANDI: ${a.anahtar} (bölüm: ${a.bolumId})`)
-  return satirlar.join('\n') + '\n'
-}
-
 // Bölüm-farkında mock executor — MODEL ÇAĞIRMAZ. overrides: {bolumId: icerik} belirli
 // bölümler için fikstürü değiştirir (mutasyon testleri için).
+//
+// provenans-ek İÇİN BİLEREK ÇAĞRILIRSA fırlatır: production artık bu bölüm için executor'ı
+// (mock ya da gerçek fark etmez) HİÇ ÇAĞIRMAMALI — içerik provenansEkRenderla ile
+// __provenansVerisi'nden mekanik üretilir (bkz planlamaBolumLoop.mjs bolumWalkAdimAt). Bu,
+// TÜM mevcut testler (D2a, PE, L, vb. — hepsi provenans-ek'e ulaşır) için ÖRTÜK bir regresyon
+// kalkanı: production bu bölüm için executor'a YANLIŞLIKLA geri dönerse, HER biri gürültülü
+// şekilde patlar.
 function bolumluExecutor(overrides = {}) {
   return async (birimId, opts) => {
+    if (birimId === 'provenans-ek') {
+      throw new Error('bolumluExecutor: provenans-ek İÇİN ÇAĞRILMAMALIYDI — mekanik render kullanılmalı (regresyon?)')
+    }
     let icerik
-    if (birimId === 'provenans-ek') icerik = provenansEkOlustur(opts.baglamlar?.__provenansVerisi)
-    else if (birimId in overrides) icerik = overrides[birimId]
+    if (birimId in overrides) icerik = overrides[birimId]
     else if (birimId in FIKSTUR_BOLUM) icerik = FIKSTUR_BOLUM[birimId]
     else if (birimId in FIKSTUR) icerik = FIKSTUR[birimId]
     else throw new Error(`bolumluExecutor: bilinmeyen birim "${birimId}"`)
@@ -409,6 +408,75 @@ bolum('PE — Regresyon: provenans-ek, GERÇEK soru/yanıt paketleriyle (varsayi
     const provPointer = nihaiState.asamalar['master-plan']?.bolumler?.['provenans-ek']?.cikti_pointer
     ok('PE: provenans-ek üretildi (cikti_pointer var ve dosya mevcut)', !!provPointer && existsSync(provPointer))
   } finally { temizle(ns) }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+bolum('PM — provenans-ek MEKANİK render: model/executor çağrısı YOK, %100 kapsam İNŞA GEREĞİ')
+{
+  // (a) Hedefli: 4 iddia tipinin HAM hâli + 3 çözümlenme yolu (veri/tahmin/hâlâ-açık) + 1
+  // atlanan kayıt — HEM ham `tip:param` (kapsam-kontrolü) HEM efektif statü/kaynak (asıl
+  // provenans bilgisi) render'da yer almalı.
+  const veriKucuk = {
+    tumIddialar: [
+      { bolumId: 'problem-cozum', satirNo: 1, satir: 'x', tip: 'dogrulandi', param: 'sektor-raporu-2026', efektifTip: 'dogrulandi', efektifKaynak: 'sektor-raporu-2026' },
+      { bolumId: 'problem-cozum', satirNo: 2, satir: 'x', tip: 'operator-beyan', param: 'mvp-sinir', efektifTip: 'operator-beyan', efektifKaynak: null },
+      { bolumId: 'pazar-analizi', satirNo: 3, satir: 'x', tip: 'operator-onayli-tahmin', param: 'buyume-tahmini', efektifTip: 'operator-onayli-tahmin', efektifKaynak: null },
+      { bolumId: 'pazar-analizi', satirNo: 4, satir: 'x', tip: 'acik-soru', param: 'veri:cozulmus-soru-1', efektifTip: 'dogrulandi', efektifKaynak: 'operator-verdigi-kaynak-42' },
+      { bolumId: 'urun-tanimi', satirNo: 5, satir: 'x', tip: 'acik-soru', param: 'veri:cozulmus-soru-2', efektifTip: 'operator-onayli-tahmin', efektifKaynak: null },
+      { bolumId: 'urun-tanimi', satirNo: 6, satir: 'x', tip: 'acik-soru', param: 'veri:hala-acik-soru', efektifTip: 'acik-soru', efektifKaynak: null },
+    ],
+    tumAtlananlar: [
+      { bolumId: 'butce-finansal', tip: 'DATA-REQUEST', anahtar: 'veri:dusurulmus-soru-1', gerekce: 'operatör test gerekçesi' },
+    ],
+  }
+  const renderKucuk = provenansEkRenderla(veriKucuk)
+  for (const i of veriKucuk.tumIddialar) {
+    ok(`PM: küçük — ham "${i.tip}:${i.param}" render'da var`, renderKucuk.includes(`${i.tip}:${i.param}`))
+  }
+  ok('PM: küçük — çözülmüş (veri) efektif kaynağı render\'da var', renderKucuk.includes('operator-verdigi-kaynak-42'))
+  ok('PM: küçük — atlanan anahtar render\'da var', renderKucuk.includes('veri:dusurulmus-soru-1'))
+  ok('PM: küçük — atlanan gerekçe render\'da var', renderKucuk.includes('operatör test gerekçesi'))
+
+  const gKucuk = bolumKapidanGecerMi('provenans-ek', renderKucuk, veriKucuk)
+  ok('PM: küçük — tam-kapsamlı render kapıdan GEÇER', gKucuk.gecti, gKucuk.neden ?? '')
+
+  // (b) NEGATİF kontrol — kapı GERÇEKTEN anlamlı mı: bir kaydı render'dan ÇIKARIRSAK kapı
+  // REDDETMELİ (trivially-geçen, her zaman true dönen bir kapı DEĞİL).
+  const eksikRender = renderKucuk.replace(/hala-acik-soru/g, 'BASKA-BIRSEY')
+  const gEksik = bolumKapidanGecerMi('provenans-ek', eksikRender, veriKucuk)
+  ok('PM: bir kayıt render\'dan eksikse kapı REDDEDER (kapı trivially-geçen değil)', !gEksik.gecti)
+  ok('PM: red nedeni eksik-referans sayısını işaret eder', /referans eksik/.test(gEksik.neden ?? ''))
+
+  // (c) GERÇEK-ÖLÇEKLİ sentetik veri (~300 iddia + 15 atlanan) — gerçek e2e koşumunda modelin
+  // karşılaştığı VE başarısız olduğu hacmi (302 eksik referans) temsil eder. O koşumun HAM
+  // __provenansVerisi'si namespace temizliğiyle (görev gereği) silindiği için BİREBİR "replay"
+  // mümkün değil — bu, AYNI ÖLÇEK VE ÇEŞİTLİLİKTE yeniden-üretilmiş bir sentetik settir.
+  // Deterministik bir render+kapı İÇİN kayıt SAYISI ilkesel olarak sonucu DEĞİŞTİRMEZ (dizi-
+  // üzerinde-döngü + string-birleştirme; bir modelin aksine dikkat/bağlam sınırı yok) — bu test
+  // bunu varsaymak yerine DOĞRUDAN kanıtlıyor.
+  const buyukIddialar = []
+  const tipler = ['dogrulandi', 'operator-beyan', 'operator-onayli-tahmin', 'acik-soru']
+  const gercekBolumler = BOLUM_SIRASI.filter(id => id !== 'provenans-ek')
+  for (let n = 0; n < 300; n++) {
+    const tip = tipler[n % tipler.length]
+    const cozulduMu = tip === 'acik-soru' && n % 3 !== 2 // acik-soru'ların 2/3'ü DATA-REQUEST ile çözülmüş
+    buyukIddialar.push({
+      bolumId: gercekBolumler[n % gercekBolumler.length],
+      satirNo: n + 1, satir: `sentetik iddia satırı ${n}`,
+      tip, param: `${tip}-param-${n}`,
+      efektifTip: cozulduMu ? (n % 2 === 0 ? 'dogrulandi' : 'operator-onayli-tahmin') : tip,
+      efektifKaynak: cozulduMu && n % 2 === 0 ? `cozulmus-kaynak-${n}` : (tip === 'dogrulandi' ? `${tip}-param-${n}` : null),
+    })
+  }
+  const buyukAtlananlar = Array.from({ length: 15 }, (_, n) => ({
+    bolumId: gercekBolumler[n % gercekBolumler.length], tip: 'DATA-REQUEST',
+    anahtar: `atlanan-anahtar-${n}`, gerekce: null,
+  }))
+  const veriBuyuk = { tumIddialar: buyukIddialar, tumAtlananlar: buyukAtlananlar }
+  const renderBuyuk = provenansEkRenderla(veriBuyuk)
+  const gBuyuk = bolumKapidanGecerMi('provenans-ek', renderBuyuk, veriBuyuk)
+  ok(`PM: gerçek-ölçekli sentetik sette (${buyukIddialar.length} iddia + ${buyukAtlananlar.length} atlanan, gerçek koşumun ~300 kaydına denk) kapı TAM kapsamla GEÇER`,
+    gBuyuk.gecti, gBuyuk.neden ?? '')
 }
 
 // ════════════════════════════════════════════════════════════════════════════

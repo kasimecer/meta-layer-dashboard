@@ -117,6 +117,31 @@ function provenansVerisiTopla(nsYolu, state, mp) {
   return { tumIddialar, tumAtlananlar }
 }
 
+// provenans-ek'in İÇERİĞİNİ provenansVerisiTopla'nın çıktısından DETERMİNİSTİK olarak üretir —
+// MODEL/executor ÇAĞRISI YOK (bkz bolumWalkAdimAt'ın executorFn dalı: tanim.mekanik olduğunda
+// bu render, ctx.executor'ın YERİNE geçer). provenansKapisi (planlamaBolumKapilari.mjs) her
+// iddia.param'ı VE her atlanan.anahtar'ı HARFİYEN metinde arar; bu fonksiyon HER kaydı (kaç
+// tane olursa olsun) tek tek, mekanik biçimde yazdığı için kapsam İNŞA GEREĞİ %100'dür —
+// bir modelin yüzlerce tam dizeyi eksiksiz nesir hâlinde yeniden üretmeye çalışmasından farklı
+// olarak, kayıt SAYISIYLA bozulmaz (dizi-üzerinde-döngü + string-birleştirme; dikkat/bağlam
+// sınırı yok). Ham `tip:param` (kapsam-kontrolü için harfiyen) VE efektif statü/kaynak (asıl
+// okunabilir provenans bilgisi) HER ikisi de yazılır — efektif çözümleme (iddialariCozumle)
+// bir açık-sorunun YANITLANDIYSA gerçek statüsünü gösterir, ham etiket ne olursa olsun.
+export function provenansEkRenderla(veri) {
+  const satirlar = ['# Provenans Eki', '', '## İddialar']
+  for (const i of (veri?.tumIddialar ?? [])) {
+    const etiket = BOLUM_TANIMLARI[i.bolumId]?.etiket ?? i.bolumId
+    const kaynakStr = i.efektifKaynak ? ` — kaynak: \`${i.efektifKaynak}\`` : ''
+    satirlar.push(`- **${etiket}** — ham: \`${i.tip}:${i.param}\` → efektif-statü: **${i.efektifTip}**${kaynakStr}`)
+  }
+  satirlar.push('', '## Atlanan Sorular')
+  for (const a of (veri?.tumAtlananlar ?? [])) {
+    const etiket = BOLUM_TANIMLARI[a.bolumId]?.etiket ?? a.bolumId
+    satirlar.push(`- **${etiket}** — soru: \`${a.anahtar}\` (tip: ${a.tip}) — gerekçe: ${a.gerekce ?? 'belirtilmedi'}`)
+  }
+  return satirlar.join('\n') + '\n'
+}
+
 // Bölüme özel kapı-çağırıcı — HER bölüm için baglam.gercekKaynaklar (grounding) +
 // baglam.efektifIddialar (acik-soru → yanıtlanmışsa efektif statü) hesaplar; provenans-ek
 // İÇİN ayrıca coverage verisini (tumIddialar/tumAtlananlar) ekler. birimKostur'un 2-argümanlı
@@ -327,7 +352,17 @@ async function bolumWalkAdimAt(nsYolu, projeId, state, ctx) {
         sira: BOLUM_SIRASI, birimler: mp.bolumler, nsYolu, projeId,
         dosyaAdiFn: bolumDosyaAdi,
         kapiFn,
-        executorFn: (bolumId, opts) => ctx.executor(bolumId, { ...opts, bolumTanim: BOLUM_TANIMLARI[bolumId] }),
+        // tanim.mekanik (yalnız provenans-ek) İÇİN model/executor HİÇ ÇAĞRILMAZ — içerik
+        // provenansEkRenderla ile __provenansVerisi'nden DETERMİNİSTİK üretilir (kapsam İNŞA
+        // GEREĞİ %100). Diğer 14 birim (14 asıl bölüm) bu dalın DIŞINDA kalır — ctx.executor
+        // (gerçek model çağrısı) o birimler için HİÇ DEĞİŞMEDEN aynen çalışır.
+        executorFn: BOLUM_TANIMLARI[B].mekanik
+          ? async (bolumId, opts) => {
+              const icerik = provenansEkRenderla(opts.baglamlar.__provenansVerisi)
+              writeFileSync(opts.hedefDosya, icerik, 'utf8')
+              return { icerik, cikti_pointer: opts.hedefDosya, maliyet_usd: 0, sure_ms: 0 }
+            }
+          : (bolumId, opts) => ctx.executor(bolumId, { ...opts, bolumTanim: BOLUM_TANIMLARI[bolumId] }),
         soruUretici: ctx.soruUretici, baglamlar, log: ctx.log, maliyet: ctx.maliyet,
         executorSayaci: ctx.executorSayaci, kostuTutucu: ctx.kostuTutucu,
         statePersistFn: () => statePersist(nsYolu, state),
