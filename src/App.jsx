@@ -3,11 +3,13 @@ import IntakeView from './views/IntakeView.jsx'
 import PartnerView from './views/PartnerView.jsx'
 import PortfolioView from './views/PortfolioView.jsx'
 import ProjectView from './views/ProjectView.jsx'
+import SoruYanitView from './views/SoruYanitView.jsx'
 
 // meta-layer-core — hash-tabanlı scoped router (GH-Pages-güvenli, ek bağımlılık yok).
 //   #/portfoy            → portföy
 //   #/proje/<id>         → proje
 //   #/partner/<id>       → partner — temiz sayfa (iç başlık/nav gizlenir)
+//   #/sorular/<id>       → planlama soru-yanıt (ProjectView'den drill-down; ayrı nav-tab YOK)
 function rota() {
   const h = (window.location.hash || '').replace(/^#\/?/, '')
   const [view, projeId] = h.split('/')
@@ -61,6 +63,7 @@ export default function App() {
 
       {r.view === 'portfoy' && <PortfolioView />}
       {r.view === 'proje'   && <ProjectView projeId={r.projeId} />}
+      {r.view === 'sorular' && <SoruYanitView projeId={r.projeId} />}
       {r.view === 'baslat'  && <IntakeView />}
     </div>
   )

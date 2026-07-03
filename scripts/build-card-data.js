@@ -2,6 +2,9 @@ import { readFileSync, writeFileSync, readdirSync, existsSync, rmSync } from 'fs
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { META_DATA_ROOT } from './config.js'
+import { stateYukle, bayatAsamalar } from '../tools/planlamaDurumMakinesiV2.mjs'
+import { sorulariOku, sorulariDogrula, VERI_KARARLARI } from '../tools/planlamaSorular.mjs'
+import { acikSoruDurum } from '../tools/planlamaDurumOzeti.mjs'
 
 // ── Karar-fasilitasyon eklentileri ──────────────────────────────────────────
 // sentez-kartlar/<karar_id>.json → partner-görünür kartlar (render-hazır v1).
@@ -276,4 +279,103 @@ if (existsSync(demoFoyaSignalPath)) {
   console.log(`cards-demo-foya.json güncellendi (base:${baseIds.size} + eklenen:${eklenecek.length} = toplam:${dfBase.kartlar.length})`)
 } else {
   console.log('_demo-foya/signal.json bulunamadı — demo-foya atlandı')
+}
+
+// ============================================================
+// 4) PLANLAMA SORU–YANIT ANLIK-GÖRÜNTÜSÜ — public/sorular-<id>.json
+//    Registry ÜYELİĞİNDEN BAĞIMSIZ: planlama-durum.json TAŞIYAN her proje dizini taranır
+//    (_demo-*/_test-* dahil) — kanonik registry'ye YAZMADAN disposable projeler de tarayıcıda
+//    görünür olur (_demo-entegre tam bu şekilde: planlama-durum.json var, registry'de YOK).
+//    Her proje kendi try/catch'i içinde: biri bozuksa diğerleri etkilenmez (sentezKartlariOku
+//    döngüsündeki desenle tutarlı). Açık-soru olguları acikSoruDurum() ÜZERİNDEN — CLI'nin
+//    (scripts/planlama-baslat.mjs) kullandığı AYNI fonksiyon — böylece "tarayıcı ve CLI aynı
+//    olguda hemfikir" tek-fonksiyon-iki-çağıran ile sağlanır (tools/planlamaDurumOzeti.mjs).
+// ============================================================
+const SORU_YANIT_REDDEDILEN_DIR = join(__dirname, '..', 'soru-yanit-kuyruk', 'reddedilen')
+
+// DATA-REQUEST'in secenekler'i (bare string[]) tarayıcının bilemeyeceği bir sırayla VERI_KARARLARI
+// koduna karşılık gelir (yalnız Node-only tools/planlamaSorular.mjs bu eşleşmeyi bilir) — burada
+// açık {karar,etiket}[] çiftine dönüştürülür. Diğer tipler olduğu gibi geçer.
+function soruyuTarayiciyaUyarla(soru) {
+  if (soru.tip !== 'DATA-REQUEST') return soru
+  const secenekler_kararli = soru.secenekler.map((etiket, i) => ({ karar: VERI_KARARLARI[i], etiket }))
+  return { ...soru, secenekler_kararli }
+}
+
+// soru-yanit-kuyruk/reddedilen/ içindeki, bu projeId'ye ait reddedilmiş gönderimler — "sessizce
+// atılmadı" görünürlüğünü tarayıcıya da taşır (yalnız operatör-görünür özet; ham gövde değil).
+function reddedilenGonderimleriOku(projeId) {
+  if (!existsSync(SORU_YANIT_REDDEDILEN_DIR)) return []
+  const sonuc = []
+  for (const f of readdirSync(SORU_YANIT_REDDEDILEN_DIR).filter(f => f.endsWith('.json'))) {
+    try {
+      const g = okJSON(join(SORU_YANIT_REDDEDILEN_DIR, f))
+      if (g.projeId === projeId) sonuc.push({ dosya: f, asama: g.asama ?? null, surum: g.surum ?? null })
+    } catch { /* noop */ }
+  }
+  return sonuc
+}
+
+if (existsSync(projelerDir)) {
+  const adaylar = readdirSync(projelerDir, { withFileTypes: true })
+    .filter(d => d.isDirectory())
+    .map(d => d.name)
+    .filter(id => existsSync(join(projelerDir, id, 'planlama-durum.json')))
+
+  let sorularYazilanSayisi = 0
+  for (const id of adaylar) {
+    try {
+      const nsYolu = join(projelerDir, id)
+      const state = stateYukle(nsYolu, id)
+      const bayatlar = bayatAsamalar(state)
+
+      const anlikGoruntu = {
+        proje_id: id,
+        aktif_asama: state.aktif_asama,
+        tamamlandi: state.aktif_asama === 'tamamlandi',
+        bayat_asamalar: bayatlar,
+        durum_etiketi: null,          // aktif aşamanın durum'u ('onay-bekliyor'|'donduruldu'|...)
+        soru_turu: 'yok',             // 'yok' | 'gecerli' | 'defekt' — snapshot render edilebilir mi
+        yanit_butunluk: null,         // acikSoruDurum().butunluk — 'gecerli'|'yok'|'bozuk'|null
+        asama: null, surum: null, soru_imza: null,
+        acik_sorular: [], ertelenen_sorular: [], atlanan_sorular: [],
+        reddedilen_gonderimler: reddedilenGonderimleriOku(id),
+      }
+
+      if (state.aktif_asama !== 'tamamlandi') {
+        const A = state.aktif_asama
+        const As = state.asamalar[A]
+        anlikGoruntu.durum_etiketi = As?.durum ?? null
+        const ss = As?.sorular_surum
+        if (ss != null) {
+          const paket = sorulariOku(nsYolu, A, ss)
+          if (paket) {
+            try {
+              sorulariDogrula(paket) // defekt paket (ör. önerisiz CHOICE) ASLA normal render edilmez
+              const asd = acikSoruDurum(nsYolu, state)
+              anlikGoruntu.soru_turu = 'gecerli'
+              anlikGoruntu.yanit_butunluk = asd?.butunluk ?? null
+              anlikGoruntu.asama = A
+              anlikGoruntu.surum = ss
+              anlikGoruntu.soru_imza = paket.imza
+              anlikGoruntu.acik_sorular = (asd?.acik ?? []).map(soruyuTarayiciyaUyarla)
+              anlikGoruntu.ertelenen_sorular = (paket.ertelenen ?? []).map(soruyuTarayiciyaUyarla)
+              anlikGoruntu.atlanan_sorular = asd?.atlanan ?? []
+            } catch (e) {
+              anlikGoruntu.soru_turu = 'defekt'
+              anlikGoruntu.defekt_nedeni = e.message
+            }
+          }
+        }
+      }
+
+      writeFileSync(join(outDir, `sorular-${id}.json`), JSON.stringify(anlikGoruntu, null, 2), 'utf8')
+      sorularYazilanSayisi++
+    } catch (e) {
+      console.warn(`sorular-${id}.json üretilemedi (proje atlandı, diğerleri etkilenmedi):`, e.message)
+    }
+  }
+  if (sorularYazilanSayisi) console.log(`sorular-<id>.json yazıldı (${sorularYazilanSayisi} proje, registry-bağımsız)`)
+} else {
+  console.log('projeler/ dizini bulunamadı — soru anlık-görüntüsü atlandı')
 }

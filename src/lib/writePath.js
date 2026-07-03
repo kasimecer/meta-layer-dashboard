@@ -94,3 +94,43 @@ export async function submitIntakeQueue({ taslak }) {
     return { ok: false, hata: `Ağ hatası: ${String(e?.message || e)}` }
   }
 }
+
+/**
+ * Planlama soru–yanıt gönderimini Worker üzerinden GitHub kuyruğuna yazar
+ * (soru-yanit-kuyruk/<projeId>--<asama>--v<surum>.json). Worker BURADA yanıt artefaktına
+ * YAZMAZ / sürüm-tazeliği DEĞERLENDİRMEZ — yalnız git'e commit eder. Kullanıcının kendi
+ * makinesinde çalışan scripts/soru-yanit-queue-watch.mjs bu dosyayı bulup gerçek sürüm/imza
+ * tazeliğini denetler ve YEREL yanıt artefaktına yazar. Planlama pipeline'ını
+ * başlatmaz/ilerletmez — bu insan tarafından ayrı, elle bir terminal komutuyla yapılır
+ * (node scripts/planlama-baslat.mjs <id>). Bkz worker/worker.js, scripts/soru-yanit-queue-watch.mjs.
+ * @param {{ gonderim: { projeId, asama, surum, soruImza, yanitlar } }} args
+ * @returns {Promise<{ok:true, path:string, commit?:string} | {ok:false, hata:string, mock?:boolean}>}
+ */
+export async function submitSoruYanit({ gonderim }) {
+  if (!gonderim?.projeId || !gonderim?.asama || !Number.isInteger(gonderim?.surum) ||
+      !gonderim?.soruImza || !Array.isArray(gonderim?.yanitlar) || gonderim.yanitlar.length === 0) {
+    return { ok: false, hata: 'Geçersiz gönderim (projeId/asama/surum/soruImza/yanitlar eksik)' }
+  }
+
+  // MOCK: Worker yapılandırılmamış → otomatik kuyruk yok, yanıt kaydedilmez.
+  if (!CANLI) {
+    return { ok: false, mock: true, hata: 'Worker yapılandırılmamış (MOCK mod) — yanıt kuyruğa alınamadı.' }
+  }
+
+  try {
+    const r = await fetch(`${WORKER_URL}/soru-yanit-queue`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-submit-token': SUBMIT_TOKEN },
+      body: JSON.stringify({ gonderim }),
+    })
+    if (!r.ok) {
+      let detay = ''
+      try { detay = (await r.json()).hata || '' } catch { /* noop */ }
+      return { ok: false, hata: `Kuyruğa alınamadı (${r.status}${detay ? ': ' + detay : ''})` }
+    }
+    const data = await r.json()
+    return { ok: true, path: data.path, commit: data.commit }
+  } catch (e) {
+    return { ok: false, hata: `Ağ hatası: ${String(e?.message || e)}` }
+  }
+}

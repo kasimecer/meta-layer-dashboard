@@ -101,27 +101,59 @@ export default function ProjectView({ projeId = 'baris' }) {
   const [kartlar, setKartlar] = useState(null)
   const [operator, setOperator] = useState(null)
   const [taslak, setTaslak] = useState(null)
+  const [sorular, setSorular] = useState(null)     // planlama soru-yanıt anlık-görüntüsü (best-effort)
 
+  // GERÇEK/materyalize veri (registry veya cards-<id>.json) HER ZAMAN localStorage taslağının
+  // ÖNÜNE geçer — aksi hâlde bir proje materyalize edildikten SONRA bile, aynı tarayıcıda kalan
+  // eski bir taslak kaydı gerçek durumu SONSUZA KADAR gölgeler (bkz PortfolioView.jsx'in kendi
+  // registry-üyeliği kontrolü — burada AYNI önceliği, per-id detay sayfasında da uyguluyoruz).
+  // Gerçek veri bulununca kalan taslak varsa BAYATTIR → kendiliğinden temizlenir (taslakSil).
   useEffect(() => {
-    setProje(undefined); setKartlar(null); setOperator(null); setTaslak(null)
+    let iptal = false
+    setProje(undefined); setKartlar(null); setOperator(null); setTaslak(null); setSorular(null)
 
-    // Önce localStorage taslakları kontrol et
-    const ls = taslaklariOku().find(t => t.id === projeId)
-    if (ls) {
-      setTaslak(ls)
-      setProje(ls.projeKaydi)
-      setKartlar(ls.cardsJson?.kartlar ?? [])
-      return
+    async function yukle() {
+      let registryProje = null
+      try {
+        const r = await fetch('./registry.json')
+        if (r.ok) {
+          const d = await r.json()
+          registryProje = (d.projeler ?? d).find(x => x.id === projeId) ?? null
+        }
+      } catch { /* noop */ }
+
+      let cardsVarMi = false, kartlarVeri = null
+      try {
+        const r = await fetch(`./cards-${projeId}.json`)
+        if (r.ok) { cardsVarMi = true; const d = await r.json(); kartlarVeri = d.kartlar ?? d }
+      } catch { /* noop */ }
+
+      if (iptal) return
+      const gercekVeriVar = !!registryProje || cardsVarMi
+
+      if (gercekVeriVar) {
+        if (taslaklariOku().some(t => t.id === projeId)) taslakSil(projeId) // bayat taslak — self-heal
+        setProje(registryProje)
+        setKartlar(kartlarVeri)
+        fetch(`./operator-${projeId}.json`).then(r => r.ok ? r.json() : null)
+          .then(o => { if (!iptal) setOperator(o) }).catch(() => {})
+      } else {
+        const ls = taslaklariOku().find(t => t.id === projeId)
+        if (ls) {
+          setTaslak(ls)
+          setProje(ls.projeKaydi)
+          setKartlar(ls.cardsJson?.kartlar ?? [])
+        } else {
+          setProje(null)
+        }
+      }
+
+      // Soru-yanıt anlık-görüntüsü — best-effort, registry-bağımsız (bkz build-card-data.js §4).
+      fetch(`./sorular-${projeId}.json`).then(r => r.ok ? r.json() : null)
+        .then(s => { if (!iptal) setSorular(s) }).catch(() => {})
     }
-
-    fetch('./registry.json').then(r => r.ok ? r.json() : null).then(d => {
-      const p = d ? (d.projeler ?? d).find(x => x.id === projeId) : null
-      setProje(p ?? null)
-    }).catch(() => setProje(null))
-    fetch(`./cards-${projeId}.json`).then(r => r.ok ? r.json() : null)
-      .then(d => setKartlar(d ? (d.kartlar ?? d) : null)).catch(() => setKartlar(null))
-    fetch(`./operator-${projeId}.json`).then(r => r.ok ? r.json() : null)
-      .then(setOperator).catch(() => setOperator(null))
+    yukle()
+    return () => { iptal = true }
   }, [projeId])
 
   // Yalnız taslak/draft projede: cevap localStorage'a yazılır (kalıcı, yenilemeye dayanıklı).
@@ -193,6 +225,22 @@ export default function ProjectView({ projeId = 'baris' }) {
         {operator?.bekleyen_insan_girdisi && (
           <div style={{ marginTop: 8, display: 'flex', gap: 8, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: '#9a3412' }}>
             <span>⏳</span><span><strong>Bekleyen girdi:</strong> {operator.bekleyen_insan_girdisi}</span>
+          </div>
+        )}
+        {/* Planlama soru-yanıt: aktif aşama + açık soru sayısı — CLI listesinin (planlama-baslat.mjs)
+            yüzeye çıkardığı AYNI olguyu tarayıcıya taşır (bkz tools/planlamaDurumOzeti.mjs). */}
+        {sorular && !sorular.tamamlandi && sorular.aktif_asama && (
+          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', background: '#eef2ff', border: '1px solid #c7d2fe', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: '#4338ca' }}>
+            <span>{sorular.acik_sorular.length > 0 ? '❓' : '◐'}</span>
+            <span>
+              <strong>planlama:</strong> aktif aşama {sorular.aktif_asama}
+              {sorular.acik_sorular.length > 0 && <> · <strong>{sorular.acik_sorular.length} açık soru</strong></>}
+            </span>
+            {sorular.acik_sorular.length > 0 && (
+              <a href={`#/sorular/${projeId}`} style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: '#4338ca', textDecoration: 'none' }}>
+                Yanıtla →
+              </a>
+            )}
           </div>
         )}
         {operator?.son_ilerleme && (
