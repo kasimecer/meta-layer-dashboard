@@ -14,7 +14,11 @@
     "planlama-baslat": "node scripts/planlama-baslat.mjs",
     "planlama-test": "node scripts/planlama-test-runner.mjs",
     "planlama-soru-test": "node scripts/planlama-soru-test-runner.mjs",
-    "planlama-soru-demo": "node scripts/planlama-soru-demo.mjs"
+    "planlama-soru-demo": "node scripts/planlama-soru-demo.mjs",
+    "soru-yanit-watch": "node scripts/soru-yanit-queue-watch.mjs",
+    "soru-yanit-queue-test": "node scripts/soru-yanit-queue-test.mjs",
+    "soru-yanit-demo-setup": "node scripts/soru-yanit-demo-setup.mjs",
+    "soru-yanit-demo-temizle": "node scripts/soru-yanit-demo-temizle.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
