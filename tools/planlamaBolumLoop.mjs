@@ -21,7 +21,7 @@ import { birimIlerlet, birimGeriDon, birimBayatMi, birimKostur, birimAcikDurum, 
 import { BOLUM_SIRASI, BOLUM_TANIMLARI, TUM_BOLUMLER_ISARETI } from './planlamaBolumTanimlari.mjs'
 import { bolumKapidanGecerMi } from './planlamaBolumKapilari.mjs'
 import { iddialariCikar, gercekKaynaklariCikar, iddialariCozumle } from './planlamaIddiaDurumu.mjs'
-import { sorulariOku, yanitlariHamOku, atlananlar } from './planlamaSorular.mjs'
+import { sorulariOku, yanitlariHamOku, yanitButunluk, atlananlar } from './planlamaSorular.mjs'
 
 const MP = 'master-plan'
 
@@ -95,8 +95,12 @@ function provenansVerisiTopla(nsYolu, state, mp) {
     if (bs?.sorular_surum != null) {
       const paket = sorulariOku(nsYolu, id, bs.sorular_surum)
       if (paket) {
-        const yanitlar = yanitlariHamOku(nsYolu, id, bs.sorular_surum)
-        for (const a of atlananlar(paket, yanitlar)) tumAtlananlar.push({ ...a, bolumId: id })
+        // yanitlariHamOku {durum,ham,dosya} ZARFINI döner — atlananlar düz bir yanıt DİZİSİ
+        // bekler. yanitButunluk bu zarfı çözüp doğrular (planlamaBirimMotoru.mjs/
+        // planlamaDurumOzeti.mjs'nin ZATEN yaptığı gibi); durum≠'gecerli' ise but.yanitlar
+        // undefined kalır, atlananlar bunu (yanitlar||[]) ile boş dizi olarak ele alır.
+        const but = yanitButunluk(paket, yanitlariHamOku(nsYolu, id, bs.sorular_surum))
+        for (const a of atlananlar(paket, but.yanitlar)) tumAtlananlar.push({ ...a, bolumId: id })
       }
     }
   }
@@ -105,8 +109,8 @@ function provenansVerisiTopla(nsYolu, state, mp) {
     if (as?.sorular_surum != null) {
       const paket = sorulariOku(nsYolu, asama, as.sorular_surum)
       if (paket) {
-        const yanitlar = yanitlariHamOku(nsYolu, asama, as.sorular_surum)
-        for (const a of atlananlar(paket, yanitlar)) tumAtlananlar.push({ ...a, bolumId: asama })
+        const but = yanitButunluk(paket, yanitlariHamOku(nsYolu, asama, as.sorular_surum))
+        for (const a of atlananlar(paket, but.yanitlar)) tumAtlananlar.push({ ...a, bolumId: asama })
       }
     }
   }

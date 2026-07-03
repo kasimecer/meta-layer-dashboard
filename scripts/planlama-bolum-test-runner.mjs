@@ -23,7 +23,7 @@ import { BOLUM_SIRASI, BOLUM_TANIMLARI } from '../tools/planlamaBolumTanimlari.m
 import { bolumKapidanGecerMi } from '../tools/planlamaBolumKapilari.mjs'
 import { bolumeGeriDon } from '../tools/planlamaBolumLoop.mjs'
 import { iddialariCikar, iddialariCozumle } from '../tools/planlamaIddiaDurumu.mjs'
-import { dataRequestAdaylari, varsayilanSoruUretici, yanitKaydet, sorulariYaz } from '../tools/planlamaSorular.mjs'
+import { dataRequestAdaylari, varsayilanSoruUretici, yanitKaydet, sorulariYaz, sorulariOku } from '../tools/planlamaSorular.mjs'
 import { FIKSTUR } from './planlama-test-fikstur.mjs'
 import { FIKSTUR_BOLUM, BOZUK_BOLUM, EKSIK_FIGUR_SATIRI, bolumFiksturuDogrula } from './planlama-bolum-fikstur.mjs'
 
@@ -361,6 +361,54 @@ bolum('OG — Sıralama düzeltmesi: yeterlilik kontrolleri İLK-GEÇİŞTE erte
   // sifirAcikGerekli) ertelenir. Fabrikasyon kaynak ilk geçişte de REDDEDİLMELİ.
   const gFakeIlk = bolumKapidanGecerMi('pazar-analizi', BOZUK_BOLUM.pazarAnaliziUydurmaKaynak, { gercekKaynaklar, ilkGecisMi: true })
   ok('OG: İLK geçişte de grounding (uydurma kaynak) REDDİ tam uygulanır (ertelenen yalnız yeterlilik)', !gFakeIlk.gecti)
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+bolum('PE — Regresyon: provenans-ek, GERÇEK soru/yanıt paketleriyle (varsayilanSoruUretici) ÇÖKMEDEN tamamlanır')
+{
+  // GERÇEK model koşumunda bulundu: provenansVerisiTopla, yanitlariHamOku'nun ZARF nesnesini
+  // ({durum,ham,dosya}) yanitButunluk ile ÇÖZMEDEN doğrudan atlananlar()'a veriyordu —
+  // atlananlar (yanitlar||[]).map bekler, bir ZARF NESNESİ üzerinde .map çağırmak TypeError
+  // fırlatıyordu. D2'nin hermetik testleri bunu HİÇ yakalamadı çünkü D2 soruUretici:null
+  // kullanıyor (sorular_surum hiçbir birimde set edilmiyor, atlananlar hiç çağrılmıyor — bkz
+  // tumYuruyusuTamamla). Bu test GERÇEK varsayilanSoruUretici + gerçek DATA-REQUEST yanıtlarıyla
+  // (veri/tahmin/dusur karışık) tam 15-birim yürüyüşünü sürer — provenans-ek'e ULAŞIR ve onun
+  // ÇÖKMEDEN tamamlandığını doğrudan kanıtlar (mock'lanmış bir provenansVerisiTopla değil).
+  const { ns, id } = yeniNs('pe-atlananlar')
+  try {
+    dortAsamaTamamlaSeed(ns, id)
+    let adim = 0, sonuc, karar = 0
+    const MAX_ADIM = 60
+    do {
+      sonuc = await planlamaLoopV2Calistir(ns, id, bolumluExecutor(), {
+        mod: 'ileri', soruUretici: varsayilanSoruUretici, masterPlanBolumleri: BOLUM_TANIMLARI, log: () => {},
+      })
+      adim++
+      if (adim > MAX_ADIM) throw new Error(`PE: ${MAX_ADIM} adımda bitmedi (son durdu: ${sonuc.durdu})`)
+      if (sonuc.durdu === 'sorular-acik') {
+        const paket = sorulariOku(ns, sonuc.bekleyenOnay, sonuc.sorularSurum)
+        for (const s of paket.sorular) {
+          if (s.tip === 'APPROVAL') continue
+          if (s.tip === 'DATA-REQUEST') {
+            const kararlar = ['veri', 'tahmin', 'dusur']
+            const k = kararlar[karar++ % 3]
+            yanitKaydet(ns, paket, k === 'veri'
+              ? { anahtar: s.anahtar, karar: k, deger: 'test-değer', kaynak: 'test-operatör-kaynağı' }
+              : { anahtar: s.anahtar, karar: k })
+          } else if (s.tip === 'FREE-TEXT') {
+            yanitKaydet(ns, paket, { anahtar: s.anahtar, metin: 'test yanıtı' })
+          } else if (s.tip === 'CHOICE') {
+            yanitKaydet(ns, paket, { anahtar: s.anahtar, secim: s.secenekler[0] })
+          }
+        }
+      }
+    } while (sonuc.durdu !== 'tamamlandi' && sonuc.durdu !== 'donduruldu')
+
+    ok('PE: GERÇEK soru/yanıt paketleriyle tam yürüyüş ÇÖKMEDEN TAMAMLANDI', sonuc.durdu === 'tamamlandi', `${adim} adımda, son durdu=${sonuc.durdu}`)
+    const nihaiState = stateYukle(ns, id)
+    const provPointer = nihaiState.asamalar['master-plan']?.bolumler?.['provenans-ek']?.cikti_pointer
+    ok('PE: provenans-ek üretildi (cikti_pointer var ve dosya mevcut)', !!provPointer && existsSync(provPointer))
+  } finally { temizle(ns) }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
