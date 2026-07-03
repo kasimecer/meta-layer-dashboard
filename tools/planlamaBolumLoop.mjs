@@ -20,7 +20,7 @@ import { bosAsama, statePersist, asamaDosyaAdi, ilerlet, GERCEK_ASAMALAR } from 
 import { birimIlerlet, birimGeriDon, birimBayatMi, birimKostur, birimAcikDurum, birimSorulariUretVeYaz } from './planlamaBirimMotoru.mjs'
 import { BOLUM_SIRASI, BOLUM_TANIMLARI, TUM_BOLUMLER_ISARETI } from './planlamaBolumTanimlari.mjs'
 import { bolumKapidanGecerMi } from './planlamaBolumKapilari.mjs'
-import { iddialariCikar } from './planlamaIddiaDurumu.mjs'
+import { iddialariCikar, gercekKaynaklariCikar, iddialariCozumle } from './planlamaIddiaDurumu.mjs'
 import { sorulariOku, yanitlariHamOku, atlananlar } from './planlamaSorular.mjs'
 
 const MP = 'master-plan'
@@ -87,7 +87,11 @@ function provenansVerisiTopla(nsYolu, state, mp) {
     if (id === 'provenans-ek') continue
     const bs = mp.bolumler[id]
     const icerik = bs?.cikti_pointer ? readIcerik(bs.cikti_pointer) : null
-    if (icerik != null) tumIddialar.push(...iddialariCikar(icerik).map(i => ({ ...i, bolumId: id })))
+    if (icerik != null) {
+      // Efektif çözümleme ile — yanıtlanmış bir açık-soru artık RESOLVED statüsüyle görünür,
+      // ham (bayat) "acik-soru" etiketiyle değil.
+      tumIddialar.push(...iddialariCozumle(nsYolu, id, bs, iddialariCikar(icerik)).map(i => ({ ...i, bolumId: id })))
+    }
     if (bs?.sorular_surum != null) {
       const paket = sorulariOku(nsYolu, id, bs.sorular_surum)
       if (paket) {
@@ -109,12 +113,25 @@ function provenansVerisiTopla(nsYolu, state, mp) {
   return { tumIddialar, tumAtlananlar }
 }
 
-// Bölüme özel kapı-çağırıcı — provenans-eki İÇİN baglam (coverage kontrolü) hesaplar, diğer 14
-// bölüm için sade (bolumId,icerik)=>sonuç şeklinde kalır (birimKostur'un 2-argümanlı
-// kapiFn(birimId,icerik) çağrısıyla TAM uyumlu — sözleşme genişletilmedi).
+// Bölüme özel kapı-çağırıcı — HER bölüm için baglam.gercekKaynaklar (grounding) +
+// baglam.efektifIddialar (acik-soru → yanıtlanmışsa efektif statü) hesaplar; provenans-ek
+// İÇİN ayrıca coverage verisini (tumIddialar/tumAtlananlar) ekler. birimKostur'un 2-argümanlı
+// kapiFn(birimId,icerik) çağrısıyla TAM uyumlu kalır — sözleşme genişletilmedi, yalnız baglam
+// artık her zaman DOLU (önceden yalnız provenans-ek için doluydu).
 function kapiFnKur(nsYolu, state, mp) {
+  // Araştırma aşamasının GERÇEK kaynak kümesi — tüm bölüm koşumları için TEK SEFER hesaplanır
+  // (içerik değişmez; araştırma zaten 'gecti' olmadan master-plan'a girilemez).
+  const arastirmaIcerik = readIcerik(state.asamalar.arastirma?.cikti_pointer)
+  const gercekKaynaklar = gercekKaynaklariCikar(arastirmaIcerik)
+
   return (bolumId, icerik) => {
-    const baglam = bolumId === 'provenans-ek' ? provenansVerisiTopla(nsYolu, state, mp) : null
+    const bs = mp.bolumler[bolumId]
+    const efektifIddialar = iddialariCozumle(nsYolu, bolumId, bs, iddialariCikar(icerik))
+    const baglam = {
+      gercekKaynaklar,
+      efektifIddialar,
+      ...(bolumId === 'provenans-ek' ? provenansVerisiTopla(nsYolu, state, mp) : {}),
+    }
     return bolumKapidanGecerMi(bolumId, icerik, baglam)
   }
 }
@@ -135,19 +152,22 @@ function onayNoktasiDonBolum(bolumId, d, sonucDonFn) {
 // edilmiş içeriğini yeniden-tarar: her yerde sıfır açık-soru + her kaynak-gerekli bölümde
 // ≥1 doğrulanmış iddia. Bu, bölüm-yerel toleransların (ör. yasal-uyumluluk) GLOBAL olarak
 // hâlâ kapatılması gerektiğini garanti eden nihai kapı.
-function layer2Kontrol(mp) {
+function layer2Kontrol(nsYolu, mp) {
   const eksikler = []
   for (const id of BOLUM_SIRASI) {
     if (id === 'provenans-ek') continue
     const bs = mp.bolumler[id]
     const icerik = bs?.cikti_pointer ? readIcerik(bs.cikti_pointer) : null
     if (icerik == null) { eksikler.push(`${id}: içerik bulunamadı`); continue }
-    const iddialar = iddialariCikar(icerik)
-    const acikSayisi = iddialar.filter(i => i.tip === 'acik-soru').length
+    // EFEKTİF statüyle say — bir açık-soru bu arada YANITLANMIŞSA (karar=veri/tahmin) artık
+    // açık/eksik sayılmaz (bkz iddialariCozumle). Grounding Layer-1'de zaten uygulandı; burada
+    // tekrar edilmiyor (bölüm zaten yerel-gecti olmadan buraya erişilemez).
+    const iddialar = iddialariCozumle(nsYolu, id, bs, iddialariCikar(icerik))
+    const acikSayisi = iddialar.filter(i => i.efektifTip === 'acik-soru').length
     if (acikSayisi > 0) eksikler.push(`${id}: ${acikSayisi} açık-soru etiketi hâlâ var`)
     const tanim = BOLUM_TANIMLARI[id]
     if (tanim.minDogrulandi > 0) {
-      const n = iddialar.filter(i => i.tip === 'dogrulandi').length
+      const n = iddialar.filter(i => i.efektifTip === 'dogrulandi').length
       if (n < tanim.minDogrulandi) eksikler.push(`${id}: yeterli doğrulanmış iddia yok (${n}/${tanim.minDogrulandi})`)
     }
   }
@@ -158,7 +178,7 @@ function layer2Kontrol(mp) {
 // nihai (yalnız-APPROVAL) soru paketini üret, outer'ı onay-bekliyor'a al.
 function layer2VeSonrasi(nsYolu, projeId, state, ctx) {
   const mp = state.asamalar[MP]
-  const sonuc = layer2Kontrol(mp)
+  const sonuc = layer2Kontrol(nsYolu, mp)
   if (!sonuc.gecti) {
     // Otomatik state değişikliği YOK — insan ilgili bölüme --geri yapıp düzeltsin. mp.durum
     // 'kosuyor' KALIR (walk zaten teknik olarak sürüyor, yalnız insan-kararı bekliyor).

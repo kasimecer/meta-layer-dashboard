@@ -22,11 +22,16 @@
 //   minDogrulandi                — Layer-1 yerel minimum [dogrulandi:*] sayısı (source-required bölümler)
 //   ekKontrol                    — bölüme özgü ek kapı kontrolü (bolumId, icerik) => {gecti,neden?} | null
 
+// NOT (düzeltme): özet-yönetici BAŞTA değil, SONDA yürütülür — görevin kendi ifadesiyle
+// "written last... only after all sections close". Mock-executor'lu testler bunu YAKALAMAZ
+// (sabit metin döner, sıradan bağımsız) ama gerçek bir model-koşumunda özet-yönetici en
+// başta çalışsaydı sentezleyeceği 13 bölümün HİÇBİRİ henüz yazılmamış olurdu — bkz
+// bolumBaglamlarKur'un TUM_BOLUMLER_ISARETI döngüsü (yalnız o ana kadar 'gecti' olanları toplar).
 export const BOLUM_SIRASI = [
-  'ozet-yonetici', 'problem-cozum', 'pazar-analizi', 'rekabet-konumlandirma', 'urun-tanimi',
+  'problem-cozum', 'pazar-analizi', 'rekabet-konumlandirma', 'urun-tanimi',
   'is-modeli-fiyatlama', 'butce-finansal', 'gtm-pazarlama', 'dijital-varlik-spec',
   'operasyon-plani', 'yasal-uyumluluk', 'risk-varsayimlar', 'yol-haritasi', 'olcumleme-kpi',
-  'provenans-ek',
+  'ozet-yonetici', 'provenans-ek',
 ]
 
 export const TUM_BOLUMLER_ISARETI = '*tum-bolumler*'

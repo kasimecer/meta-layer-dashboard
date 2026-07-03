@@ -22,8 +22,10 @@ import { boslukState, statePersist, stateYukle, asamaDosyaAdi } from '../tools/p
 import { BOLUM_SIRASI, BOLUM_TANIMLARI } from '../tools/planlamaBolumTanimlari.mjs'
 import { bolumKapidanGecerMi } from '../tools/planlamaBolumKapilari.mjs'
 import { bolumeGeriDon } from '../tools/planlamaBolumLoop.mjs'
+import { iddialariCikar, iddialariCozumle } from '../tools/planlamaIddiaDurumu.mjs'
+import { dataRequestAdaylari, varsayilanSoruUretici, yanitKaydet, sorulariYaz } from '../tools/planlamaSorular.mjs'
 import { FIKSTUR } from './planlama-test-fikstur.mjs'
-import { FIKSTUR_BOLUM, BOZUK_BOLUM, bolumFiksturuDogrula } from './planlama-bolum-fikstur.mjs'
+import { FIKSTUR_BOLUM, BOZUK_BOLUM, EKSIK_FIGUR_SATIRI, bolumFiksturuDogrula } from './planlama-bolum-fikstur.mjs'
 
 let gecti = 0, kaldi = 0
 function ok(ad, kosul, ekBilgi = '') {
@@ -239,6 +241,91 @@ bolum('G — Bölüm-seviyesi --geri (spiral, stage-seviyesiyle AYNI birimGeriDo
     ok('G: bilinmeyen hedef REDDEDİLİR', hataAtildi)
     ok('G: geçersiz geri-dönüş state\'i DEĞİŞTİRMEDİ (persist edilmedi)', JSON.stringify(stateYukle(ns, id)) === oncekiJSON)
   } finally { temizle(ns) }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+bolum('GR — Grounding: kaynak-gerçeklik + acik-soru → DATA-REQUEST + efektif çözümleme')
+{
+  const gercekKaynaklar = new Set(['sektor-raporu-2026'])
+
+  // GR1 — gerçek kaynak (araştırmada GERÇEKTEN doğrulanmış) doğrulanmış olarak KABUL edilir.
+  const gReal = bolumKapidanGecerMi('pazar-analizi', FIKSTUR_BOLUM['pazar-analizi'], { gercekKaynaklar })
+  ok('GR1: gerçek kaynağa sahip iddia doğrulanmış olarak KABUL edilir', gReal.gecti)
+
+  // GR2 — UYDURMA kaynak (sözdizimi geçerli, ama araştırmada YOK) REDDEDİLİR — "damga kaynak yerine geçmez".
+  const gFake = bolumKapidanGecerMi('pazar-analizi', BOZUK_BOLUM.pazarAnaliziUydurmaKaynak, { gercekKaynaklar })
+  ok('GR2: UYDURMA kaynak (araştırmada yok) REDDEDİLİR', !gFake.gecti)
+  ok('GR2: red nedeni grounding sorununu işaret eder', /doğrulanmış bir kaynak DEĞİL/.test(gFake.neden ?? ''))
+
+  // GR3 — dataRequestAdaylari genişletmesi: [eksik] VE bölüm-sözlüğü [acik-soru:konu] da
+  // artık birer DATA-REQUEST adayı üretir (önceden yalnız [tahmin-doğrulanacak:kaynak] üretiyordu).
+  const eksikAdaylari = dataRequestAdaylari(EKSIK_FIGUR_SATIRI)
+  ok('GR3: [eksik] artık bir DATA-REQUEST adayı üretir', eksikAdaylari.length === 1 && eksikAdaylari[0].tip === 'DATA-REQUEST')
+
+  const acikSoruAdaylari = dataRequestAdaylari(BOZUK_BOLUM.pazarAnaliziAcikSoru)
+  ok('GR3: bölüm [acik-soru:konu] etiketi bir DATA-REQUEST adayı üretir', acikSoruAdaylari.length === 1 && acikSoruAdaylari[0].tip === 'DATA-REQUEST')
+  ok('GR3: DATA-REQUEST anahtarı acik-soru konusundan türetilir', acikSoruAdaylari[0].anahtar === 'veri:kullanici-basi-harcama')
+
+  // GR4/5/6 — efektif çözümleme: AYNI [acik-soru:...] iddiası, YANIT KARARINA göre farklı
+  // efektif statüye evrilir — metin ASLA değişmez, yalnız gate/Layer-2'nin SAYDIĞI statü değişir.
+  const { ns, id } = yeniNs('gr-cozum')
+  try {
+    const dosya = join(ns, 'master-plan--pazar-analizi.md')
+    writeFileSync(dosya, BOZUK_BOLUM.pazarAnaliziAcikSoru, 'utf8')
+    const bolumState = { cikti_pointer: dosya, surum: 1, sorular_surum: null }
+    const iddialarHam = iddialariCikar(BOZUK_BOLUM.pazarAnaliziAcikSoru)
+
+    const cozumsuz = iddialariCozumle(ns, 'pazar-analizi', bolumState, iddialarHam)
+    const acikIddiaOnce = cozumsuz.find(i => i.tip === 'acik-soru')
+    ok('GR4: yanıtsızken efektif statü hâlâ acik-soru (bloklar)', acikIddiaOnce?.efektifTip === 'acik-soru')
+
+    // Gerçek (deterministik) üreticiyle GERÇEK bir soru paketi üret + yaz.
+    const paket = varsayilanSoruUretici('pazar-analizi', BOZUK_BOLUM.pazarAnaliziAcikSoru, { projeId: id, surum: 1 })
+    sorulariYaz(ns, paket)
+    bolumState.sorular_surum = 1
+    const dr = paket.sorular.find(s => s.tip === 'DATA-REQUEST')
+    ok('GR4: gerçek üretici de acik-soru\'dan bir DATA-REQUEST üretti', !!dr && dr.anahtar === 'veri:kullanici-basi-harcama')
+
+    // (a) karar=veri + kaynak sağlandı → operatör BİZZAT kaynak verdi → efektif DOĞRULANMIŞ.
+    yanitKaydet(ns, paket, { anahtar: dr.anahtar, karar: 'veri', deger: '2400 SEK', kaynak: 'operatör-anketi-2026' })
+    const cozumVeri = iddialariCozumle(ns, 'pazar-analizi', bolumState, iddialarHam)
+    const veriIddia = cozumVeri.find(i => i.param === 'kullanici-basi-harcama')
+    ok('GR4: karar=veri → efektif statü dogrulandi', veriIddia?.efektifTip === 'dogrulandi')
+    ok('GR4: efektif kaynak operatörün bizzat girdiği kaynak', veriIddia?.efektifKaynak === 'operatör-anketi-2026')
+    const gVeri = bolumKapidanGecerMi('pazar-analizi', BOZUK_BOLUM.pazarAnaliziAcikSoru, { gercekKaynaklar, efektifIddialar: cozumVeri })
+    ok('GR4: yanıtlandıktan (karar=veri) sonra bölüm kapıdan GEÇER', gVeri.gecti)
+
+    // (b) karar=tahmin → efektif OPERATOR-ONAYLI-TAHMIN (doğrulanmış SAYILMAZ, ama artık açık da değil).
+    yanitKaydet(ns, paket, { anahtar: dr.anahtar, karar: 'tahmin' })
+    const cozumTahmin = iddialariCozumle(ns, 'pazar-analizi', bolumState, iddialarHam)
+    const tahminIddia = cozumTahmin.find(i => i.param === 'kullanici-basi-harcama')
+    ok('GR5: karar=tahmin → efektif statü operator-onayli-tahmin (dogrulandi DEĞİL)', tahminIddia?.efektifTip === 'operator-onayli-tahmin')
+    ok('GR5: tahmin otomatik değil — yalnız BU AÇIK yanitKaydet çağrısıyla oluştu', dr.tip === 'DATA-REQUEST')
+
+    // (c) karar=dusur → efektif DÜŞÜRÜLDÜ (ne açık ne doğrulanmış — sayılmaz, bloklamaz da).
+    yanitKaydet(ns, paket, { anahtar: dr.anahtar, karar: 'dusur' })
+    const cozumDusur = iddialariCozumle(ns, 'pazar-analizi', bolumState, iddialarHam)
+    const dusurIddia = cozumDusur.find(i => i.param === 'kullanici-basi-harcama')
+    ok('GR6: karar=dusur → efektif statü dusuruldu', dusurIddia?.efektifTip === 'dusuruldu')
+    ok('GR6: düşürülen iddia açık SAYILMAZ (bloklamaz)', !cozumDusur.some(i => i.efektifTip === 'acik-soru'))
+  } finally { temizle(ns) }
+
+  // GR7 — uçtan uca NEGATİF: pazar-analizi'nde UYDURMA kaynak → TÜM YÜRÜYÜŞ orada durur,
+  // Layer-2/tamamlanmaya HİÇ ulaşmaz (ürün-seviyesi done-when'in "genuinely-sourced" şartı).
+  const { ns: ns2, id: id2 } = yeniNs('gr-uctan-uca-red')
+  try {
+    dortAsamaTamamlaSeed(ns2, id2)
+    const { sonuc } = await tumYuruyusuTamamla(
+      ns2, id2, bolumluExecutor({ 'pazar-analizi': BOZUK_BOLUM.pazarAnaliziUydurmaKaynak })
+    )
+    ok('GR7: uydurma kaynak TÜM YÜRÜYÜŞÜ pazar-analizi\'de durdurur', sonuc.durdu === 'donduruldu')
+    const engelState = stateYukle(ns2, id2)
+    const pazarBs = engelState.asamalar['master-plan'].bolumler['pazar-analizi']
+    ok('GR7: bloke olan bölüm pazar-analizi (aktif_bolum)', engelState.asamalar['master-plan'].aktif_bolum === 'pazar-analizi')
+    ok('GR7: pazar-analizi durum=donduruldu', pazarBs.durum === 'donduruldu')
+    ok('GR7: blok_nedeni grounding sorununu işaret eder', /doğrulanmış bir kaynak DEĞİL/.test(pazarBs.blok_nedeni ?? ''))
+    ok('GR7: pipeline TAMAMLANMADI', engelState.aktif_asama !== 'tamamlandi')
+  } finally { temizle(ns2) }
 }
 
 // ════════════════════════════════════════════════════════════════════════════

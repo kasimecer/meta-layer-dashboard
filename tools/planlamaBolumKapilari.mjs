@@ -7,7 +7,9 @@
 
 import { ciplakSayiVarMi } from './planlamaKapilari.mjs'
 import { BOLUM_TANIMLARI } from './planlamaBolumTanimlari.mjs'
-import { bolumIcerikGovdesiKontrolEt, iddialariCikar, iddiaEtiketVarMi } from './planlamaIddiaDurumu.mjs'
+import {
+  bolumIcerikGovdesiKontrolEt, iddialariCikar, iddiaEtiketVarMi, kaynakGercekMi,
+} from './planlamaIddiaDurumu.mjs'
 
 // ── Bölüme-özgü ek kontroller (registry'de string-anahtarla referans edilir — döngüsel import yok) ──
 
@@ -84,17 +86,41 @@ export function bolumKapidanGecerMi(bolumId, icerik, baglam = null) {
   const govde = bolumIcerikGovdesiKontrolEt(icerik, { iddiaMuaf: false })
   if (!govde.gecti) return govde
 
-  const iddialar = iddialariCikar(icerik)
+  // GROUNDING: HAM (metinde yazılı) her [dogrulandi:kaynak] iddiası — kaynak GERÇEKTEN
+  // araştırma aşamasında doğrulanmış mı (baglam.gercekKaynaklar)? Bir kaynak ADI yazmak TEK
+  // BAŞINA yeterli DEĞİL; uydurma/izlenemez kaynak burada REDDEDİLİR — "damga kaynak yerine
+  // geçmez". baglam sağlanmadıysa (ör. baglamsız doğrudan-çağrı testleri) kontrolsüz geçilir
+  // (bkz kaynakGercekMi). Sınıf farkı gözetmeden HER bölümde uygulanır — görev metni bunu
+  // "kaynak-gerekli bölümlerde" istiyordu ama sahte bir "doğrulanmış" iddia hangi bölümde
+  // olursa olsun sorunludur; kısıtlamak ek karmaşıklık getirirdi, genişletmek getirmedi.
+  const iddialarHam = iddialariCikar(icerik)
+  for (const i of iddialarHam) {
+    if (i.tip === 'dogrulandi' && !kaynakGercekMi(i.param, baglam?.gercekKaynaklar)) {
+      return {
+        gecti: false,
+        neden: `${bolumId}: "[dogrulandi:${i.param}]" (satır ${i.satirNo}) araştırma aşamasında ` +
+               `doğrulanmış bir kaynak DEĞİL — uydurma/izlenemez kaynak kabul edilmez. Gerçek ` +
+               `kaynağı araştırmaya [doğrulanmış:...] olarak ekleyin, ya da bu iddiayı ` +
+               `[acik-soru:...] işaretleyip DATA-REQUEST üzerinden çözün.`,
+      }
+    }
+  }
+
+  // minDogrulandi/sifirAcikGerekli EFEKTİF statüyle sayılır (baglam.efektifIddialar
+  // verilmişse) — yanıtlanmış bir acik-soru (karar=veri/tahmin) artık HAM etiket ne olursa
+  // olsun doğrulanmış/tahmin sayılır; baglam yoksa (ör. doğrudan-çağrı testleri) HAM sayıma düşer.
+  const iddialar = baglam?.efektifIddialar ?? iddialarHam
+  const efektifTipOf = (i) => i.efektifTip ?? i.tip
 
   if (tanim.minDogrulandi > 0) {
-    const n = iddialar.filter(i => i.tip === 'dogrulandi').length
+    const n = iddialar.filter(i => efektifTipOf(i) === 'dogrulandi').length
     if (n < tanim.minDogrulandi) {
       return { gecti: false, neden: `${bolumId}: yeterli doğrulanmış iddia yok (bulunan: ${n}, gereken: ≥${tanim.minDogrulandi})` }
     }
   }
 
   if (tanim.sifirAcikGerekli) {
-    const acikSayisi = iddialar.filter(i => i.tip === 'acik-soru').length
+    const acikSayisi = iddialar.filter(i => efektifTipOf(i) === 'acik-soru').length
     if (acikSayisi > 0) {
       return { gecti: false, neden: `${bolumId}: bu bölüm yerel sıfır-açık şartı taşıyor ama ${acikSayisi} açık-soru etiketi var` }
     }

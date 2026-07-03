@@ -174,7 +174,32 @@ Toplam adreslenebilir pazar için operatör bir tahmini kabul etmiştir. [operat
 
 Hedef segment operatör tarafından tanımlanmıştır. [operator-beyan:segment-tanimi]
 `,
+
+  // GR testi: bariz UYDURMA bir kaynak — sözdizimi geçerli ([dogrulandi:kaynak]) ama kaynak
+  // araştırma aşamasında GERÇEKTEN doğrulanmamış. Gate bunu REDDETMELİ (damga kaynak yerine geçmez).
+  pazarAnaliziUydurmaKaynak: `# Pazar Analizi — Test Projesi
+
+Toplam adreslenebilir pazar UYDURULMUŞ bir rakamla verilmiştir. [dogrulandi:uydurma-kaynak-xyz]
+
+Hedef segment, düşük-bakım çözümlere açık şehirli yetişkinlerden oluşuyor. [dogrulandi:sektor-raporu-2026]
+`,
+
+  // GR testi: pazar-analizi'nde bir iddia HENÜZ kaynaklanamadı ([acik-soru:...]) — diğer 2 satır
+  // zaten GERÇEK kaynaklı (minDogrulandi=1 bağımsız karşılanıyor); testin odağı YALNIZ
+  // açık-soru → DATA-REQUEST + yerel sıfır-açık bloğu mekaniği (pazar-analizi sifirAcikGerekli=true).
+  pazarAnaliziAcikSoru: `# Pazar Analizi — Test Projesi
+
+Toplam adreslenebilir pazar sektör raporuyla doğrulanmıştır. [dogrulandi:sektor-raporu-2026]
+
+Hedef segment, düşük-bakım çözümlere açık şehirli yetişkinlerden oluşuyor. [dogrulandi:sektor-raporu-2026]
+
+Kullanıcı başına ortalama yıllık harcama HENÜZ doğrulanamadı. [acik-soru:kullanici-basi-harcama]
+`,
 }
+
+// Genel (bölüme özgü olmayan) DATA-REQUEST-tetikleme testi için ham parça — araştırma-tarzı
+// [eksik] etiketi, bölüm sözlüğü DIŞINDA (görev metninin "figures marked missing" örneği).
+export const EKSIK_FIGUR_SATIRI = 'Kullanıcı edinme maliyeti [eksik] henüz ölçülmedi.'
 
 // ── Kendi kendini doğrula (F0 "drift kalkanı") ──────────────────────────────────────────
 export function bolumFiksturuDogrula() {
@@ -194,6 +219,12 @@ export function bolumFiksturuDogrula() {
   kontrolEt('ozet-yonetici', BOZUK_BOLUM.ozetEtiketli, false, 'ozetEtiketli')
   kontrolEt('yasal-uyumluluk', BOZUK_BOLUM.yasalUyumlulukAcik, true, 'yasalUyumlulukAcik (yerel tolerans)')
   kontrolEt('pazar-analizi', BOZUK_BOLUM.pazarAnaliziDogrulanmamis, false, 'pazarAnaliziDogrulanmamis')
+  // baglamsız (kontrolsüz) çağrıda grounding uygulanmaz — bu fikstür YALNIZ baglam.gercekKaynaklar
+  // verildiğinde reddedilir (bkz test-runner GR bölümü, burada yalnız yapı/govde geçtiğini doğrular).
+  kontrolEt('pazar-analizi', BOZUK_BOLUM.pazarAnaliziUydurmaKaynak, true, 'pazarAnaliziUydurmaKaynak (baglamsız — grounding YOK)')
+  // sifirAcikGerekli=true bölümde ÇÖZÜLMEMİŞ bir açık-soru, baglamsız (=ham sayım) çağrıda da
+  // REDDEDİLMELİ — bu, "yanıtlanana kadar bloklar" iddiasının en temel hâli.
+  kontrolEt('pazar-analizi', BOZUK_BOLUM.pazarAnaliziAcikSoru, false, 'pazarAnaliziAcikSoru (çözülmemiş → bloklar)')
 
   // Kayıt bütünlüğü: BOLUM_SIRASI'ndaki her asıl bölüm (provenans-ek hariç) FIKSTUR_BOLUM'da var mı?
   for (const id of BOLUM_SIRASI) {
