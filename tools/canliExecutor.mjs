@@ -50,7 +50,21 @@ function yanitlarMetni(tuketim) {
     if (e.atlandi === true) { satirlar.push(`- (ATLANDI, karar operatörce ertelendi) ${s.metin}${e.gerekce ? ` — gerekçe: ${e.gerekce}` : ''}`); continue }
     if (s.tip === 'CHOICE') satirlar.push(`- SEÇİM: ${s.metin} → operatör seçti: «${e.secim}»`)
     else if (s.tip === 'DATA-REQUEST') {
-      if (e.karar === 'veri') satirlar.push(`- VERİ (kaynaklı): «${konu}» → değer: ${e.deger}${e.kaynak ? `; kaynak: ${e.kaynak}` : ''}. Bunu [doğrulanmış:${e.kaynak ?? 'operatör'}] etiketiyle kullan.`)
+      if (e.karar === 'veri') {
+        // 'veri' iki farklı şeyi taşıyabilir: (a) araştırmanın GERÇEKTEN doğrulayabileceği dış
+        // kaynak, (b) operatörün kendi stratejik kararı/beyanı (kaynak yok ya da "operatör
+        // kararı" gibi). İkisini AYNI [dogrulandi:...] etiketiyle yönlendirmek (b) durumunda
+        // sonraki bölümün gate'ini (gercekKaynaklariCikar karşılaştırması) yanlışlıkla
+        // reddettirir — operatör beyanı hiçbir zaman arastirma.md'nin gerçek kaynak kümesinde
+        // olmaz. Kaynak metninde "operatör/operator" geçiyorsa ya da kaynak hiç verilmemişse
+        // KESİN olarak operator-beyan'a yönlendir; aksi halde modele iki olasılığı da göster.
+        const kaynakStr = e.kaynak ? `; kaynak: ${e.kaynak}` : ''
+        const operatorBeyaniMi = !e.kaynak || /operat[öo]r/i.test(e.kaynak)
+        const rehber = operatorBeyaniMi
+          ? `Bu bir DIŞ KAYNAK DEĞİL — operatörün kendi kararı/beyanı. [operator-beyan:...] etiketiyle kullan; ASLA [dogrulandi:...] ile KULLANMA (araştırmanın doğrulamadığı bir "kaynak" gate'i reddettirir).`
+          : `Bu araştırma aşamasının GERÇEKTEN doğruladığı bir kaynaksa [dogrulandi:${e.kaynak}] etiketiyle kullan; değilse (operatörün kendi kararıysa) [operator-beyan:...] kullan.`
+        satirlar.push(`- VERİ: «${konu}» → değer: ${e.deger}${kaynakStr}. ${rehber}`)
+      }
       else if (e.karar === 'tahmin') satirlar.push(`- TAHMİN (operatör-onaylı): «${konu}» → operatör tahmini onayladı. [tahmin-doğrulanacak:operatör-onaylı] etiketiyle kullan.`)
       else if (e.karar === 'dusur') satirlar.push(`- DÜŞÜR: «${konu}» → bu iddiayı ÇIKAR, bu aşamada KULLANMA.`)
     }
@@ -322,6 +336,13 @@ Başlık/tablo-ayracı/boş satır DIŞINDAKİ HER içerik satırı şu 4 etiket
   [operator-onayli-tahmin:<soru-anahtari>]     — operatörün açıkça kabul ettiği tahmin
   [acik-soru:<soru-anahtari-veya-konu>]        — henüz çözülmemiş
 
+[dogrulandi:X] İÇİN SIKI KURAL: X, araştırma belgesinin KENDİSİNDE zaten [doğrulanmış:X] olarak
+geçen kaynak-adının BİREBİR AYNISI olmalı (harfi harfine kopyala — Türkçe/İsveççe özel karakterler
+DAHİL). "araştırma-bölüm-2-rakip-ekosistemi" gibi bir BÖLÜM'e veya genel başlığa gönderme YAPMA —
+bölüm/başlık adı bir kaynak DEĞİLDİR. Araştırmada o bilgi [tahmin-doğrulanacak:...] veya [eksik]
+olarak geçiyorsa (yani araştırmanın kendisi de doğrulamamışsa), burada da [dogrulandi:...] YAZMA —
+[operator-onayli-tahmin:<yeni-anahtar>] kullan. Emin değilsen [acik-soru:...] kullan.
+
 Etiketsiz satır BIRAKMA; statüsü belirsizse [acik-soru:...] kullan, SESSİZCE atlama.`
 
 // Bölüm tanımının ustBaglamAnahtarlari'na göre bağlam-blokları kur (TUM_BOLUMLER_ISARETI ⟹
@@ -441,6 +462,16 @@ export function canliExecutorOlustur(nsYolu, projeConfig, opts = {}) {
     ist.toplamMaliyet              += sonuc.maliyet_usd ?? 0
     ist.asamaMaliyetleri[asama]    = sonuc.maliyet_usd
 
+    // 2026-07-06: burada denenen bir otomatik "sohbet-sarmalayıcı" kırpma (ilk #-başlığından
+    // öncesini silme) GERİ ALINDI — risk-varsayimlar'da içeriğin ORTASINDAN bir kelimeyi keserek
+    // sessiz veri kaybına yol açtığı GÖZLEMLENDİ (muhtemelen metnin içinde herhangi bir nedenle
+    // satır-başı "#" ile başlayan bir ifade — kod/renk/referans vb. — gerçek başlıkmış gibi
+    // yanlış eşleşti). "Belgeyi bulmaca gibi kırp" heuristiği bu sınıf hatalar için doğası gereği
+    // güvensiz: yanlış-pozitif maliyeti (sessiz içerik kaybı) yanlış-negatif maliyetinden (gözle
+    // görülür sarmalayıcı metin, kapı yakalar, elle düzeltilir) çok daha yüksek. Sarmalayıcı
+    // metin sorunu — bkz promptUret/promptUretBolum'daki "Belgenin başına/sonuna yorum EKLEME" —
+    // ELLE tespit + düzeltme ile ele alınmaya devam ediyor (kapı zaten statüsüz-satır olarak
+    // yakalıyor, sessiz değil).
     const dosyaYolu = opts.hedefDosya ?? join(nsYolu, ASAMA_DOSYALARI[asama])
     guvenliYaz(dosyaYolu, sonuc.metin, nsYolu)
     baglamlar[asama] = sonuc.metin

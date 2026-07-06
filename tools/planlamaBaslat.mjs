@@ -23,7 +23,12 @@ import { bolumeGeriDon } from './planlamaBolumLoop.mjs'
  */
 export async function planlamaBaslat(nsYolu, projeId, projeConfig, opts = {}) {
   const { log = () => {}, mod = 'ileri' } = opts
-  const { executor } = canliExecutorOlustur(nsYolu, projeConfig, { log })
+  // Varsayılan (360sn) master-plan bölümlerinin biriken bağlamıyla yetersiz kaldı (arastirma
+  // 2/3, pazar-analizi 6/6 zaman aşımına uğradı — 2026-07-05); 900sn'ye çıkarıldı. "synthesis"
+  // sınıfı bölümler (risk-varsayimlar, ozet-yonetici) TUM_BOLUMLER_ISARETI ile TÜM aşama+bölüm
+  // çıktılarını bağlam alıyor — risk-varsayimlar 900sn'de de 3/3 zaman aşımına uğradı
+  // (2026-07-06), 1800sn'ye çıkarıldı.
+  const { executor } = canliExecutorOlustur(nsYolu, projeConfig, { log, zaman_asimi_ms: 1_800_000 })
   // Canlı akışta SORU–YANIT katmanı AÇIK (deterministik üretici). Ham loop'ta varsayılan
   // KAPALI'dır (geriye-uyum); burada açıkça enjekte ediyoruz. Aynı şekilde master-plan
   // BÖLÜM-YÜRÜYÜŞÜ de yalnız GERÇEK CLI'da (burada) açılır — BOLUM_TANIMLARI'nın varlığı

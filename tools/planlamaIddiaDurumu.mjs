@@ -63,9 +63,18 @@ function tabloBasligiMi(satirlar, i) {
   return sonraki != null && TABLO_AYIRAC_DESENI.test(sonraki)
 }
 
+// Bir satır SADECE kalın alt-başlık mı (ör. "**Sorun 1 — Koordinasyon Maliyeti**")? `#`
+// kullanmayan ama satırın TAMAMI tek bir bold span'dan ibaret olan alt-başlıklar — genesis'in
+// KENDİ prompt şablonunda da (canliExecutor.mjs "**EKSİK TÜR:**" vb) yerleşik bir konvansiyon.
+// Satırda bold-etiketin YANINDA başka içerik varsa (ör. "**Sorun 1:** açıklama...") bu iddia
+// SAYILIR — yalnız satırın TAMAMI salt başlıksa muaf.
+function boldSadeceBasligiMi(satir) {
+  return /^\*\*[^*]+\*\*$/.test(satir.trim())
+}
+
 // İlk statüsüz (etiketsiz) içerik satırını bul — yoksa null. ciplakSayiVarMi'nin satır-bazlı
-// tarama biçimiyle AYNI (boş/başlık/tablo-ayracı/tablo-başlığı/salt-dekoratif atlanır; tablo
-// VERİ satırı atlanmaz).
+// tarama biçimiyle AYNI (boş/başlık/tablo-ayracı/tablo-başlığı/bold-alt-başlık/salt-dekoratif
+// atlanır; tablo VERİ satırı atlanmaz).
 export function statususuzSatirBul(icerik) {
   const satirlar = String(icerik ?? '').split('\n')
   for (let i = 0; i < satirlar.length; i++) {
@@ -74,6 +83,7 @@ export function statususuzSatirBul(icerik) {
     if (/^\s*#/.test(satir)) continue
     if (TABLO_AYIRAC_DESENI.test(satir)) continue
     if (tabloBasligiMi(satirlar, i)) continue
+    if (boldSadeceBasligiMi(satir)) continue
     if (!anlamliMi(satir)) continue
     if (!new RegExp(IDDIA_ETIKET_KAYNAK).test(satir)) return { satirNo: i + 1, satir: satir.trim() }
   }
