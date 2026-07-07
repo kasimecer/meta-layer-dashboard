@@ -6,25 +6,37 @@
 // tools/ katmanında yaşar (scripts/*.mjs başka bir scripts/*.mjs'yi İTHAL ETMEZ — repo
 // konvansiyonu); her iki çağıran da yalnız bu saf modülden okur.
 
-import { sorulariOku, yanitlariHamOku, yanitButunluk, acikSorular, atlananlar } from './planlamaSorular.mjs'
+import {
+  sorulariOku, yanitlariHamOku, yanitButunluk, acikSorular, atlananlar,
+  tumAcikAdaylar, acikBlokerler,
+} from './planlamaSorular.mjs'
 import { aktifBolumBilgisi } from './planlamaBolumLoop.mjs'
 
 // Genel çekirdek — bir BİRİMİN (aşama VEYA master-plan bölümü) sorular artefaktından açık-soru
 // durumu. birimState = state.asamalar[birimId] VEYA bir bölümün kendi state-nesnesi (AYNI şekil:
 // sorular_surum alanı olan herhangi bir birim). Dönüş: null veya
 //   { asama, paket, acik, atlanan, butunluk: 'gecerli'|'yok'|'bozuk', neden? }
+// acikBloker/acikErtelenen: SAF EKLEME (mevcut tüketiciler görmezden gelebilir) — CLI'nin
+// toplu-atla/blocker raporlaması için (bkz scripts/planlama-baslat.mjs).
 function acikSoruDurumJenerik(nsYolu, birimId, birimState) {
   const ss = birimState?.sorular_surum
   if (ss == null) return null
   const paket = sorulariOku(nsYolu, birimId, ss)
   if (!paket) return null
   const substantive = paket.sorular.filter(s => s.tip !== 'APPROVAL')
-  if (substantive.length === 0) return { asama: birimId, paket, acik: [], atlanan: [], butunluk: 'gecerli' }
+  if (substantive.length === 0) return { asama: birimId, paket, acik: [], acikBloker: [], acikErtelenen: [], atlanan: [], butunluk: 'gecerli' }
   const but = yanitButunluk(paket, yanitlariHamOku(nsYolu, birimId, ss))
   if (but.durum === 'gecerli') {
-    return { asama: birimId, paket, acik: acikSorular(paket, but.yanitlar), atlanan: atlananlar(paket, but.yanitlar), butunluk: 'gecerli' }
+    const acik = acikSorular(paket, but.yanitlar)
+    const tumAcik = tumAcikAdaylar(paket, but.yanitlar)
+    return {
+      asama: birimId, paket, acik,
+      acikBloker: acikBlokerler(paket, but.yanitlar),
+      acikErtelenen: tumAcik.filter(s => !acik.includes(s)),
+      atlanan: atlananlar(paket, but.yanitlar), butunluk: 'gecerli',
+    }
   }
-  return { asama: birimId, paket, acik: substantive, atlanan: [], butunluk: but.durum, neden: but.neden }
+  return { asama: birimId, paket, acik: substantive, acikBloker: substantive.filter(s => s.tier === 'blocker'), acikErtelenen: [], atlanan: [], butunluk: but.durum, neden: but.neden }
 }
 
 // Aktif aşamanın sorular artefaktından açık-soru durumu — CLI (scripts/planlama-baslat.mjs) VE

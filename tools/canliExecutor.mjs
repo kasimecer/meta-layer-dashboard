@@ -27,9 +27,15 @@ Kabul edilen etiket biçimleri:
   [eksik]                          — veri bilinmiyor
   [metadata:2026-06]               — yıl / tarih meta bilgisi
 
+[tahmin-doğrulanacak:...] / [eksik] İÇİN OPSİYONEL EK ETİKET — AYNI SATIRA, ayrı bir etiket
+olarak [tier:blocker|onemli|opsiyonel] ekleyebilirsin (rubric IDDIA-STATÜSÜ kuralındaki ile
+AYNI): blocker = bu veri olmadan plan maddi biçimde yanlış/yanıltıcı olur; onemli = planı
+iyileştirir ama yokluğu yüzeye çıkmış bir varsayımdır; opsiyonel = incelik. Belirtmezsen
+'onemli' varsayılır — emin değilsen etiketi ATLA.
+
 Örnekler:
   ✓ Abonelik pazar büyüme oranı [tahmin-doğrulanacak:McKinsey-abonelik-2024] yıllık %18 civarındadır.
-  ✓ Kutu başına hedef gelir 350₺ [tahmin-doğrulanacak:rakip-fiyat-kıyaslaması].
+  ✓ Kutu başına hedef gelir 350₺ [tahmin-doğrulanacak:rakip-fiyat-kıyaslaması] [tier:blocker].
   ✓ Pilot başlangıç tarihi [metadata:2026-09].
   ✓ Balkonlu konut verisi [eksik] — TÜİK araştırması gerekli.
   ✗ Pazar büyümesi yıllık %18'dir.         ← etiket yok
@@ -343,6 +349,18 @@ bölüm/başlık adı bir kaynak DEĞİLDİR. Araştırmada o bilgi [tahmin-doğ
 olarak geçiyorsa (yani araştırmanın kendisi de doğrulamamışsa), burada da [dogrulandi:...] YAZMA —
 [operator-onayli-tahmin:<yeni-anahtar>] kullan. Emin değilsen [acik-soru:...] kullan.
 
+TIER (öncelik-derecesi) — [acik-soru:...] VE [tahmin-doğrulanacak:...] etiketleri İÇİN AYRICA,
+AYNI SATIRA, bağımsız bir [tier:blocker|onemli|opsiyonel] etiketi ekle (statü etiketinin PARAMINA
+GÖMME — ayrı bir etiket):
+  [tier:blocker]   — bu iddia yanıtlanmadan plan maddi biçimde YANLIŞ/YANILTICI olur: yük taşıyan
+                     bir operatör kararı (MVP kapsamı, problem tanımı, gelir-modeli seçimi) YA DA
+                     sonraki bir bölümün tamamlanma-kapısının BAĞLI OLDUĞU sert-kaynaklı iddia.
+  [tier:onemli]    — planı gerçek biçimde iyileştirir; yokluğu yüzeye çıkmış (açık) bir
+                     varsayımdır, plan yine de tutarlıdır (ör. aralık bilinirken somut rakam eksik).
+  [tier:opsiyonel] — incelik/güzelleştirme; yokluğu planı neredeyse etkilemez.
+Belirtmezsen 'onemli' varsayılır. Emin değilsen 'onemli' kullan — 'blocker' yalnız GERÇEKTEN
+yük-taşıyan bir karar/sert-bağımlılık için, aşırı-kullanma plan ilerlemesini gereksiz durdurur.
+
 Etiketsiz satır BIRAKMA; statüsü belirsizse [acik-soru:...] kullan, SESSİZCE atlama.`
 
 // Bölüm tanımının ustBaglamAnahtarlari'na göre bağlam-blokları kur (TUM_BOLUMLER_ISARETI ⟹
@@ -362,6 +380,17 @@ function bolumBaglamBlogu(bolumTanim, baglamlar) {
     if (icerik != null) { bloklar.push(`<${anahtar}>\n${icerik}\n</${anahtar}>`); eklenen.add(anahtar) }
   }
   return bloklar.join('\n')
+}
+
+// Bazı bölümlerde TEK bir karar/iddia rubric'in genel değerlendirmesinden BAĞIMSIZ olarak HER
+// ZAMAN blocker'dır — bu, "problem-definition approval" / "MVP-scope approval" adlarıyla anılan
+// operatör onayları: problem-cozum'un hedefAciklama'sı zaten "Problem ifadesi operatör onayına
+// sunulmalı" der, urun-tanimi'nin ki "MVP sınırı operatör onayına sunulmalı" — bu İKİ karar
+// modelin KENDİ rubric-yargısına bırakılamaz (mekanik olarak HANGİ iddianın "bu" karar olduğunu
+// JS tarafı bilemez — bu yüzden burada bir PROMPT talimatı, deterministik bir kural DEĞİL).
+const TIER_ZORUNLU_NOTLARI = {
+  'problem-cozum': 'BU BÖLÜMDE EK KURAL: problem tanımının KENDİSİNİ operatör onayına sunan iddia/karar HER ZAMAN [tier:blocker] taşımalı (rubric\'in genel değerlendirmesi bu ikisi için geçerli değil — bu karar yapısı gereği yük taşıyandır).',
+  'urun-tanimi': 'BU BÖLÜMDE EK KURAL: MVP kapsam sınırını operatör onayına sunan iddia/karar HER ZAMAN [tier:blocker] taşımalı (rubric\'in genel değerlendirmesi bu ikisi için geçerli değil — bu karar yapısı gereği yük taşıyandır).',
 }
 
 // Master-plan BÖLÜM prompt'u — promptUret'in KARDEŞİ (switch-case'e EKLENMEZ). 14 bölüm + ek
@@ -419,7 +448,7 @@ ${baglamBlogu || '(bu bölüm için özel üst bağlam yok — proje geneline da
 GÖREV: ${bolumTanim.hedefAciklama}
 
 ${IDDIA_KURALI}
-
+${TIER_ZORUNLU_NOTLARI[bolumId] ? `\n${TIER_ZORUNLU_NOTLARI[bolumId]}\n` : ''}
 Belgenin başına veya sonuna yorum/açıklama EKLEME. Sadece "${bolumTanim.etiket}" başlıklı bölüm içeriği.`
 }
 

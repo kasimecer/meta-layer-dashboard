@@ -108,7 +108,7 @@ export const BOLUM_TANIMLARI = {
   },
   'risk-varsayimlar': {
     id: 'risk-varsayimlar', etiket: 'Riskler ve Varsayımlar',
-    hedefAciklama: 'Riskler ve varsayımlar. HER varsayımı statüle; gizli-varsayım avı yap (üstü kapalı kabul edilmiş ama hiç yazılmamış varsayımları da yüzeye çıkar).',
+    hedefAciklama: 'Riskler ve varsayımlar. HER varsayımı statüle; gizli-varsayım avı yap (üstü kapalı kabul edilmiş ama hiç yazılmamış varsayımları da yüzeye çıkar). Provenans Eki\'ndeki Varsayım Defteri\'ne (skip ile kapatılmış izlenen-varsayımlar) bir CÜMLEYLE gönderme yap — orada listelenen kayıtları burada TEKRARLAMA/KOPYALAMA (tek kaynak orasıdır); blocker-tier olmayan (onemli-tier) izlenen-varsayımların plan riskine etkisi daha yüksektir, bunu belirt.',
     iddiaSinifi: ['synthesis'], ustBaglamAnahtarlari: ['genesis', 'premise', 'arastirma', 'strateji', TUM_BOLUMLER_ISARETI],
     iddiaMuaf: false, mekanik: false, sifirAcikGerekli: false, minDogrulandi: 0, ekKontrol: null,
   },

@@ -11,6 +11,7 @@ import { join } from 'path'
 import {
   sorulariOku, yanitButunluk, yanitlariHamOku, acikSorular,
   sorulariYaz, enSonYanitliOncekiSurum, oncekiYanitlariOku,
+  tumAcikAdaylar,
 } from './planlamaSorular.mjs'
 
 // Üst (bir önceki) birim; sıradaki ilk eleman için null (kökün üstü yok).
@@ -48,11 +49,17 @@ export function birimIlerletHedefle(sira, ebeveyn, aktifAlan, hedef) {
 }
 
 // Bir birim BAYAT mı? — kabul ettiği üst sürüm, üstün güncel sürümünden eski mi?
+// 'onay-bekliyor' DAHİL (yalnız 'gecti' DEĞİL): tier modelinde (onemli/opsiyonel artık
+// engellemez) bir birim 'gecti' olmadan ÖNCE, 'onay-bekliyor'da otururken üstü --geri ile
+// yeniden açılıp yeni sürüme geçebilir — bu ANDA henüz 'gecti' olmadığı için ESKİ (yalnız-
+// gecti) kontrol bunu YAKALAYAMAZDI, üst değişmiş olsa bile bu birim sessizce (bayat kontrolü
+// hiç TETİKLENMEDEN) onaylanıp ilerlerdi. Çağıranlar (bolumWalkAdimAt/ileriMod) zaten yalnız
+// ilgili durumda (gecti veya onay-bekliyor) çağırır; bu fonksiyonun kendisi ikisini de kabul eder.
 export function birimBayatMi(sira, birimler, birim) {
   const ust = birimUst(sira, birim)
   if (!ust) return false
   const s = birimler[birim]
-  if (!s || s.durum !== 'gecti' || (s.surum ?? 0) < 1) return false
+  if (!s || (s.durum !== 'gecti' && s.durum !== 'onay-bekliyor') || (s.surum ?? 0) < 1) return false
   const kabul = s.kabul_edilen_ust_surum ?? 0
   const ustSurum = birimler[ust]?.surum ?? 0
   return kabul < ustSurum
@@ -116,26 +123,44 @@ export function birimSorulariUretVeYaz(nsYolu, soruUretici, birimId, surum, icer
 }
 
 // Bir birimin AÇIK-SORU durumu — hem koşum-sonrası ilk durakta HEM yeniden-çağırmada aynı kaynak.
+// `engelli` (blok kararı) artık TIER-FARKINDA: yalnız açık BLOCKER varsa engeller — açık onemli/
+// opsiyonel ilerlemeyi durdurmaz (bkz acikBlokerler). `acik` ana-set kapsamında KALIR (geriye-
+// uyum — mevcut tüketiciler bunu "bu turun açık soruları" anlamında kullanır); `acikErtelenen`
+// (ertelenen'deki açık adaylar) ve `acikBlokerler` (yalnız engelli kararının girdisi) EKLENEN
+// alanlar. Bu tek fonksiyon HEM aşama-seviyesi (planlamaLoopV2.mjs) HEM bölüm-seviyesi
+// (planlamaBolumLoop.mjs) ilerlemeyi besler — burada yapılan düzeltme HER İKİSİNE de otomatik
+// yansır (paralel bir "engelli" hesaplaması yok).
 export function birimAcikDurum(nsYolu, birimler, birimId) {
   const as = birimler[birimId]
   const ss = as.sorular_surum
-  const bos = { engelli: false, acik: [], sorularSurum: ss ?? null, ertelenen: [], butunlukHatasi: null, paketVar: false }
+  const bos = { engelli: false, acik: [], acikBlokerler: [], acikErtelenen: [], sorularSurum: ss ?? null, ertelenen: [], butunlukHatasi: null, paketVar: false }
   if (ss == null) return bos
   const paket = sorulariOku(nsYolu, birimId, ss)
   if (!paket) return bos
   const substantive = paket.sorular.filter(s => s.tip !== 'APPROVAL')
   const ertelenen = paket.ertelenen ?? []
   if (substantive.length === 0) {
-    return { engelli: false, acik: [], sorularSurum: ss, ertelenen, butunlukHatasi: null, paketVar: true }
+    return { engelli: false, acik: [], acikBlokerler: [], acikErtelenen: [], sorularSurum: ss, ertelenen, butunlukHatasi: null, paketVar: true }
   }
   const but = yanitButunluk(paket, yanitlariHamOku(nsYolu, birimId, ss))
-  if (but.durum === 'gecerli') {
-    const acik = acikSorular(paket, but.yanitlar)
-    return { engelli: acik.length > 0, acik, sorularSurum: ss, ertelenen, butunlukHatasi: null, paketVar: true }
+  // 'yok' (henüz HİÇ yanıt dosyası yazılmadı) ARTIK 'bozuk' (kurcalanmış/geçersiz format) İLE
+  // AYNI ŞEKİLDE ele alınmıyor: 'yok' durumunda substantive'in TAMAMI "açık" sayılır ve engelli
+  // TIER'E göre belirlenir (blocker yoksa engellemez) — operatör, yalnız onemli/opsiyonel
+  // soru üreten bir birimde HİÇBİR yanıt dosyası yazmadan da ilerleyebilmeli (bu olmadan tier
+  // modeli anlamsız kalırdı — "cevapsız → koşulsuz blok" eski flat davranışın ta kendisi
+  // olurdu). 'bozuk' (GERÇEK bir kurcalama/format hatası — imza/sürüm uyuşmazlığı, bozuk JSON,
+  // yabancı anahtar) ise HÂLÂ koşulsuz engeller: veri bütünlüğü tier'den bağımsız bir eksendir.
+  if (but.durum === 'gecerli' || but.durum === 'yok') {
+    const yanitlar = but.durum === 'gecerli' ? but.yanitlar : []
+    const acik = acikSorular(paket, yanitlar)
+    const acikBlokerler = acik.filter(s => s.tier === 'blocker')
+    const tumAcik = tumAcikAdaylar(paket, yanitlar)
+    const acikErtelenen = tumAcik.filter(s => !acik.includes(s))
+    return { engelli: acikBlokerler.length > 0, acik, acikBlokerler, acikErtelenen, sorularSurum: ss, ertelenen, butunlukHatasi: null, paketVar: true }
   }
   return {
-    engelli: true, acik: substantive, sorularSurum: ss, ertelenen,
-    butunlukHatasi: but.durum === 'bozuk' ? but.neden : null, paketVar: true,
+    engelli: true, acik: substantive, acikBlokerler: substantive.filter(s => s.tier === 'blocker'), acikErtelenen: [], sorularSurum: ss, ertelenen,
+    butunlukHatasi: but.neden ?? null, paketVar: true,
   }
 }
 

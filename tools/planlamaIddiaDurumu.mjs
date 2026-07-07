@@ -24,6 +24,14 @@ export const IDDIA_TIPLERI = ['dogrulandi', 'operator-beyan', 'operator-onayli-t
 
 const IDDIA_ETIKET_KAYNAK = '\\[(dogrulandi|operator-beyan|operator-onayli-tahmin|acik-soru):([^\\]]+)\\]'
 
+// tier — AYRI/BAĞIMSIZ bir etiket, statü etiketiyle AYNI satırda birlikte durur (ör.
+// "...[acik-soru:X] [tier:blocker]"). BİLEREK statü etiketinin param'ına GÖMÜLMEDİ: böylece
+// provenansKapisi'nin (planlamaBolumKapilari.mjs) harfiyen `icerik.includes(iddia.param)`
+// kapsam-kontrolü hiç ETKİLENMEZ — param dün neyse bugün de odur. Yok sayılırsa 'onemli'
+// varsayılır (mevcut/eski içerik geriye dönük YENİ blocker icat ETMEZ).
+const TIER_ETIKET_DESENI = /\[tier:(blocker|onemli|opsiyonel)\]/
+const TIER_VARSAYILAN = 'onemli'
+
 // planlamaKapilari.mjs'deki tabloVeriSatirSayisi'nin ayraç-satırı deseniyle AYNI.
 const TABLO_AYIRAC_DESENI = /^\s*\|[\s\-:|]+\|?\s*$/
 
@@ -36,7 +44,8 @@ export function iddialariCikar(icerik) {
     const desen = new RegExp(IDDIA_ETIKET_KAYNAK, 'g')
     let m
     while ((m = desen.exec(satir))) {
-      sonuc.push({ satirNo: i + 1, satir: satir.trim(), tip: m[1], param: m[2].trim() })
+      const tierM = TIER_ETIKET_DESENI.exec(satir)
+      sonuc.push({ satirNo: i + 1, satir: satir.trim(), tip: m[1], param: m[2].trim(), tier: tierM?.[1] ?? TIER_VARSAYILAN })
     }
   })
   return sonuc
@@ -137,6 +146,15 @@ export function kaynakGercekMi(kaynak, gercekKaynaklar) {
 //   acik-soru + yanıt karar='dusur'  → efektifTip='dusuruldu' (ne açık ne doğrulanmış; saymaz, bloklamaz)
 //   acik-soru + yanıtsız/atlanmamış  → efektifTip='acik-soru' (DEĞİŞMEDİ — hâlâ açık, bloklar)
 //   dogrulandi/operator-beyan/operator-onayli-tahmin (ham) → dokunulmadan geçer
+//
+// `closure` — efektifTip'ten BAĞIMSIZ, ORTOGONAL bir eksen (tier/kapanma modeli): bir skip
+// (atlandi=true) SONRASI da efektifTip 'acik-soru' KALIR (yukarıdaki gibi, kasıtlı — bir
+// izlenen-varsayım hâlâ "doğrulanmış" DEĞİLDİR), ama closure='skip' olur; bu ayrım olmadan
+// "hâlâ acik-soru" ile "hiç dokunulmamış açık" birbirinden ayırt edilemez (bkz layer2Kontrol).
+//   yanıt yok           → closure='acik'
+//   atlandi=true         → closure='skip'
+//   karar='dusur'        → closure='atildi'
+//   karar='veri'|'tahmin' → closure='cevaplandi'
 export function iddialariCozumle(nsYolu, bolumId, bolumState, iddialar) {
   const ss = bolumState?.sorular_surum
   let yanitHaritasi = new Map()
@@ -149,17 +167,20 @@ export function iddialariCozumle(nsYolu, bolumId, bolumState, iddialar) {
   }
   return iddialar.map(i => {
     if (i.tip !== 'acik-soru') {
-      return { ...i, efektifTip: i.tip, efektifKaynak: i.tip === 'dogrulandi' ? i.param : null }
+      return { ...i, efektifTip: i.tip, efektifKaynak: i.tip === 'dogrulandi' ? i.param : null, closure: 'cevaplandi' }
     }
     const anahtar = `veri:${slug(i.param)}`
     const yanit = yanitHaritasi.get(anahtar)
-    if (!yanit || yanit.atlandi === true) return { ...i, efektifTip: 'acik-soru', efektifKaynak: null }
+    if (!yanit) return { ...i, efektifTip: 'acik-soru', efektifKaynak: null, closure: 'acik' }
+    if (yanit.atlandi === true) {
+      return { ...i, efektifTip: 'acik-soru', efektifKaynak: null, closure: 'skip', varsayilanDeger: yanit.varsayilan_deger ?? null }
+    }
     if (yanit.karar === 'veri') {
       const kaynak = (yanit.kaynak && String(yanit.kaynak).trim()) || 'operatör-girdisi'
-      return { ...i, efektifTip: 'dogrulandi', efektifKaynak: kaynak }
+      return { ...i, efektifTip: 'dogrulandi', efektifKaynak: kaynak, closure: 'cevaplandi' }
     }
-    if (yanit.karar === 'tahmin') return { ...i, efektifTip: 'operator-onayli-tahmin', efektifKaynak: null }
-    if (yanit.karar === 'dusur') return { ...i, efektifTip: 'dusuruldu', efektifKaynak: null }
-    return { ...i, efektifTip: 'acik-soru', efektifKaynak: null }
+    if (yanit.karar === 'tahmin') return { ...i, efektifTip: 'operator-onayli-tahmin', efektifKaynak: null, closure: 'cevaplandi' }
+    if (yanit.karar === 'dusur') return { ...i, efektifTip: 'dusuruldu', efektifKaynak: null, closure: 'atildi' }
+    return { ...i, efektifTip: 'acik-soru', efektifKaynak: null, closure: 'acik' }
   })
 }

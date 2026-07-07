@@ -293,6 +293,15 @@ export async function planlamaLoopV2Calistir(nsYolu, projeId, executor, {
       // ONAY (ilerlet). Bu invokasyon = APPROVAL jesti; ama substantive soru(lar) açıksa
       // (veya yanıt bütünlüğü bozuksa) İLERLEME — bloke et, executor'a DOKUNMA (MODELSİZ).
       if (As.durum === 'onay-bekliyor') {
+        // Bayat kontrolü ÖNCE (tier modeli — onemli/opsiyonel artık engellemez): bu aşama
+        // ÜRETİLDİKTEN SONRA (henüz 'gecti' olmadan) üstü --geri ile yeniden açılıp yeni
+        // sürüme geçmiş olabilir. Eskiden bu ihtimal önemsizdi (herhangi bir açık soru zaten
+        // engellerdi, operatör fark etmeden onaylanamazdı); şimdi ONAYLAMADAN önce AÇIKÇA
+        // yakalanmalı — aksi halde bu aşama üstün ESKİ bir sürümüne göre sessizce onaylanır.
+        if (bayatMi(state, A)) {
+          log(`BAYAT ${A} — karar bekliyor (üst yeni sürüme geçti; yeniden-koş: düz çağrı / olduğu-gibi: --tut)`)
+          return sonucDon({ durdu: 'bayat-karar', bayatAsama: A })
+        }
         const d = acikDurum(A)
         if (d.engelli) {
           statePersist(nsYolu, state) // durum değişmedi; savunmacı persist

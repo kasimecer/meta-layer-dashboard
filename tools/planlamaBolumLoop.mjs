@@ -7,12 +7,19 @@
 // Bir invokasyon EN ÇOK bir birim (bir bölüm VEYA nihai onay) işler — üst-seviye "bir-koşum-
 // bir-karar" sözleşmesi bölüm-seviyesinde de AYNEN geçerlidir (bkz birimKostur).
 //
-// İKİ-KATMANLI done-when:
+// İKİ-KATMANLI done-when (tier/kapanma modeli — REVİZE):
 //   Layer-1 (bölüm-yerel)  — bolumKapidanGecerMi; bazı bölümler (ör. yasal-uyumluluk) yerel
 //                            açık-soru'yu TOLERE eder (görev metninin kendi ifadesiyle).
-//   Layer-2 (tüm-plan)     — TÜM 15 birim yerel-gecti olduktan SONRA (layer2Kontrol), her
-//                            yerde SIFIR açık-soru + her kaynak-gerekli bölümde ≥1 doğrulanmış
-//                            iddia. Yalnız BUNDAN SONRA nihai APPROVAL sorusu üretilir.
+//   Layer-2 (tüm-plan)     — TÜM 15 birim yerel-gecti olduktan SONRA (layer2Kontrol): her
+//                            kaynak-gerekli bölümde ≥1 doğrulanmış iddia (değişmedi) + her
+//                            bölümde SIFIR açık BLOCKER + aktif-set = 0 (soru-yanıt katmanı
+//                            üzerinden — her aday cevaplandı/skip/atildi). ESKİ "her yerde sıfır
+//                            açık-soru İÇERİK ETİKETİ" ölçütü KALDIRILDI: bir skip-kapatılmış
+//                            iddianın etiketi KASITLI OLARAK acik-soru'da KALIR (izlenen-varsayım
+//                            — bkz planlamaIddiaDurumu.mjs closure alanı), bu yüzden o ölçüt
+//                            yapısal olarak asla sıfıra inemezdi (bkz meta-kanal.md "Layer-2/
+//                            MAX_SORU tension" bulgusu). Yalnız BUNDAN SONRA nihai APPROVAL
+//                            sorusu üretilir.
 
 import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -132,14 +139,46 @@ export function provenansEkRenderla(veri) {
   for (const i of (veri?.tumIddialar ?? [])) {
     const etiket = BOLUM_TANIMLARI[i.bolumId]?.etiket ?? i.bolumId
     const kaynakStr = i.efektifKaynak ? ` — kaynak: \`${i.efektifKaynak}\`` : ''
-    satirlar.push(`- **${etiket}** — ham: \`${i.tip}:${i.param}\` → efektif-statü: **${i.efektifTip}**${kaynakStr}`)
+    // tier/kapanma: graceful varsayılan — hand-rolled/eski test verisi bu alanları taşımasa da
+    // (bkz PM testleri) render "undefined" basmaz, sessizce en-güvenli varsayılana düşer.
+    const tier = i.tier ?? 'onemli'
+    const kapanma = i.closure ?? 'acik'
+    satirlar.push(`- **${etiket}** — ham: \`${i.tip}:${i.param}\` → efektif-statü: **${i.efektifTip}**${kaynakStr} — tier: ${tier} — kapanma: ${kapanma}`)
   }
   satirlar.push('', '## Atlanan Sorular')
   for (const a of (veri?.tumAtlananlar ?? [])) {
     const etiket = BOLUM_TANIMLARI[a.bolumId]?.etiket ?? a.bolumId
     satirlar.push(`- **${etiket}** — soru: \`${a.anahtar}\` (tip: ${a.tip}) — gerekçe: ${a.gerekce ?? 'belirtilmedi'}`)
   }
+  satirlar.push('', '## Varsayım Defteri (izlenen-varsayımlar — skip ile kapatılmış sorular)')
+  const ledger = assumptionLedgerOlustur(veri)
+  if (ledger.length === 0) {
+    satirlar.push('(izlenen varsayım yok — hiçbir onemli/opsiyonel soru skip ile kapatılmadı)')
+  } else {
+    for (const kayit of ledger) {
+      const deger = kayit.assumedValue ? ` — varsayılan değer: \`${kayit.assumedValue}\`` : ''
+      satirlar.push(`- **${kayit.sectionEtiket}** [tier: ${kayit.tier}] — ${kayit.question}${deger} (statü: ${kayit.status})`)
+    }
+  }
   return satirlar.join('\n') + '\n'
+}
+
+// Varsayım defteri — provenansEkRenderla'nın ALDIĞI AYNI tumIddialar verisinin FİLTRELENMİŞ bir
+// projeksiyonu (closure === 'skip'). Tek kaynak, kopya toplama-mantığı YOK. Her kayıt bir
+// "izlenen-varsayım": operatör bir onemli/opsiyonel iddiayı YANITLAMADAN skip ile kapattı;
+// status HER ZAMAN 'acik-soru' kalır (iddialariCozumle bunu asla 'dogrulandi'ya YÜKSELTMEZ —
+// bir izlenen-varsayım gerçekten doğrulanmış GİBİ sayılamaz).
+export function assumptionLedgerOlustur(veri) {
+  return (veri?.tumIddialar ?? [])
+    .filter(i => i.closure === 'skip')
+    .map(i => ({
+      question: i.satir,
+      assumedValue: i.varsayilanDeger ?? null,
+      tier: i.tier ?? 'onemli',
+      section: i.bolumId,
+      sectionEtiket: BOLUM_TANIMLARI[i.bolumId]?.etiket ?? i.bolumId,
+      status: i.efektifTip,
+    }))
 }
 
 // Bölüme özel kapı-çağırıcı — HER bölüm için baglam.gercekKaynaklar (grounding) +
@@ -188,9 +227,12 @@ function onayNoktasiDonBolum(bolumId, d, sonucDonFn) {
 }
 
 // Layer-2: tüm 15 birim yerel-gecti OLDUKTAN SONRA çağrılır. 13 asıl bölümün GÜNCEL kabul
-// edilmiş içeriğini yeniden-tarar: her yerde sıfır açık-soru + her kaynak-gerekli bölümde
-// ≥1 doğrulanmış iddia. Bu, bölüm-yerel toleransların (ör. yasal-uyumluluk) GLOBAL olarak
-// hâlâ kapatılması gerektiğini garanti eden nihai kapı.
+// edilmiş içeriğini yeniden-tarar: her kaynak-gerekli bölümde ≥1 doğrulanmış iddia (DEĞİŞMEDİ,
+// içerik/claim düzeyinde) + her bölümde sıfır açık BLOCKER + aktif-set=0 (SORU-YANIT katmanı
+// üzerinden — birimAcikDurum). Bu, bölüm-yerel toleransların (ör. yasal-uyumluluk) GLOBAL olarak
+// hâlâ kapatılması gerektiğini garanti eden nihai kapı — ama artık "hâlâ acik-soru etiketli" ile
+// "skip ile kapatılmış (izlenen-varsayım)" arasında AYRIM yapar (bkz closure), ikincisini
+// ENGELLEMEZ.
 function layer2Kontrol(nsYolu, mp) {
   const eksikler = []
   for (const id of BOLUM_SIRASI) {
@@ -198,16 +240,25 @@ function layer2Kontrol(nsYolu, mp) {
     const bs = mp.bolumler[id]
     const icerik = bs?.cikti_pointer ? readIcerik(bs.cikti_pointer) : null
     if (icerik == null) { eksikler.push(`${id}: içerik bulunamadı`); continue }
-    // EFEKTİF statüyle say — bir açık-soru bu arada YANITLANMIŞSA (karar=veri/tahmin) artık
-    // açık/eksik sayılmaz (bkz iddialariCozumle). Grounding Layer-1'de zaten uygulandı; burada
-    // tekrar edilmiyor (bölüm zaten yerel-gecti olmadan buraya erişilemez).
+    // minDogrulandi: EFEKTİF statüyle say (DEĞİŞMEDİ) — bir açık-soru bu arada YANITLANMIŞSA
+    // (karar=veri/tahmin) artık doğrulanmış/tahmin sayılır (bkz iddialariCozumle). Grounding
+    // Layer-1'de zaten uygulandı; burada tekrar edilmiyor.
     const iddialar = iddialariCozumle(nsYolu, id, bs, iddialariCikar(icerik))
-    const acikSayisi = iddialar.filter(i => i.efektifTip === 'acik-soru').length
-    if (acikSayisi > 0) eksikler.push(`${id}: ${acikSayisi} açık-soru etiketi hâlâ var`)
     const tanim = BOLUM_TANIMLARI[id]
     if (tanim.minDogrulandi > 0) {
       const n = iddialar.filter(i => i.efektifTip === 'dogrulandi').length
       if (n < tanim.minDogrulandi) eksikler.push(`${id}: yeterli doğrulanmış iddia yok (${n}/${tanim.minDogrulandi})`)
+    }
+    // active-set + blocker: SORU-YANIT katmanı üzerinden (içerik-etiketi ÜZERİNDEN DEĞİL) —
+    // bir skip-kapatılmış claim'in etiketi KASITLI OLARAK acik-soru'da kalır (izlenen-varsayım),
+    // içerik-etiketi tek başına "hâlâ dokunulmamış" ile "skip ile kapandı"yı ayırt edemez;
+    // birimAcikDurum (closure'a bakan iddialariCozumle'nin AYNI yanıt-okuma yolunu kullanır)
+    // bu ayrımı doğru yapar.
+    const d = birimAcikDurum(nsYolu, mp.bolumler, id)
+    if (d.acikBlokerler.length > 0) {
+      eksikler.push(`${id}: ${d.acikBlokerler.length} açık blocker soru hâlâ var`)
+    } else if (d.acik.length > 0 || d.acikErtelenen.length > 0) {
+      eksikler.push(`${id}: ${d.acik.length + d.acikErtelenen.length} açık (onemli/opsiyonel) soru hâlâ var — aktif-set≠0 (cevapla / skip / at gerekir)`)
     }
   }
   return { gecti: eksikler.length === 0, eksikler }
@@ -306,6 +357,11 @@ async function bolumWalkAdimAt(nsYolu, projeId, state, ctx) {
     }
 
     if (Bs.durum === 'onay-bekliyor') {
+      // Bayat kontrolü ÖNCE (tier modeli — bkz planlamaLoopV2.mjs'deki AYNI düzeltme + birimBayatMi
+      // üstündeki not): bu bölüm 'gecti' olmadan ÖNCE üstü --geri ile yeni sürüme geçmiş olabilir.
+      if (birimBayatMi(BOLUM_SIRASI, mp.bolumler, B)) {
+        return ctx.sonucDonFn({ durdu: 'bayat-karar', bayatAsama: B })
+      }
       const d = birimAcikDurum(nsYolu, mp.bolumler, B)
       if (d.engelli) {
         statePersist(nsYolu, state)

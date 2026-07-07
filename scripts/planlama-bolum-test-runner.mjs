@@ -23,7 +23,10 @@ import { BOLUM_SIRASI, BOLUM_TANIMLARI } from '../tools/planlamaBolumTanimlari.m
 import { bolumKapidanGecerMi } from '../tools/planlamaBolumKapilari.mjs'
 import { bolumeGeriDon, provenansEkRenderla } from '../tools/planlamaBolumLoop.mjs'
 import { iddialariCikar, iddialariCozumle } from '../tools/planlamaIddiaDurumu.mjs'
-import { dataRequestAdaylari, varsayilanSoruUretici, yanitKaydet, sorulariYaz, sorulariOku } from '../tools/planlamaSorular.mjs'
+import {
+  dataRequestAdaylari, varsayilanSoruUretici, yanitKaydet, sorulariYaz, sorulariOku,
+  topluAtla, yanitButunluk, yanitlariHamOku,
+} from '../tools/planlamaSorular.mjs'
 import { FIKSTUR } from './planlama-test-fikstur.mjs'
 import { FIKSTUR_BOLUM, BOZUK_BOLUM, EKSIK_FIGUR_SATIRI, bolumFiksturuDogrula } from './planlama-bolum-fikstur.mjs'
 
@@ -206,19 +209,34 @@ bolum('D2 — Layer-2 (tüm-plan) done-when + ürün-seviyesi zorunluluk')
     ok('D2a: provenans-eki ≥1 "operator-beyan" referansı taşıyor', beyanSayisi > 0, `${beyanSayisi} adet`)
   } finally { temizle(ns1) }
 
-  // D2b — bir yerde açık-soru KALDI (yasal-uyumluluk yerel geçer ama Layer-2 GLOBAL sıfır-açık ister).
+  // D2b — REVİZE (tier/kapanma modeli, bkz görev "structurally unreachable" düzeltmesi):
+  // BOZUK_BOLUM.yasalUyumlulukAcik'in acik-soru etiketi tier'sız → varsayılan 'onemli'. Bu D2
+  // harness'ı TÜMÜYLE soruUretici:null kullanır (D1/D2/G/S9/T ortak deseni — soru-yanıt
+  // katmanını devre dışı bırakıp YALNIZ içerik-kapılarını sınamak için); bu yüzden HİÇBİR birim
+  // için soru paketi HİÇ ÜRETİLMEZ.
+  //   ESKİ davranış: Layer-2 herhangi bir kalan acik-soru İÇERİK ETİKETİNİ (tier'den bağımsız)
+  //   sayıp bloke ederdi — TAM OLARAK "300+ ertelenen soru resmî olarak asla kapanamadı"
+  //   bulgusunun mekanizması (bir içerik-etiketi tek başına "hiç sorulmadı" ile "skip ile
+  //   kapandı"yı ayırt edemez).
+  //   YENİ davranış: Layer-2 artık SORU-YANIT katmanı üzerinden bakar (birimAcikDurum); bu
+  //   senaryoda hiçbir soru paketi hiç var olmadığından aktif-set HER birim için YAPISAL OLARAK
+  //   BOŞTUR (hiç soru sorulmadıysa kapatılacak bir şey de yoktur) — plan artık TAMAMLANIR. Bu,
+  //   görevin istediği düzeltmenin doğrudan kanıtı: eskiden-bloke-eden bu senaryo şimdi geçiyor.
+  // (Soru-yanıt katmanı GERÇEKTEN aktifken bir blocker-tier sorunun nasıl bloke ettiği/skip'in
+  // nasıl reddedildiği ayrı bir eksen — scripts/planlama-tier-test-runner.mjs, gerçek
+  // varsayilanSoruUretici ile.)
   const { ns: ns2, id: id2 } = yeniNs('d2-acik')
   try {
     dortAsamaTamamlaSeed(ns2, id2)
     const { sonuc, adim } = await tumYuruyusuTamamla(
       ns2, id2, bolumluExecutor({ 'yasal-uyumluluk': BOZUK_BOLUM.yasalUyumlulukAcik })
     )
-    ok('D2b: yasal-uyumluluk\'ta kalan açık-soru TÜM-PLANI BLOKE eder (Layer-2)', sonuc.durdu === 'donduruldu', `${adim} adımda`)
-    const engelState = stateYukle(ns2, id2)
-    ok('D2b: master-plan.blok_nedeni Layer-2 kaynaklı olarak işaretli', (engelState.asamalar['master-plan'].blok_nedeni ?? '').startsWith('Layer-2'))
-    ok('D2b: yasal-uyumluluk bölümünün KENDİSİ hâlâ yerel-gecti (yerel kabul edilmişti — Layer-1/Layer-2 ayrımı gerçek)',
-      engelState.asamalar['master-plan'].bolumler['yasal-uyumluluk'].durum === 'gecti')
-    ok('D2b: pipeline TAMAMLANMADI (aktif_asama hâlâ master-plan)', engelState.aktif_asama === 'master-plan')
+    ok('D2b: yasal-uyumluluk\'ta kalan (onemli-tier varsayılan) açık-soru ARTIK TÜM-PLANI BLOKE ETMİYOR (tarihsel "unreachable" bulgusunun düzeltmesi)',
+      sonuc.durdu === 'tamamlandi', `${adim} adımda`)
+    const sonState = stateYukle(ns2, id2)
+    ok('D2b: yasal-uyumluluk bölümünün KENDİSİ yerel-gecti (Layer-1 DEĞİŞMEDİ)',
+      sonState.asamalar['master-plan'].bolumler['yasal-uyumluluk'].durum === 'gecti')
+    ok('D2b: pipeline TAMAMLANDI (aktif_asama=tamamlandi)', sonState.aktif_asama === 'tamamlandi')
   } finally { temizle(ns2) }
 }
 
@@ -376,9 +394,9 @@ bolum('PE — Regresyon: provenans-ek, GERÇEK soru/yanıt paketleriyle (varsayi
   const { ns, id } = yeniNs('pe-atlananlar')
   try {
     dortAsamaTamamlaSeed(ns, id)
-    let adim = 0, sonuc, karar = 0
+    let adim = 0, sonuc, karar = 0, layer2TemizlikYapildi = false
     const MAX_ADIM = 60
-    do {
+    while (true) {
       sonuc = await planlamaLoopV2Calistir(ns, id, bolumluExecutor(), {
         mod: 'ileri', soruUretici: varsayilanSoruUretici, masterPlanBolumleri: BOLUM_TANIMLARI, log: () => {},
       })
@@ -401,7 +419,30 @@ bolum('PE — Regresyon: provenans-ek, GERÇEK soru/yanıt paketleriyle (varsayi
           }
         }
       }
-    } while (sonuc.durdu !== 'tamamlandi' && sonuc.durdu !== 'donduruldu')
+      // Tier modeli: bölümler artık yalnız onemli/opsiyonel (blocker olmayan) açık sorularla
+      // otomatik İLERLER — bu döngü yalnız 'sorular-acik' anında (engelli=true, yani bir
+      // BLOCKER varken) yanıtlıyor, bu yüzden bölümlerin FREE-TEXT/DATA-REQUEST'leri hiç
+      // yanıtlanmadan geçilmiş olabilir. Layer-2 (aktif-set=0) yine de bunların KAPANMASINI
+      // ister — bu döngü onları hiç görmediği için (asla sorular-acik'e düşmediler) burada
+      // TEK SEFERLİK bir temizlik geçişiyle (topluAtla, tüm bölümler) kapatıyoruz, sonra devam.
+      if (sonuc.durdu === 'donduruldu' && !layer2TemizlikYapildi) {
+        const mpBlok = stateYukle(ns, id).asamalar['master-plan']?.blok_nedeni ?? ''
+        if (mpBlok.startsWith('Layer-2')) {
+          layer2TemizlikYapildi = true
+          const temizlikState = stateYukle(ns, id)
+          for (const bolumId of BOLUM_SIRASI) {
+            if (bolumId === 'provenans-ek') continue
+            const bs = temizlikState.asamalar['master-plan'].bolumler[bolumId]
+            if (bs.sorular_surum == null) continue
+            const p = sorulariOku(ns, bolumId, bs.sorular_surum)
+            const but = yanitButunluk(p, yanitlariHamOku(ns, bolumId, bs.sorular_surum))
+            topluAtla(ns, p, but.durum === 'gecerli' ? but.yanitlar : [], 'PE test: layer-2 temizliği')
+          }
+          continue // temizlik SONRASI mutlaka bir daha dene (do-while'ın erken çıkışını önler)
+        }
+      }
+      if (sonuc.durdu === 'tamamlandi' || sonuc.durdu === 'donduruldu') break
+    }
 
     ok('PE: GERÇEK soru/yanıt paketleriyle tam yürüyüş ÇÖKMEDEN TAMAMLANDI', sonuc.durdu === 'tamamlandi', `${adim} adımda, son durdu=${sonuc.durdu}`)
     const nihaiState = stateYukle(ns, id)
