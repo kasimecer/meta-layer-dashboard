@@ -160,6 +160,28 @@ export function provenansEkRenderla(veri) {
       satirlar.push(`- **${kayit.sectionEtiket}** [tier: ${kayit.tier}] — ${kayit.question}${deger} (statü: ${kayit.status})`)
     }
   }
+  satirlar.push('', '## Doğrulama Tablosu (claim-type × needs_verification — mekanik projeksiyon)')
+  const tablo = dogrulamaTablosuOlustur(veri)
+  const dogrulamaSatiri = (i) => {
+    const etiket = BOLUM_TANIMLARI[i.bolumId]?.etiket ?? i.bolumId
+    return `- **${etiket}** — ${i.satir ?? '(iddia metni yok)'} — statü: ${i.efektifTip} — tier: ${i.tier ?? 'onemli'} — tip: ${i.claimType ?? '(tipsiz)'}`
+  }
+  const bolumYaz = (baslik, aciklama, kalemler) => {
+    satirlar.push('', `### ${baslik} (${kalemler.length})`)
+    if (aciklama) satirlar.push(aciklama)
+    if (kalemler.length === 0) satirlar.push('(yok)')
+    else kalemler.forEach(i => satirlar.push(dogrulamaSatiri(i)))
+  }
+  bolumYaz('Aramayla Eritilebilir — masabaşı, doğrulama-gerekli',
+    'Gelecekte bir arama/araştırma turu BUNLARI hedefleyebilir.', tablo.aramaylaEritilebilir)
+  bolumYaz('⚠ Arama ÇÖZEMEZ — Saha Verisi Gerekli',
+    'Bir arama turuyla ASLA kapanmaz — birincil veri toplanmalı (saha/pilot/anket). Bir arama-otomasyonu bu kalemleri ASLA "doğrulandı" SAYAMAZ.', tablo.aramaCozemezSaha)
+  bolumYaz('⚠ Arama ÇÖZEMEZ — Operatör Girdisi Gerekli',
+    'Bir arama turuyla ASLA kapanmaz — yalnız operatör/domain bilgisiyle kapanır. Bir arama-otomasyonu bu kalemleri ASLA "doğrulandı" SAYAMAZ.', tablo.aramaCozemezOperator)
+  bolumYaz('Kapalı — doğrulama gerekmiyor', null, tablo.kapali)
+  if (tablo.tipsiz.length > 0) {
+    bolumYaz('⚠⚠ TİPSİZ (beklenmez — gate bunu engellemeliydi)', null, tablo.tipsiz)
+  }
   return satirlar.join('\n') + '\n'
 }
 
@@ -179,6 +201,38 @@ export function assumptionLedgerOlustur(veri) {
       sectionEtiket: BOLUM_TANIMLARI[i.bolumId]?.etiket ?? i.bolumId,
       status: i.efektifTip,
     }))
+}
+
+// Doğrulama-bucket sınıflandırması (görev sözleşmesi, SAFETY-CRITICAL): bir iddia YALNIZ
+// needsVerification=true İKEN claimType'a göre üç ayrık bucket'tan birine düşer; needsVerification
+// =false olan HER ŞEY (claimType ne olursa olsun) 'kapali'ya düşer. claimType=masabasi DIŞINDA
+// HİÇBİR ŞEY 'aramayla-eritilebilir'e GİREMEZ — bu, bir gelecek arama-otomasyonunun birincil/
+// icbilgi iddiaları asla "yeşil" sayamamasının YAPISAL garantisidir (bkz dogrulamaTablosuOlustur
+// üstündeki not). 'tipsiz' yalnız savunmacı bir düşüş — gate (bolumIcerikGovdesiKontrolEt)
+// üretimde bunu zaten engeller, buraya normalde asla ulaşılmaz.
+export function dogrulamaBuketuOf(iddia) {
+  if (!iddia.needsVerification) return 'kapali'
+  if (iddia.claimType === 'masabasi') return 'aramayla-eritilebilir'
+  if (iddia.claimType === 'birincil') return 'arama-cozemez-saha'
+  if (iddia.claimType === 'icbilgi') return 'arama-cozemez-operator'
+  return 'tipsiz'
+}
+
+// Doğrulama tablosu — provenansEkRenderla'nın ALDIĞI AYNI tumIddialar verisinin (efektif
+// çözümlenmiş, claimType+needsVerification taşıyan — bkz iddialariCozumle) GRUPLANMIŞ bir
+// projeksiyonu. Arama-otomasyonu (AYRI, SONRAKİ bir görev) YALNIZ aramaylaEritilebilir'i
+// hedefleyebilir; arama-cozemez-saha/arama-cozemez-operator YAPISAL OLARAK ayrı kalır — bir
+// arama turu bunları ASLA "kapattı" sayamaz (görev sözleşmesinin invariant'ı).
+export function dogrulamaTablosuOlustur(veri) {
+  const kalemler = (veri?.tumIddialar ?? []).map(i => ({ ...i, buket: dogrulamaBuketuOf(i) }))
+  const buketle = (b) => kalemler.filter(k => k.buket === b)
+  return {
+    aramaylaEritilebilir: buketle('aramayla-eritilebilir'),
+    aramaCozemezSaha: buketle('arama-cozemez-saha'),
+    aramaCozemezOperator: buketle('arama-cozemez-operator'),
+    kapali: buketle('kapali'),
+    tipsiz: buketle('tipsiz'),
+  }
 }
 
 // Bölüme özel kapı-çağırıcı — HER bölüm için baglam.gercekKaynaklar (grounding) +

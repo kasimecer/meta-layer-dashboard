@@ -370,6 +370,21 @@ GÖMME — ayrı bir etiket):
 Belirtmezsen 'onemli' varsayılır. Emin değilsen 'onemli' kullan — 'blocker' yalnız GERÇEKTEN
 yük-taşıyan bir karar/sert-bağımlılık için, aşırı-kullanma plan ilerlemesini gereksiz durdurur.
 
+İDDİA-TİPİ (doğrulama-yolu) — [dogrulandi:...], [operator-onayli-tahmin:...] VE [acik-soru:...]
+etiketleri İÇİN AYRICA, AYNI SATIRA, bağımsız bir [tip:masabasi|birincil|icbilgi] etiketi ekle
+(tier gibi statü etiketinin PARAMINA GÖMME — ayrı bir etiket). Bu, iddianın NASIL ve KİM
+TARAFINDAN doğrulanabileceğini sınıflar:
+  [tip:masabasi]  — masa-başı doğrulanabilir: dış/kamu bir kaynağa karşı bir arama/araştırma
+                    turuyla doğrulanabilir (pazar büyüklüğü, rakip fiyatı, yasal gereklilik).
+  [tip:birincil]  — YENİ birincil veri toplamayı gerektirir (bu segment gerçekten öder mi,
+                    dönüşüm oranımız ne). Hiçbir dış kaynak bunu doğrulamaz; saha çalışması gerekir.
+  [tip:icbilgi]   — yalnız operatör/domain bilgisiyle doğrulanır (tedarikçi şartlarımız, iç
+                    maliyet yapımız, elimizdeki bir ilişki). Hiçbir dış kaynak bunu doğrulamaz;
+                    yalnız operatör verebilir.
+[operator-beyan:...] İÇİN [tip:...] GEREKMEZ (saf operatör kararı — ampirik bir iddia değil).
+Etiketsiz bırakma: her [dogrulandi:...]/[operator-onayli-tahmin:...]/[acik-soru:...] satırı
+[tip:...] TAŞIMALI — taşımıyorsa bölüm kapıdan geri döner (statü etiketinin kendisi kadar zorunlu).
+
 Etiketsiz satır BIRAKMA; statüsü belirsizse [acik-soru:...] kullan, SESSİZCE atlama.`
 
 // Bölüm tanımının ustBaglamAnahtarlari'na göre bağlam-blokları kur (TUM_BOLUMLER_ISARETI ⟹

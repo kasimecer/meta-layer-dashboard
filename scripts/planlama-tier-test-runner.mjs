@@ -12,6 +12,13 @@
 //   RT  yeniden-derecele: blocker→onemli, reddedilen skip/at'i açar, imza etkilenmez
 //   LEDGER  provenansEkRenderla kapanma-sütunu + Varsayım Defteri; assumptionLedgerOlustur projeksiyonu
 //   PROMPT  tier rubric bölüm prompt'una yansır; problem-cozum/urun-tanimi ALWAYS-blocker notu
+//   TIP     claim-type ([tip:masabasi|birincil|icbilgi]) co-located ayrıştırma — tier'in KARDEŞİ
+//           eksen; çoklu-iddia TEK SATIR regresyon testi (bölge-farkında eşleştirme)
+//   NV      needs_verification: status'tan mekanik türetim, TÜM efektifTip değerleri + acik-soru
+//           yanıtlandıktan sonraki geçiş (flip)
+//   TABLE   dogrulamaTablosuOlustur: 4 bucket + SAFETY-CRITICAL invariant (birincil/icbilgi ASLA
+//           aramayla-eritilebilir'e girmez) + provenansEkRenderla'daki görsel-ayrım
+//   GATE    negatif-gate: co-located [tip:...] eksik ampirik iddia REDDEDİLİR; operator-beyan MUAF
 //
 // Koşum: node scripts/planlama-tier-test-runner.mjs
 
@@ -21,9 +28,13 @@ import { tmpdir } from 'os'
 import { planlamaLoopV2Calistir } from '../tools/planlamaLoopV2.mjs'
 import { boslukState, statePersist, stateYukle, asamaDosyaAdi } from '../tools/planlamaDurumMakinesiV2.mjs'
 import { BOLUM_SIRASI, BOLUM_TANIMLARI } from '../tools/planlamaBolumTanimlari.mjs'
-import { provenansEkRenderla, assumptionLedgerOlustur } from '../tools/planlamaBolumLoop.mjs'
+import { provenansEkRenderla, assumptionLedgerOlustur, dogrulamaTablosuOlustur, dogrulamaBuketuOf } from '../tools/planlamaBolumLoop.mjs'
+import { bolumKapidanGecerMi } from '../tools/planlamaBolumKapilari.mjs'
 import { birimAcikDurum } from '../tools/planlamaBirimMotoru.mjs'
-import { iddialariCikar, iddialariCozumle } from '../tools/planlamaIddiaDurumu.mjs'
+import {
+  iddialariCikar, iddialariCozumle, needsVerificationHesapla, tipsizIddiaBul,
+  bolumIcerikGovdesiKontrolEt, IDDIA_TURU_DEGERLERI,
+} from '../tools/planlamaIddiaDurumu.mjs'
 import {
   varsayilanSoruUretici, soruSetiKur, soruOnay, soruCHOICE, soruSerbest, soruVeriIstek, soruPaketiKur,
   sorulariDogrula, sorulariOku, sorulariYaz, atlaYaz, yanitKaydet, yanitButunluk, yanitlariHamOku,
@@ -31,7 +42,7 @@ import {
 } from '../tools/planlamaSorular.mjs'
 import { promptUretBolum } from '../tools/canliExecutor.mjs'
 import { FIKSTUR } from './planlama-test-fikstur.mjs'
-import { FIKSTUR_BOLUM } from './planlama-bolum-fikstur.mjs'
+import { FIKSTUR_BOLUM, BOZUK_BOLUM } from './planlama-bolum-fikstur.mjs'
 
 let gecti = 0, kaldi = 0
 function ok(ad, kosul, ekBilgi = '') {
@@ -99,7 +110,7 @@ async function tumYuruyusuTamamla(ns, id, executor, { maxAdim = 60 } = {}) {
 function cokAcikSoruIcerikUret(n) {
   const satirlar = [`# Ölçümleme (KPI) — Tier Test Projesi`, '']
   for (let i = 1; i <= n; i++) {
-    satirlar.push(`KPI hedefi ${i} henüz operatörce netleştirilmedi. [acik-soru:kpi-hedef-${i}]`, '')
+    satirlar.push(`KPI hedefi ${i} henüz operatörce netleştirilmedi. [acik-soru:kpi-hedef-${i}] [tip:masabasi]`, '')
   }
   return satirlar.join('\n')
 }
@@ -123,6 +134,64 @@ bolum('F0 — Tier: varsayılanlar + co-located etiket ayrıştırma (temel sağ
   ok('F0: iddialariCikar co-located tier etiketini ayrıştırır', ic[0]?.tier === 'blocker')
   const ic2 = iddialariCikar('Etiketsiz tier ile iddia. [operator-beyan:soru-x]')
   ok('F0: iddialariCikar tier etiketsizse onemli varsayar', ic2[0]?.tier === 'onemli')
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+bolum('TIP — claim-type ([tip:masabasi|birincil|icbilgi]) co-located ayrıştırma — tier\'in kardeşi eksen')
+{
+  ok('TIP: IDDIA_TURU_DEGERLERI tam 3 değer taşır', IDDIA_TURU_DEGERLERI.join(',') === 'masabasi,birincil,icbilgi')
+
+  const m = iddialariCikar('Pazar büyüklüğü kaynaklı. [dogrulandi:kaynak-a] [tip:masabasi]')
+  ok('TIP: iddialariCikar [tip:masabasi] ayrıştırır', m[0]?.claimType === 'masabasi')
+  const b = iddialariCikar('Dönüşüm oranı bilinmiyor. [acik-soru:donusum] [tip:birincil]')
+  ok('TIP: iddialariCikar [tip:birincil] ayrıştırır', b[0]?.claimType === 'birincil')
+  const ic3 = iddialariCikar('Tedarikçi şartımız. [operator-onayli-tahmin:tedarik] [tip:icbilgi]')
+  ok('TIP: iddialariCikar [tip:icbilgi] ayrıştırır', ic3[0]?.claimType === 'icbilgi')
+
+  const yok = iddialariCikar('Operatör kararı. [operator-beyan:karar-x]')
+  ok('TIP: claimType etiketsizse null (tier gibi sessizce varsayılana DÜŞMEZ)', yok[0]?.claimType === null)
+  const eksikTip = iddialariCikar('Kaynaklı ama tipsiz. [dogrulandi:kaynak-b]')
+  ok('TIP: [dogrulandi:...] tip olmadan da ayrıştırılır (gate ayrı katmanda reddeder)', eksikTip[0]?.claimType === null && eksikTip[0]?.tip === 'dogrulandi')
+
+  // REGRESYON — kritik: gerçek-model smoke'ta (2026-07-07 12:05) keşfedilen sınıf hata: birden
+  // fazla iddia TEK fiziksel satıra yazılınca, satırın İLK co-located etiketi TÜM satıra sızıyordu
+  // (tier İÇİN önceden var olan bir kusur; tip'i bu kusuru MİRAS ALMADAN doğru inşa ettik).
+  // Bölge-farkında eşleştirme bunu yapısal olarak engeller — her iddia YALNIZ KENDİ etiketini alır.
+  const cok = iddialariCikar('A. [dogrulandi:x] [tip:masabasi] [tier:blocker] B. [acik-soru:y] [tip:icbilgi] [tier:onemli] C. [operator-onayli-tahmin:z] [tip:birincil]')
+  ok('TIP-REGRESYON: aynı satırda 3 iddia doğru sırayla ayrıştı', cok.length === 3)
+  ok('TIP-REGRESYON: 1. iddia (x) KENDİ tip/tier\'ını taşır, komşularınınkini DEĞİL',
+    cok[0].param === 'x' && cok[0].claimType === 'masabasi' && cok[0].tier === 'blocker')
+  ok('TIP-REGRESYON: 2. iddia (y) KENDİ tip/tier\'ını taşır (satırın İLK etiketi sızmadı)',
+    cok[1].param === 'y' && cok[1].claimType === 'icbilgi' && cok[1].tier === 'onemli')
+  ok('TIP-REGRESYON: 3. iddia (z) KENDİ tip\'ini taşır, tier etiketsiz → varsayılan onemli',
+    cok[2].param === 'z' && cok[2].claimType === 'birincil' && cok[2].tier === 'onemli')
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+bolum('NV — needs_verification: status\'tan mekanik türetim (LLM asla stampalamaz)')
+{
+  ok('NV: dogrulandi -> false (tartışmaya kapalı)', needsVerificationHesapla('dogrulandi') === false)
+  ok('NV: operator-beyan -> false (tartışmaya kapalı)', needsVerificationHesapla('operator-beyan') === false)
+  ok('NV: operator-onayli-tahmin -> true (doğrulama yolu açık)', needsVerificationHesapla('operator-onayli-tahmin') === true)
+  ok('NV: acik-soru -> true (doğrulama yolu açık)', needsVerificationHesapla('acik-soru') === true)
+  ok('NV: dusuruldu -> false (iddia geri çekildi, doğrulanacak bir şey yok)', needsVerificationHesapla('dusuruldu') === false)
+
+  // iddialariCozumle ENTEGRASYONU: needsVerification HAM etikete değil EFEKTİF statüye göre
+  // hesaplanmalı — bir acik-soru yanıtlandığında (karar=veri) needsVerification false'A DÜŞMELİ.
+  const iddia = iddialariCikar('Henüz netleşmedi. [acik-soru:konu-x] [tip:masabasi]')
+  const cozumOnce = iddialariCozumle('/nonexistent', 'test-nv', { sorular_surum: null }, iddia)
+  ok('NV: yanıtsız acik-soru needsVerification=true', cozumOnce[0].needsVerification === true)
+
+  const { ns, id } = yeniNs('nv')
+  try {
+    const paket = varsayilanSoruUretici('pazar-analizi', 'Henüz netleşmedi. [acik-soru:konu-x] [tip:masabasi]', { projeId: id, surum: 1 })
+    sorulariYaz(ns, paket)
+    const dr = paket.sorular.find(s => s.tip === 'DATA-REQUEST')
+    yanitKaydet(ns, paket, { anahtar: dr.anahtar, karar: 'veri', deger: 'gerçek değer', kaynak: 'operatör kararı' })
+    const cozumSonra = iddialariCozumle(ns, 'pazar-analizi', { sorular_surum: 1 }, iddia)
+    ok('NV: acik-soru karar=veri İLE yanıtlanınca needsVerification FLIP eder (true -> false)',
+      cozumSonra[0].efektifTip === 'dogrulandi' && cozumSonra[0].needsVerification === false)
+  } finally { temizle(ns) }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -323,12 +392,92 @@ bolum('LEDGER — provenansEkRenderla kapanma-sütunu + Varsayım Defteri; assum
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+bolum('TABLE — dogrulamaTablosuOlustur: 4 bucket + SAFETY-CRITICAL invariant (birincil/icbilgi ASLA aramayla-eritilebilir\'e girmez)')
+{
+  const veri = {
+    tumIddialar: [
+      { bolumId: 'pazar-analizi', satir: 'Pazar büyüklüğü kaynaklı.', tip: 'dogrulandi', param: 'a', tier: 'blocker', efektifTip: 'dogrulandi', efektifKaynak: 'a', closure: 'cevaplandi', claimType: 'masabasi', needsVerification: false },
+      { bolumId: 'butce-finansal', satir: 'Rakip fiyatı henüz aranmadı.', tip: 'acik-soru', param: 'rakip-fiyat', tier: 'onemli', efektifTip: 'acik-soru', efektifKaynak: null, closure: 'acik', claimType: 'masabasi', needsVerification: true },
+      { bolumId: 'is-modeli-fiyatlama', satir: 'Dönüşüm oranı henüz bilinmiyor.', tip: 'acik-soru', param: 'donusum', tier: 'onemli', efektifTip: 'acik-soru', efektifKaynak: null, closure: 'acik', claimType: 'birincil', needsVerification: true },
+      { bolumId: 'operasyon-plani', satir: 'Tedarikçi şartlarımız.', tip: 'operator-onayli-tahmin', param: 'tedarik', tier: 'blocker', efektifTip: 'operator-onayli-tahmin', efektifKaynak: null, closure: 'cevaplandi', claimType: 'icbilgi', needsVerification: true },
+      { bolumId: 'rekabet-konumlandirma', satir: 'Operatör kararı.', tip: 'operator-beyan', param: 'karar-x', tier: 'onemli', efektifTip: 'operator-beyan', efektifKaynak: null, closure: 'cevaplandi', claimType: null, needsVerification: false },
+    ],
+    tumAtlananlar: [],
+  }
+  const tablo = dogrulamaTablosuOlustur(veri)
+  ok('TABLE: masabasi∧needsVerification=false -> kapali (1)', tablo.kapali.some(i => i.param === 'a') && tablo.aramaylaEritilebilir.every(i => i.param !== 'a'))
+  ok('TABLE: masabasi∧needsVerification=true -> aramayla-eritilebilir (1)', tablo.aramaylaEritilebilir.length === 1 && tablo.aramaylaEritilebilir[0].param === 'rakip-fiyat')
+  ok('TABLE: birincil∧needsVerification=true -> arama-cozemez-saha (1)', tablo.aramaCozemezSaha.length === 1 && tablo.aramaCozemezSaha[0].param === 'donusum')
+  ok('TABLE: icbilgi∧needsVerification=true -> arama-cozemez-operator (1)', tablo.aramaCozemezOperator.length === 1 && tablo.aramaCozemezOperator[0].param === 'tedarik')
+  ok('TABLE: operator-beyan (claimType=null, needsVerification=false) -> kapali (muaf, tipsiz DEĞİL)', tablo.kapali.some(i => i.param === 'karar-x'))
+  ok('TABLE: tipsiz bucket boş (üretimde gate önler)', tablo.tipsiz.length === 0)
+
+  // SAFETY-CRITICAL INVARIANT: gelecekte bir arama-otomasyonu YALNIZ aramaylaEritilebilir'i
+  // hedefleyebilir — birincil/icbilgi hiçbir zaman, hiçbir koşulda oraya sızmamalı. Adversarial
+  // kontrol: needsVerification=true olan HER kalemi dolaş, yalnız claimType=masabasi olanların
+  // aramaylaEritilebilir'DE, DİĞERLERİNİN aramaylaEritilebilir'DE OLMADIĞINI doğrula.
+  const dogrulamaGerekenler = veri.tumIddialar.filter(i => i.needsVerification)
+  const ihlal = dogrulamaGerekenler.some(i => {
+    const buket = dogrulamaBuketuOf(i)
+    return i.claimType !== 'masabasi' && buket === 'aramayla-eritilebilir'
+  })
+  ok('TABLE INVARIANT: claimType≠masabasi olan HİÇBİR kalem aramayla-eritilebilir\'e giremez', !ihlal)
+  const digerYonIhlal = dogrulamaGerekenler.some(i => i.claimType === 'masabasi' && dogrulamaBuketuOf(i) !== 'aramayla-eritilebilir')
+  ok('TABLE INVARIANT (ters yön): needsVerification=true + masabasi HER ZAMAN aramayla-eritilebilir\'e girer', !digerYonIhlal)
+
+  const render = provenansEkRenderla(veri)
+  ok('TABLE: render "Doğrulama Tablosu" başlığını taşır', render.includes('Doğrulama Tablosu'))
+  ok('TABLE: aramayla-eritilebilir kalemi render\'da görünür', render.includes('Rakip fiyatı henüz aranmadı'))
+  ok('TABLE: arama-çözemez/saha kalemi render\'da görünür', render.includes('Dönüşüm oranı henüz bilinmiyor'))
+  ok('TABLE: arama-çözemez/operatör kalemi render\'da görünür', render.includes('Tedarikçi şartlarımız'))
+  // GÖRSEL AYRIM (görev sözleşmesi): iki "arama-çözemez" başlığı ⚠ taşır, "aramayla-eritilebilir" TAŞIMAZ.
+  const aramaBasligi = render.indexOf('### Aramayla Eritilebilir')
+  const sahaBasligi = render.indexOf('### ⚠ Arama ÇÖZEMEZ — Saha')
+  const operatorBasligi = render.indexOf('### ⚠ Arama ÇÖZEMEZ — Operatör')
+  ok('TABLE: aramayla-eritilebilir başlığı ⚠ TAŞIMAZ', aramaBasligi !== -1 && !render.slice(aramaBasligi, aramaBasligi + 60).includes('⚠'))
+  ok('TABLE: saha/operatör başlıkları ⚠ İLE görsel-ayrışık', sahaBasligi !== -1 && operatorBasligi !== -1)
+  ok('TABLE: "ASLA doğrulandı SAYAMAZ" uyarısı her iki arama-çözemez bölümünde de var',
+    (render.match(/ASLA "doğrulandı" SAYAMAZ/g) || []).length === 2)
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+bolum('GATE — Negatif-gate: co-located [tip:...] eksik ampirik iddia REDDEDİLİR; operator-beyan/metadata MUAF')
+{
+  ok('GATE: tipsizIddiaBul — [dogrulandi:...] tipsizse bulur', tipsizIddiaBul('İddia. [dogrulandi:kaynak-a]')?.param === 'kaynak-a')
+  ok('GATE: tipsizIddiaBul — [operator-onayli-tahmin:...] tipsizse bulur', tipsizIddiaBul('İddia. [operator-onayli-tahmin:soru-a]')?.param === 'soru-a')
+  ok('GATE: tipsizIddiaBul — [acik-soru:...] tipsizse bulur', tipsizIddiaBul('İddia. [acik-soru:soru-b]')?.param === 'soru-b')
+  ok('GATE: tipsizIddiaBul — [operator-beyan:...] MUAF, hiç bulunmaz', tipsizIddiaBul('İddia. [operator-beyan:karar-a]') === null)
+  ok('GATE: tipsizIddiaBul — [tip:...] varsa bulunmaz', tipsizIddiaBul('İddia. [dogrulandi:kaynak-a] [tip:masabasi]') === null)
+
+  ok('GATE: bolumIcerikGovdesiKontrolEt tipsiz ampirik iddiayı REDDEDER',
+    bolumIcerikGovdesiKontrolEt('İçerik satırı. [dogrulandi:kaynak-a]').gecti === false)
+  ok('GATE: bolumIcerikGovdesiKontrolEt operator-beyan-only içeriği GEÇİRİR (muaf)',
+    bolumIcerikGovdesiKontrolEt('İçerik satırı. [operator-beyan:karar-a]').gecti === true)
+  ok('GATE: bolumIcerikGovdesiKontrolEt tipli ampirik iddiayı GEÇİRİR',
+    bolumIcerikGovdesiKontrolEt('İçerik satırı. [dogrulandi:kaynak-a] [tip:masabasi]').gecti === true)
+
+  // Tam bölüm-kapısı (bolumKapidanGecerMi) üzerinden — negatif test (görev §4, §6): tipsiz
+  // ampirik iddia taşıyan bir bölüm REDDEDİLİR. BOZUK_BOLUM.tipsizAmpirikIddia: bir
+  // [operator-beyan:...] (muaf, dokunulmadı) + bir tipsiz [dogrulandi:...] — amaç YALNIZ
+  // tip-gerekliliğini izole etmek.
+  const red = bolumKapidanGecerMi('urun-tanimi', BOZUK_BOLUM.tipsizAmpirikIddia)
+  ok('GATE: bolumKapidanGecerMi tipsiz ampirik iddia taşıyan bölümü REDDEDER', red.gecti === false)
+  ok('GATE: red nedeni "tipsiz iddia" ifadesini taşır', (red.neden ?? '').includes('tipsiz iddia'))
+
+  // Pozitif kontrol: AYNI bölümün tam-tipli hâli (FIKSTUR_BOLUM'daki, bu görev kapsamında
+  // güncellenmiş) normal GEÇER — negatif testin YALNIZ tip-eksikliğinden dolayı reddettiğinin kanıtı.
+  const yesil = bolumKapidanGecerMi('urun-tanimi', FIKSTUR_BOLUM['urun-tanimi'])
+  ok('GATE (kontrol): FIKSTUR_BOLUM.urun-tanimi (tamamı operator-beyan, tip gerekmez) normal GEÇER', yesil.gecti === true)
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 bolum('PROMPT — tier rubric bölüm prompt\'una yansır; problem-cozum/urun-tanimi ALWAYS-blocker notu yalnız o ikisinde')
 {
   const proje = { ad: 'Test Projesi', aciklama: 'kısa açıklama' }
   const pazarPrompt = promptUretBolum('pazar-analizi', proje, {}, BOLUM_TANIMLARI['pazar-analizi'])
   ok('PROMPT: genel bölüm prompt\'u tier rubric\'ini içerir', pazarPrompt.includes('[tier:blocker|onemli|opsiyonel]'))
   ok('PROMPT: pazar-analizi ALWAYS-blocker notu İÇERMEZ (yalnız problem-cozum/urun-tanimi\'nde)', !pazarPrompt.includes('EK KURAL'))
+  ok('PROMPT: genel bölüm prompt\'u [tip:...] rubric\'ini de içerir (tier\'in kardeşi eksen)', pazarPrompt.includes('[tip:masabasi|birincil|icbilgi]'))
 
   const problemPrompt = promptUretBolum('problem-cozum', proje, {}, BOLUM_TANIMLARI['problem-cozum'])
   ok('PROMPT: problem-cozum ALWAYS-blocker notu içerir', problemPrompt.includes('problem tanımının') && problemPrompt.includes('[tier:blocker]'))
