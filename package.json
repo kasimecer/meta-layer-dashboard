@@ -16,6 +16,7 @@
     "planlama-soru-test": "node scripts/planlama-soru-test-runner.mjs",
     "planlama-bolum-test": "node scripts/planlama-bolum-test-runner.mjs",
     "planlama-tier-test": "node scripts/planlama-tier-test-runner.mjs",
+    "planlama-elestiri-test": "node scripts/planlama-elestiri-test-runner.mjs",
     "planlama-soru-demo": "node scripts/planlama-soru-demo.mjs",
     "soru-yanit-watch": "node scripts/soru-yanit-queue-watch.mjs",
     "soru-yanit-queue-test": "node scripts/soru-yanit-queue-test.mjs",

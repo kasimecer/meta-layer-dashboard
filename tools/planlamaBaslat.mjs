@@ -12,6 +12,7 @@ import { stateYukle, statePersist, geriAsamaya } from './planlamaDurumMakinesiV2
 import { varsayilanSoruUretici } from './planlamaSorular.mjs'
 import { BOLUM_TANIMLARI } from './planlamaBolumTanimlari.mjs'
 import { bolumeGeriDon } from './planlamaBolumLoop.mjs'
+import { elestiriAdimAt } from './elestiriPasi.mjs'
 
 /**
  * Pipeline'ı bir adım işlet.
@@ -23,6 +24,17 @@ import { bolumeGeriDon } from './planlamaBolumLoop.mjs'
  */
 export async function planlamaBaslat(nsYolu, projeId, projeConfig, opts = {}) {
   const { log = () => {}, mod = 'ileri' } = opts
+
+  // Kritik Pasaj yönlendirmesi: 5-aşama + bölüm-yürüyüşü ÖNCEDEN tamamlanmışsa (bu invokasyondan
+  // ÖNCE — 'tamamlandi' o zaman ZATEN true'ydu, bu çağrıda YENİ değil), kontrol tamamen
+  // elestiriAdimAt'a (tools/elestiriPasi.mjs) devredilir — AYRI bir birim-döngüsü, AYRI bir
+  // model (OpenRouter/DeepSeek, üreticiden farklı soy). Bilerek AYRI bir invokasyon sınırıdır:
+  // planı TAMAMLAYAN çağrı asla AYNI anda kritik pasajı da BAŞLATMAZ ("bir-koşum-bir-karar").
+  const oncekiState = stateYukle(nsYolu, projeId)
+  if (oncekiState.aktif_asama === 'tamamlandi') {
+    return elestiriAdimAt(nsYolu, projeId, projeConfig, oncekiState, { log, mod, soruUretici: varsayilanSoruUretici })
+  }
+
   // Varsayılan (360sn) master-plan bölümlerinin biriken bağlamıyla yetersiz kaldı (arastirma
   // 2/3, pazar-analizi 6/6 zaman aşımına uğradı — 2026-07-05); 900sn'ye çıkarıldı. "synthesis"
   // sınıfı bölümler (risk-varsayimlar, ozet-yonetici) TUM_BOLUMLER_ISARETI ile TÜM aşama+bölüm

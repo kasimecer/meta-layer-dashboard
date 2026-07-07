@@ -55,7 +55,11 @@ export function bosAsama() {
 export function boslukState(projeId) {
   const asamalar = {}
   for (const asama of GERCEK_ASAMALAR) asamalar[asama] = bosAsama()
-  return { proje_id: projeId, semasurum: SEMA_SURUM, aktif_asama: 'genesis', asamalar }
+  // elestiri (Kritik Pasaj) BİLEREK ASAMA_SIRASI/GERCEK_ASAMALAR'ın DIŞINDA: kendi tekil-birim
+  // döngüsüyle (tools/elestiriPasi.mjs) YÖNETİLİR, yalnız aktif_asama==='tamamlandi' iken
+  // devreye girer — bkz tools/planlamaBaslat.mjs'deki yönlendirme. bosAsama() ile AYNI şekli
+  // paylaşır (birimKostur/birimAcikDurum bu şekli GENEL olarak bekler).
+  return { proje_id: projeId, semasurum: SEMA_SURUM, aktif_asama: 'genesis', asamalar, elestiri: bosAsama() }
 }
 
 // Eski-şema (veya kısmi) state'i BELLEKTE normalize et: eksik alanları güvenli
@@ -88,6 +92,9 @@ export function normalizeState(state) {
       s.kabul_edilen_ust_surum = state.asamalar[ust].surum ?? 0
     }
   }
+  // elestiri — GERİYE-UYUMLULUK: bu alanın var olmadığı eski state dosyaları (Kritik Pasaj
+  // özelliğinden ÖNCE oluşturulmuş) bosAsama() ile doldurulur; anlamı DEĞİŞMEZ (bekliyor).
+  if (state.elestiri == null) state.elestiri = bosAsama()
   return state
 }
 

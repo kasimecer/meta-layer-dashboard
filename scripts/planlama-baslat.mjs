@@ -29,12 +29,17 @@ import { acikSoruDurum } from '../tools/planlamaDurumOzeti.mjs'
 import { BOLUM_SIRASI } from '../tools/planlamaBolumTanimlari.mjs'
 import { aktifBolumBilgisi } from '../tools/planlamaBolumLoop.mjs'
 
-// Bir birim-id'nin (aşama VEYA master-plan bölümü) state-nesnesini + üstünü çözer — sonuc.
-// bekleyenOnay/bayatAsama artık İKİ granülerlikten biri olabilir (bkz tools/planlamaBolumLoop.mjs).
+// Bir birim-id'nin (aşama VEYA master-plan bölümü VEYA elestiri/Kritik Pasaj) state-nesnesini +
+// üstünü çözer — sonuc.bekleyenOnay/bayatAsama artık ÜÇ granülerlikten biri olabilir. elestiri
+// BİLEREK GERCEK_ASAMALAR/BOLUM_SIRASI'nın DIŞINDadır (bkz tools/elestiriPasi.mjs) — kendi
+// state.elestiri alanını taşır, bu yüzden ayrıca kontrol edilmesi gerekir (aksi halde undefined
+// döner ve çağıran s.surum gibi bir alana erişince patlar).
 function birimStateOf(state, id) {
+  if (id === 'elestiri') return state.elestiri
   return GERCEK_ASAMALAR.includes(id) ? state.asamalar[id] : state.asamalar['master-plan']?.bolumler?.[id]
 }
 function birimUstAdi(id) {
+  if (id === 'elestiri') return 'master-plan'
   if (GERCEK_ASAMALAR.includes(id)) return ustAsama(id)
   const i = BOLUM_SIRASI.indexOf(id)
   return i > 0 ? BOLUM_SIRASI[i - 1] : null
@@ -87,7 +92,19 @@ function durumOzetiCikar(id) {
   const bayatEk = bayatlar.length ? `  ⟂ bayat: ${bayatlar.join(', ')}` : ''
 
   if (state.aktif_asama === 'tamamlandi') {
-    return { etiket: 'tamamlandı', detay: bayatEk.trim() ? `(bayat var: ${bayatlar.join(', ')})` : '' }
+    // 5-aşama + bölüm-yürüyüşü bitti — ama Kritik Pasaj (elestiri) AYRI, kendi durumunu taşıyan
+    // bir birim (bkz tools/elestiriPasi.mjs); "tamamlandı" tek başına yanıltıcı olurdu.
+    const es = state.elestiri
+    if (es?.durum === 'donduruldu') {
+      return { etiket: 'BLOKE (kritik pasaj)', detay: es.blok_nedeni ?? '(neden bilinmiyor)' }
+    }
+    if (es?.durum === 'onay-bekliyor') {
+      return { etiket: 'KRİTİK PASAJ — KARAR BEKLİYOR', detay: 'go/no-go/pivot kararınızı verin' }
+    }
+    if (es?.durum === 'gecti') {
+      return { etiket: 'tamamlandı', detay: 'kritik pasaj dahil TAM tamamlandı' }
+    }
+    return { etiket: 'tamamlandı', detay: (bayatEk.trim() ? `(bayat var: ${bayatlar.join(', ')}) ` : '') + '— kritik pasaj henüz başlamadı' }
   }
 
   const A = state.aktif_asama
@@ -154,13 +171,23 @@ function raporYaz(id, sonuc) {
       if (bayatlar.length) console.log(`  ⚠ bayat aşama(lar) var: ${bayatlar.join(', ')}`)
       break
     }
+    case 'elestiri-tamamlandi': {
+      const es = state.elestiri
+      console.log(`✓ KRİTİK PASAJ TAMAMLANDI — ${id}`)
+      console.log(`    elestiri     sürüm ${es.surum}  → ${gorPath(es.cikti_pointer)}`)
+      console.log(`  E kararı (go/no-go/pivot) kaydedildi — bkz ${gorPath(join(nsYoluOf(id), yanitDosyaAdi('elestiri', es.sorular_surum ?? 1)))}`)
+      break
+    }
     case 'onay-bekliyor': {
       const a = sonuc.bekleyenOnay
       const s = birimStateOf(state, a)
-      const sonraki = GERCEK_ASAMALAR.includes(a)
-        ? ASAMA_SIRASI[ASAMA_SIRASI.indexOf(a) + 1]
-        : (BOLUM_SIRASI[BOLUM_SIRASI.indexOf(a) + 1] ?? '(nihai master-plan onayı)')
-      console.log(`■ ${GERCEK_ASAMALAR.includes(a) ? 'AŞAMA' : 'BÖLÜM'} BİTTİ, ONAY BEKLİYOR — ${a}  (proje: ${id})`)
+      const sonraki = a === 'elestiri'
+        ? '(E kararı — nihai)'
+        : GERCEK_ASAMALAR.includes(a)
+          ? ASAMA_SIRASI[ASAMA_SIRASI.indexOf(a) + 1]
+          : (BOLUM_SIRASI[BOLUM_SIRASI.indexOf(a) + 1] ?? '(nihai master-plan onayı)')
+      const birimEtiket = a === 'elestiri' ? 'KRİTİK PASAJ' : (GERCEK_ASAMALAR.includes(a) ? 'AŞAMA' : 'BÖLÜM')
+      console.log(`■ ${birimEtiket} BİTTİ, ONAY BEKLİYOR — ${a}  (proje: ${id})`)
       console.log(`  Yapısal kapı  : GEÇTİ`)
       console.log(`  Çıktı (sürüm ${s.surum}): ${gorPath(s.cikti_pointer)}`)
       console.log(`  Sıradaki aşama: ${sonraki}`)
