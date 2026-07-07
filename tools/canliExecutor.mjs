@@ -28,10 +28,19 @@ Kabul edilen etiket biçimleri:
   [metadata:2026-06]               — yıl / tarih meta bilgisi
 
 [tahmin-doğrulanacak:...] / [eksik] İÇİN OPSİYONEL EK ETİKET — AYNI SATIRA, ayrı bir etiket
-olarak [tier:blocker|onemli|opsiyonel] ekleyebilirsin (rubric IDDIA-STATÜSÜ kuralındaki ile
-AYNI): blocker = bu veri olmadan plan maddi biçimde yanlış/yanıltıcı olur; onemli = planı
-iyileştirir ama yokluğu yüzeye çıkmış bir varsayımdır; opsiyonel = incelik. Belirtmezsen
-'onemli' varsayılır — emin değilsen etiketi ATLA.
+olarak [tier:blocker|onemli|opsiyonel] ekleyebilirsin (rubric IDDIA-STATÜSÜ kuralıyla AYNI
+ruhta, ama bu aşamada DAHA SIKI uygulanır):
+  [tier:blocker]   — YALNIZ tek, gerçekten plan-kırıcı bir olgu/karar: onsuz bu aşamanın
+                     bulguları TEMELDEN geçersiz olur (ör. pazarın var olup olmadığını belirleyen
+                     eşik, kategoriyi tanımlayan tek rakam). Bir bütçe/birim-ekonomi/fiyatlama
+                     hesabına GİRDİ olması TEK BAŞINA blocker gerekçesi DEĞİLDİR.
+  [tier:onemli]    — VARSAYILAN tier. Somut ama tek-başına plan-kırıcı OLMAYAN her rakam (büyüme
+                     oranı, rakip fiyatı, maliyet kalemi, WTP tahmini) buraya düşer — tahminle
+                     ilerlenir, sonradan doğrulanır.
+  [tier:opsiyonel] — incelik/güzelleştirme; yokluğu planı neredeyse etkilemez.
+Belirtmezsen 'onemli' varsayılır — emin değilsen 'onemli' kullan, 'blocker' DEĞİL: bu ölçüte
+gerçekten uyan kalemler bir bölümde NADİRDİR (genellikle sıfır, en fazla bir-iki) — aşırı-kullanım
+bu aşamanın tempo hedefini (turda ≤7 rahat soru) gereksiz bozar.
 
 Örnekler:
   ✓ Abonelik pazar büyüme oranı [tahmin-doğrulanacak:McKinsey-abonelik-2024] yıllık %18 civarındadır.
