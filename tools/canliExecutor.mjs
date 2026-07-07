@@ -370,6 +370,14 @@ GÖMME — ayrı bir etiket):
 Belirtmezsen 'onemli' varsayılır. Emin değilsen 'onemli' kullan — 'blocker' yalnız GERÇEKTEN
 yük-taşıyan bir karar/sert-bağımlılık için, aşırı-kullanma plan ilerlemesini gereksiz durdurur.
 
+ZİNCİR KURALI: bir hesap zincirinde (ör. COGS → katkı payı → başabaş → LTV/CAC) yalnız ZİNCİRİN
+KÖKÜNDEKİ bağımsız/çözülmemiş girdi(ler) blocker olabilir. "X bilinmediği için Y hesaplanamaz"
+biçimindeki HER sonraki adım köktEN türer — kendi başına AYRI bir blocker DEĞİLDİR, onemli kullan
+(kök zaten blocker işaretliyken zincirdeki her türevi de blocker yapmak aynı sorunu N kez
+saymaktır). Somut sinyal: bir bölümde blocker sayısı ~5'i geçiyorsa muhtemelen aynı kökün
+türevlerini tekrar tekrar blocker işaretliyorsundur — dur, gerçek KÖK NEDENLERİ (genellikle 2-4)
+ayır, geri kalan türevleri onemli'ye indir.
+
 İDDİA-TİPİ (doğrulama-yolu) — [dogrulandi:...], [operator-onayli-tahmin:...] VE [acik-soru:...]
 etiketleri İÇİN AYRICA, AYNI SATIRA, bağımsız bir [tip:masabasi|birincil|icbilgi] etiketi ekle
 (tier gibi statü etiketinin PARAMINA GÖMME — ayrı bir etiket). Bu, iddianın NASIL ve KİM

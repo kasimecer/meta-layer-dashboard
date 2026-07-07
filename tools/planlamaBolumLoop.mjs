@@ -157,7 +157,7 @@ export function provenansEkRenderla(veri) {
   } else {
     for (const kayit of ledger) {
       const deger = kayit.assumedValue ? ` — varsayılan değer: \`${kayit.assumedValue}\`` : ''
-      satirlar.push(`- **${kayit.sectionEtiket}** [tier: ${kayit.tier}] — ${kayit.question}${deger} (statü: ${kayit.status})`)
+      satirlar.push(`- **${kayit.sectionEtiket}** [tier:${kayit.tier}] — ${kayit.question}${deger} (statü: ${kayit.status})`)
     }
   }
   satirlar.push('', '## Doğrulama Tablosu (claim-type × needs_verification — mekanik projeksiyon)')
