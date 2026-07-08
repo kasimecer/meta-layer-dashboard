@@ -17,8 +17,10 @@ Statik site (GH-Pages) **olduğu gibi kalır**. Bu Worker ayrı bir write/auth e
   denetler ve YEREL yanıt artefaktına yazar. Planlama pipeline'ını başlatmaz/ilerletmez — bu
   insan tarafından ayrı, elle bir terminal komutuyla yapılır (`node scripts/planlama-baslat.mjs
   <id>`). Bkz `soru-yanit-kuyruk/README.md`.
-- `GET /operator` — `OPERATOR_TOKEN` kapısı (şimdilik **iskelet**: veriyi henüz servis etmez).
 - `GET /health` — canlılık testi.
+
+Operatör okuma-yolu artık burada değil: `meta-layer-operator.pages.dev` (Direct-Upload, ayrı Pages
+projesi, Cloudflare Access ile korunur). Eski `GET /operator` (`OPERATOR_TOKEN` iskelet) kaldırıldı.
 
 Yapılandırma `wrangler.toml [vars]` içinde (owner/repo/branch/inbox-path). Secret'ler **repoya girmez**.
 
@@ -48,7 +50,6 @@ wrangler deploy            # Worker'ı yayınlar → URL verir: https://meta-lay
 # Secret'leri Cloudflare'e koy (değeri komut soracak — yapıştır):
 wrangler secret put GITHUB_TOKEN     # adım 2'deki fine-grained PAT
 wrangler secret put SUBMIT_TOKEN     # rastgele dize:  openssl rand -hex 24
-wrangler secret put OPERATOR_TOKEN   # rastgele dize:  openssl rand -hex 24
 ```
 `SUBMIT_TOKEN` değerini **not al** — birazdan client `.env`'ine AYNISI girecek.
 
@@ -59,7 +60,7 @@ cp .env.example .env
 # .env içine yaz:
 #   VITE_WORKER_URL=https://meta-layer-write.<altad>.workers.dev
 #   VITE_SUBMIT_TOKEN=<adım 3'teki SUBMIT_TOKEN ile AYNI>
-npm run deploy             # .env build'e gömülür → gh-pages'e push
+npm run deploy:public       # .env build'e gömülür → allowlist-trimmed dist → gh-pages'e push
 ```
 `.env` boş kalırsa partner-view **MOCK** modda kalır (Worker'sız da çalışır, dosya yazmaz).
 
@@ -137,7 +138,7 @@ Lokal client testi için `ALLOWED_ORIGIN`'e `http://localhost:5173` ekle (virgü
 
 ## Güvenlik notları
 - **`SUBMIT_TOKEN` client JS'inde görünür** (gh-pages public). Kararlı saldırgana karşı gerçek değil —
-  hafif casual-abuse kapısı (v1, Barış için kabul). `GITHUB_TOKEN` + `OPERATOR_TOKEN` server-side = gerçek.
+  hafif casual-abuse kapısı (v1, Barış için kabul). `GITHUB_TOKEN` server-side = gerçek.
 - Mevcut sertleştirme (kod içinde): CORS origin-allowlist + sabit-zaman token compare + boyut limiti + 409 retry.
 - **Ucuz v1-sonrası sertleştirme** (öneri, zorunlu değil): Cloudflare Turnstile (free CAPTCHA) +
   KV ile basit rate-limit. İkisi de `/submit`'e birkaç satır.

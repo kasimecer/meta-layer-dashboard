@@ -1,21 +1,24 @@
 // meta-layer-write — TEK standalone Cloudflare Worker.
-// Dört iş taşır: (1) yazma-yolu    POST /submit             (partner cevabı → GitHub inbox dosyası)
-//                (2) intake-kuyruğu POST /intake-queue       (taslak → GitHub kuyruk dosyası; yerel
-//                    izleyici (scripts/intake-queue-watch.mjs) bunu görüp materyalize+loop koşar)
-//                (3) soru-yanıt-kuyruğu POST /soru-yanit-queue (planlama sorularına operatör yanıtı →
-//                    GitHub kuyruk dosyası; yerel izleyici (scripts/soru-yanit-queue-watch.mjs) bunu
-//                    görüp planlama SORU–YANIT artefaktına yazar — pipeline'ı BAŞLATMAZ/İLERLETMEZ)
-//                (4) auth temeli    GET  /operator            (OPERATOR_TOKEN kapısı — şimdilik iskelet)
+// Üç iş taşır: (1) yazma-yolu    POST /submit             (partner cevabı → GitHub inbox dosyası)
+//              (2) intake-kuyruğu POST /intake-queue       (taslak → GitHub kuyruk dosyası; yerel
+//                  izleyici (scripts/intake-queue-watch.mjs) bunu görüp materyalize+loop koşar)
+//              (3) soru-yanıt-kuyruğu POST /soru-yanit-queue (planlama sorularına operatör yanıtı →
+//                  GitHub kuyruk dosyası; yerel izleyici (scripts/soru-yanit-queue-watch.mjs) bunu
+//                  görüp planlama SORU–YANIT artefaktına yazar — pipeline'ı BAŞLATMAZ/İLERLETMEZ)
 //
 // GH-Pages statik kalır (RE-HOST YOK). Statik site bu Worker'ı ayrı origin'den çağırır → CORS şart.
 // Worker HİÇBİR ZAMAN `claude` çalıştırmaz / pipeline'a dokunmaz — yalnız git'e yazar. Abonelik-auth
 // gerektiren tüm iş (materyalize + planlama pipeline) YEREL izleyicide, kullanıcının makinesinde kalır.
 //
+// Operatör okuma-yolu artık BURADA DEĞİL: meta-layer-operator.pages.dev (Direct-Upload, ayrı Pages
+// projesi) + Cloudflare Access. Eski GET /operator (OPERATOR_TOKEN iskelet) kaldırıldı — bkz
+// meta-kanal.md deploy-ayrımı görevi.
+//
 // Yapılandırma (wrangler [vars], HARDCODE YOK):
 //   GH_OWNER, GH_REPO, GH_BRANCH, INBOX_PATH, INTAKE_QUEUE_PATH, SORU_YANIT_QUEUE_PATH,
 //   ALLOWED_ORIGIN (virgülle çok-origin)
 // Secret (wrangler secret put — repoya GİRMEZ):
-//   GITHUB_TOKEN (server-side, GERÇEK) · SUBMIT_TOKEN (client'ta görünür, hafif kapı) · OPERATOR_TOKEN (server-side, GERÇEK)
+//   GITHUB_TOKEN (server-side, GERÇEK) · SUBMIT_TOKEN (client'ta görünür, hafif kapı)
 
 const GH_API = 'https://api.github.com'
 const UA = 'meta-layer-write-worker'
@@ -42,9 +45,6 @@ export default {
       }
       if (url.pathname === '/soru-yanit-queue' && request.method === 'POST') {
         return await handleSoruYanitQueue(request, env, origin)
-      }
-      if (url.pathname === '/operator' && request.method === 'GET') {
-        return await handleOperator(request, env, origin, url)
       }
       return json({ ok: false, hata: 'bulunamadı' }, 404, origin, env)
     } catch (e) {
@@ -196,27 +196,6 @@ async function handleSoruYanitQueue(request, env, origin) {
   if (!sonuc.ok) return json({ ok: false, hata: sonuc.hata }, sonuc.status || 502, origin, env)
 
   return json({ ok: true, commit: sonuc.commit, path: kuyrukYol }, 200, origin, env)
-}
-
-// ============================================================
-// GET /operator — auth temeli (İSKELET)
-// Orkestratör kararı: operatör verisi HENÜZ TAŞINMAZ (düşük-hassasiyet survivor-pull +
-// public repo'ya commit'lenen her şey zaten public → gerçek gate veri-taşıma projesi).
-// Burada token kapısı UÇTAN-UCA kanıtlanır; sonraki slice veriyi ucuza arkasına alır.
-// ============================================================
-async function handleOperator(request, env, origin, url) {
-  const token = request.headers.get('x-operator-token') || bearer(request)
-  if (!env.OPERATOR_TOKEN || !safeEqual(token, env.OPERATOR_TOKEN)) {
-    return json({ ok: false, hata: 'yetkisiz' }, 401, origin, env)
-  }
-  const proje = String(url.searchParams.get('proje') || '').trim()
-  // İSKELET: gerçek operatör JSON'u henüz BURADAN servis edilmiyor (hâlâ statik public).
-  return json({
-    ok: true,
-    gated: true,
-    proje: proje || null,
-    not: 'auth iskeleti çalışıyor — operatör verisi taşıma bekliyor (sonraki slice)',
-  }, 200, origin, env)
 }
 
 // ============================================================
@@ -384,7 +363,7 @@ function originAllowed(origin, env) {
 function corsHeaders(origin, env) {
   const h = {
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'content-type, x-submit-token, x-operator-token, authorization',
+    'Access-Control-Allow-Headers': 'content-type, x-submit-token, authorization',
     'Access-Control-Max-Age': '86400',
     'Vary': 'Origin',
   }
