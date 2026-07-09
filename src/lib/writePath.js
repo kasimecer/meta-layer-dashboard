@@ -41,21 +41,31 @@ export async function submitPartnerInput({ projeId, kart, cevap }) {
     return { ok: true, kart: yeniKart, inboxSatiri, mock: true }
   }
 
-  // CANLI: Worker POST /submit
-  try {
-    const r = await fetch(`${WORKER_URL}/submit`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-submit-token': SUBMIT_TOKEN },
-      body: JSON.stringify({ projeId, kartId: kart.id, ozet: kart.ozet, cevap: temiz }),
-    })
-    if (!r.ok) {
-      let detay = ''
-      try { detay = (await r.json()).hata || '' } catch { /* noop */ }
-      return { ok: false, hata: `Gönderilemedi (${r.status}${detay ? ': ' + detay : ''})` }
+  // CANLI: Worker POST /submit — mobil ağda ara sıra bağlantı yanıt gelmeden düşüyor (WebKit:
+  // "Load failed"); Worker genelde yazmayı BİTİRMİŞ oluyor, yalnız yanıt istemciye ulaşmıyor
+  // (bkz meta-kanal.md 2026-07-09 seam-reconcile-run-baris — partner aynı cevabı günler içinde
+  // 7 kez yeniden göndermiş). Kısa backoff'lu otomatik tekrar bu görünür-hata oranını azaltır;
+  // tekrar gönderim veri KAYBI yaratmaz (seam-reconcile kart-bazlı latest-wins ile dedup eder),
+  // yalnız gürültü. Yalnız ATILAN (network-level) hatada tekrar edilir — sunucunun gerçek bir
+  // HTTP hata yanıtı (ör. 401/400) hemen döner, körlemesine tekrar edilmez.
+  const MAX_DENEME = 3
+  for (let deneme = 1; deneme <= MAX_DENEME; deneme++) {
+    try {
+      const r = await fetch(`${WORKER_URL}/submit`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-submit-token': SUBMIT_TOKEN },
+        body: JSON.stringify({ projeId, kartId: kart.id, ozet: kart.ozet, cevap: temiz }),
+      })
+      if (!r.ok) {
+        let detay = ''
+        try { detay = (await r.json()).hata || '' } catch { /* noop */ }
+        return { ok: false, hata: `Gönderilemedi (${r.status}${detay ? ': ' + detay : ''})` }
+      }
+      return { ok: true, kart: yeniKart, inboxSatiri, mock: false }
+    } catch (e) {
+      if (deneme === MAX_DENEME) return { ok: false, hata: `Ağ hatası: ${String(e?.message || e)}` }
+      await new Promise(res => setTimeout(res, 600 * deneme))
     }
-    return { ok: true, kart: yeniKart, inboxSatiri, mock: false }
-  } catch (e) {
-    return { ok: false, hata: `Ağ hatası: ${String(e?.message || e)}` }
   }
 }
 
