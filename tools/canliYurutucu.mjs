@@ -3,8 +3,9 @@
 // Namespace dışına yazma → ScopeLockHatasi fırlatır.
 
 import { spawn } from 'child_process'
-import { writeFileSync, mkdirSync } from 'fs'
-import { resolve, dirname } from 'path'
+import { writeFileSync, readFileSync, renameSync, unlinkSync, mkdirSync } from 'fs'
+import { resolve, dirname, join, basename } from 'path'
+import { randomBytes } from 'crypto'
 
 export class ScopeLockHatasi extends Error {
   constructor(hedef, sinir) {
@@ -131,10 +132,57 @@ export async function claudeCalistirRetry(prompt, {
   throw new Error(`claude -p ${maxDeneme} denemede de başarısız:\n${denemeHatalari.join('\n')}`)
 }
 
-export function guvenliYaz(dosyaYolu, icerik, nsKokYolu) {
+/**
+ * Scope-lock'lu GÜVENLİ yazma — yaz + doğrula + gerekirse yeniden-dene.
+ *
+ * İKİ katmanlı savunma (gözlemlenen gerçek vaka: üretilen bir bölüm, Drive-senkronlu bir mount'a
+ * yazılırken kırpılmış hâliyle HEM yerelde HEM Drive'da göründü — yazımın senkronla YARIŞTIĞI
+ * ile tutarlı):
+ *   1. Geçici dosyaya (AYNI dizin, dolayısıyla AYNI dosya sistemi — atomik rename garantisi) yaz,
+ *      SONRA hedefin ÜZERİNE atomik rename et. Bir senkron istemcisi (ör. Google Drive Desktop)
+ *      hedef yolu izliyor olsa bile ASLA kısmi bir yazım GÖZLEMLEYEMEZ — rename ya ESKİ ya TAM
+ *      YENİ içeriği gösterir, ikisi arası bir an YOKTUR. Bu birincil savunma.
+ *   2. Rename SONRASI yerinden geri-oku + yazılanla HARFİYEN karşılaştır (senkron GECİKMESİNDEN
+ *      bağımsız — Drive'ın buluta yüklemesini BEKLEMEZ, yalnız yerel diskten hemen geri-okur).
+ *      Uyuşmazsa (temp-dosya/rename mekanizması dışında bir nedenle) sınırlı-yeniden-dene; tüm
+ *      denemeler tükenirse SESSİZCE KABUL ETMEK YERİNE net bir hata fırlatır (fail loud).
+ *
+ * @param {{maxDeneme?, _writeFileSync?, _readFileSync?, _renameSync?, _unlinkSync?}} opts —
+ *        son 4'ü yalnız test için fault-injection noktası (claudeCalistirRetry'nin _claudeCalistir
+ *        deseniyle AYNI); verilmezse gerçek fs çağrıları kullanılır.
+ */
+export function guvenliYaz(dosyaYolu, icerik, nsKokYolu, opts = {}) {
+  const {
+    maxDeneme = 3,
+    _writeFileSync = writeFileSync,
+    _readFileSync = readFileSync,
+    _renameSync = renameSync,
+    _unlinkSync = unlinkSync,
+  } = opts
+
   scopeKontrol(dosyaYolu, nsKokYolu)
   const mutlak = resolve(dosyaYolu)
-  mkdirSync(dirname(mutlak), { recursive: true })
-  writeFileSync(mutlak, icerik, 'utf8')
-  return mutlak
+  const dizin = dirname(mutlak)
+  mkdirSync(dizin, { recursive: true })
+
+  const denemeHatalari = []
+  for (let deneme = 1; deneme <= maxDeneme; deneme++) {
+    const geciciYol = join(dizin, `.${basename(mutlak)}.tmp-${randomBytes(6).toString('hex')}`)
+    try {
+      _writeFileSync(geciciYol, icerik, 'utf8')
+      _renameSync(geciciYol, mutlak)
+      const geriOkunan = _readFileSync(mutlak, 'utf8')
+      if (geriOkunan !== icerik) {
+        throw new Error(`geri-okuma uyuşmazlığı: yazılan ${icerik.length} karakter, okunan ${geriOkunan.length} karakter`)
+      }
+      return mutlak
+    } catch (e) {
+      denemeHatalari.push(`deneme ${deneme}/${maxDeneme}: ${e.message}`)
+      try { _unlinkSync(geciciYol) } catch { /* zaten yok olabilir (rename başarılı olmuş olabilir) */ }
+    }
+  }
+  throw new Error(
+    `guvenliYaz: ${maxDeneme} denemede de DOĞRULANMIŞ yazım başarısız (${mutlak}) — kısmi/tutarsız ` +
+    `yazım SESSİZCE kabul edilmedi:\n${denemeHatalari.join('\n')}`
+  )
 }
