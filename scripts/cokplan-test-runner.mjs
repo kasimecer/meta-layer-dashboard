@@ -430,9 +430,9 @@ if (birinci_erisilebildi) {
 }
 console.log(`    ${join(TEST_ROOT, 'karsilastirma.json')} — yan yana karşılaştırma`)
 
-// ── meta-kanal.md ──────────────────────────────────────────────────────────────
+// ── test-kanal-log.md (İZOLE — gerçek meta-kanal.md'ye ASLA yazılmaz, bkz _build-test-cokplan/) ──
 const now = new Date().toISOString().slice(0, 16).replace('T', ' ')
-const kanalYol = join(META_DATA_ROOT, 'meta-kanal.md')
+const kanalYol = join(TEST_ROOT, 'test-kanal-log.md')
 const kanalNot = `
 --- [${now}] masterPlanBolucu.mjs çok-plan izole doğrulama ---
 Test: scripts/cokplan-test-runner.mjs
@@ -463,9 +463,9 @@ Artefaktlar:
 `
 try {
   appendFileSync(kanalYol, kanalNot, 'utf8')
-  console.log('\nmeta-kanal.md güncellendi.')
+  console.log('\ntest-kanal-log.md güncellendi (izole, gerçek kanal DEĞİL).')
 } catch (e) {
-  console.warn('meta-kanal.md yazılamadı:', e.message)
+  console.warn('test-kanal-log.md yazılamadı:', e.message)
 }
 
 if (failed > 0) process.exit(1)

@@ -371,9 +371,9 @@ assert(!existsSync(join(PROJELER_ROOT, '_build-test-event-blok/sentez-kartlar/ba
 // ── Özet ─────────────────────────────────────────────────────────────────────
 section(`Özet: ${passed + failed} test | ✓ ${passed} geçti | ✗ ${failed} başarısız`)
 
-// ── meta-kanal.md ──────────────────────────────────────────────────────────────
+// ── test-kanal-log.md (İZOLE — gerçek meta-kanal.md'ye ASLA yazılmaz, bkz _build-test-event-blok/) ──
 const now = new Date().toISOString().slice(0, 16).replace('T', ' ')
-const kanalYol = join(META_DATA_ROOT, 'meta-kanal.md')
+const kanalYol = join(TEST_ROOT, 'test-kanal-log.md')
 const kanalNot = `
 --- [${now}] event_blok tek-kural izole doğrulama ---
 Test: scripts/event-blok-test-runner.mjs
@@ -400,9 +400,9 @@ Güncellenen mevcut assertionlar (build-test-runner.mjs Section 7):
 `
 try {
   appendFileSync(kanalYol, kanalNot, 'utf8')
-  console.log('\nmeta-kanal.md güncellendi.')
+  console.log('\ntest-kanal-log.md güncellendi (izole, gerçek kanal DEĞİL).')
 } catch (e) {
-  console.warn('meta-kanal.md yazılamadı:', e.message)
+  console.warn('test-kanal-log.md yazılamadı:', e.message)
 }
 
 if (failed > 0) process.exit(1)

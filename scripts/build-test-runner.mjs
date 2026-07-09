@@ -610,9 +610,9 @@ console.log(`  _build-test/_fasilitasyon-taslak/ : ${existsSync(join(BUILD_TEST_
 console.log(`  _build-test/sentez-kartlar/       : ${existsSync(join(BUILD_TEST_ROOT, 'sentez-kartlar')) ? readdirSync(join(BUILD_TEST_ROOT, 'sentez-kartlar')).length : 0} dosya`)
 console.log(`  _build-test/output/               : ${readdirSync(join(BUILD_TEST_ROOT, 'output')).length} dosya`)
 
-// ── meta-kanal.md ─────────────────────────────────────────────────────────────
+// ── test-kanal-log.md (İZOLE — gerçek meta-kanal.md'ye ASLA yazılmaz, bkz _build-test/) ────────
 const now = new Date().toISOString().slice(0, 16).replace('T', ' ')
-const kanalYol = join(META_DATA_ROOT, 'meta-kanal.md')
+const kanalYol = join(BUILD_TEST_ROOT, 'test-kanal-log.md')
 const kanalNot = `
 --- [${now}] build-task bağlama + fasilitasyon render doğrulama ---
 Test: scripts/build-test-runner.mjs
@@ -641,9 +641,9 @@ Bloklu→aç geçişi: event_blok set → onay kartı cevaplandi (onayKartinaCev
 `
 try {
   appendFileSync(kanalYol, kanalNot, 'utf8')
-  console.log('\nmeta-kanal.md güncellendi.')
+  console.log('\ntest-kanal-log.md güncellendi (izole, gerçek kanal DEĞİL).')
 } catch (e) {
-  console.warn('meta-kanal.md yazılamadı:', e.message)
+  console.warn('test-kanal-log.md yazılamadı:', e.message)
 }
 
 if (failed > 0) process.exit(1)

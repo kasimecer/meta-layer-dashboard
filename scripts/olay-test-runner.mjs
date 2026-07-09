@@ -460,8 +460,8 @@ section(`6) Özet — ${passed + failed} test | ✓ ${passed} geçti | ✗ ${fai
 
 const allPass = failed === 0
 
-// meta-kanal.md
-const kanalYol = join(META_DATA_ROOT, 'meta-kanal.md')
+// test-kanal-log.md (İZOLE — gerçek meta-kanal.md'ye ASLA yazılmaz, bkz _build-test-olay/)
+const kanalYol = join(OLAY_TEST_ROOT, 'test-kanal-log.md')
 const nowStr = new Date().toISOString().slice(0, 16).replace('T', ' ')
 const kanalNot = `
 --- [${nowStr}] in-build olay-tipleri doğrulama (üç tip) ---
@@ -486,9 +486,9 @@ Regresyon: public/ baseline değişmedi; _build-test/ dokunulmadı ✓
 
 try {
   appendFileSync(kanalYol, kanalNot, 'utf8')
-  console.log('  meta-kanal.md güncellendi.')
+  console.log('  test-kanal-log.md güncellendi (izole, gerçek kanal DEĞİL).')
 } catch (e) {
-  console.warn('  meta-kanal.md yazılamadı:', e.message)
+  console.warn('  test-kanal-log.md yazılamadı:', e.message)
 }
 
 if (!allPass) process.exit(1)

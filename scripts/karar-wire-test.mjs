@@ -297,10 +297,10 @@ console.log('\n═════════════════════�
 console.log(`  Toplam: ${passed + failed} test | ✓ ${passed} geçti | ✗ ${failed} başarısız`)
 console.log('════════════════════════════════════════════════════\n')
 
-// meta-kanal.md'ye APPEND
+// test-kanal-log.md'ye APPEND (İZOLE — gerçek meta-kanal.md'ye ASLA yazılmaz, bkz _mekanik-test/wire-test/)
 import { appendFileSync } from 'fs'
 const now = new Date().toISOString().slice(0, 16).replace('T', ' ')
-const kanalYol = join(META_DATA_ROOT, 'meta-kanal.md')
+const kanalYol = join(TEST_ROOT, 'test-kanal-log.md')
 const kanalNot = `
 --- [${now}] karar-wire uçtan-uca test ---
 Test: scripts/karar-wire-test.mjs
@@ -324,9 +324,9 @@ içeren ### KOMUT blokları bulununca kararWire.mjs --komut koşturulabilir.
 `
 try {
   appendFileSync(kanalYol, kanalNot, 'utf8')
-  console.log('meta-kanal.md güncellendi.')
+  console.log('test-kanal-log.md güncellendi (izole, gerçek kanal DEĞİL).')
 } catch (e) {
-  console.warn('meta-kanal.md yazılamadı:', e.message)
+  console.warn('test-kanal-log.md yazılamadı:', e.message)
 }
 
 if (failed > 0) process.exit(1)
