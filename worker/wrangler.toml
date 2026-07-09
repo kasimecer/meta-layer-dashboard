@@ -24,5 +24,10 @@ INTAKE_QUEUE_PATH = "intake-kuyruk"
 # artefaktına yazar. Pipeline'ı BAŞLATMAZ/İLERLETMEZ.
 SORU_YANIT_QUEUE_PATH = "soru-yanit-kuyruk"
 # CORS + origin-allowlist. Virgülle çok-origin. Lokal test için localhost eklendi (bkz README
-# "Lokal geliştirme" — worker/soru-yanit-queue canlı-demo doğrulaması için).
-ALLOWED_ORIGIN = "https://kasimecer.github.io,http://localhost:5173"
+# "Lokal geliştirme" — worker/soru-yanit-queue canlı-demo doğrulaması için). Operatör Cloudflare
+# Pages hedefi (deploy:operator) 2026-07-08'de (1a4e1fe) ayrı origin olarak eklendi ama BURAYA hiç
+# yansımamıştı → tüm operatör-kaynaklı /submit istekleri sessizce CORS'a takılıyordu (preflight
+# Allow-Origin'siz döndüğü için tarayıcı asıl POST'u hiç göndermiyordu, istemcide "Ağ hatası: Load
+# failed" olarak görünüyordu). `*.` öneki alt-alan joker'i (yalnız bu iki alan): her deploy yeni bir
+# hash-önekli pages.dev önizleme alanı ürettiği için sabit bir origin listesi bunu asla kapsayamaz.
+ALLOWED_ORIGIN = "https://kasimecer.github.io,http://localhost:5173,https://meta-layer-operator.pages.dev,https://*.meta-layer-operator.pages.dev"

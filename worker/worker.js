@@ -356,9 +356,19 @@ function safeEqual(a, b) {
 function allowedOrigins(env) {
   return String(env.ALLOWED_ORIGIN || '').split(',').map(s => s.trim()).filter(Boolean)
 }
+// Girdi tam eşleşme VEYA "https://*.pages.dev" gibi tek-seviye alt-alan joker'i (Cloudflare Pages
+// her deploy'da yeni bir hash-önekli önizleme alanı ürettiği için sabit liste bunu kapsayamaz —
+// bkz worker/wrangler.toml ALLOWED_ORIGIN yorumu).
 function originAllowed(origin, env) {
   const list = allowedOrigins(env)
-  return list.length === 0 ? false : list.includes(origin)
+  if (list.length === 0) return false
+  return list.some(izinli => {
+    const yildizIdx = izinli.indexOf('*.')
+    if (yildizIdx === -1) return origin === izinli
+    const onek = izinli.slice(0, yildizIdx)
+    const sonek = izinli.slice(yildizIdx + 1)
+    return origin.startsWith(onek) && origin.endsWith(sonek) && origin.length > onek.length + sonek.length
+  })
 }
 function corsHeaders(origin, env) {
   const h = {
