@@ -1,0 +1,30 @@
+{
+  "id": "fotball-podcast-2026-07-09",
+  "projeKaydi": {
+    "id": "fotball-podcast-2026-07-09",
+    "ad": "Fotball Podcast",
+    "durum": "fikir",
+    "faz": "planlama",
+    "rol": "solo",
+    "status": "aktif",
+    "efor": "?",
+    "deger": "?",
+    "zaman_son_aktivite": "2026-07-09",
+    "ozet": "isvecte, farkli formatlarda podcast yayini yapan, futbol içeriki oluşturan, end to end AI üretimi, periyodik futbol kaynaklarini arar, güçlü"
+  },
+  "cardsJson": {
+    "kartlar": [
+      {
+        "id": "fotball-podcast-2026-07-09-k01",
+        "tip": "girdi-talebi",
+        "durum": "cevap-bekliyor",
+        "ozet": "Bir cümleyle netleştir: hedef kitle + çözülen sorun",
+        "detay": "**Başlangıç fikri:**\n\nisvecte, farkli formatlarda podcast yayini yapan, futbol içeriki oluşturan, end to end AI üretimi, periyodik futbol kaynaklarini arar, güçlü kaliteli mantikli, izleme metriklerine göre optime edilmiş, kisa özet haberler, hikayesi olan anlatimlar, taktik yorum, her lige özel liste, vs vs \n\n*Sonraki adım: premise kapısı için fikri netleştir.*",
+        "partner_cevap": null,
+        "olusturma": "2026-07-09T21:52:34.804Z",
+        "guncelleme": "2026-07-09T21:52:34.804Z"
+      }
+    ]
+  },
+  "intakeMd": "# Intake — Fotball Podcast\n**ID:** fotball-podcast-2026-07-09\n**Giriş kipi:** fikir-var\n**Tarih:** 2026-07-09\n\n## Fikir\n\nisvecte, farkli formatlarda podcast yayini yapan, futbol içeriki oluşturan, end to end AI üretimi, periyodik futbol kaynaklarini arar, güçlü kaliteli mantikli, izleme metriklerine göre optime edilmiş, kisa özet haberler, hikayesi olan anlatimlar, taktik yorum, her lige özel liste, vs vs "
+}
