@@ -7,6 +7,7 @@ import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { claudeCalistirRetry, guvenliYaz } from './canliYurutucu.mjs'
 import { TUM_BOLUMLER_ISARETI } from './planlamaBolumTanimlari.mjs'
+import { executorSarmalayicisiniTemizle } from './planlamaSarmalayiciTemizle.mjs'
 
 const ASAMA_DOSYALARI = {
   genesis:        'genesis.md',
@@ -525,20 +526,27 @@ export function canliExecutorOlustur(nsYolu, projeConfig, opts = {}) {
 
     // 2026-07-06: burada denenen bir otomatik "sohbet-sarmalayıcı" kırpma (ilk #-başlığından
     // öncesini silme) GERİ ALINDI — risk-varsayimlar'da içeriğin ORTASINDAN bir kelimeyi keserek
-    // sessiz veri kaybına yol açtığı GÖZLEMLENDİ (muhtemelen metnin içinde herhangi bir nedenle
-    // satır-başı "#" ile başlayan bir ifade — kod/renk/referans vb. — gerçek başlıkmış gibi
-    // yanlış eşleşti). "Belgeyi bulmaca gibi kırp" heuristiği bu sınıf hatalar için doğası gereği
-    // güvensiz: yanlış-pozitif maliyeti (sessiz içerik kaybı) yanlış-negatif maliyetinden (gözle
-    // görülür sarmalayıcı metin, kapı yakalar, elle düzeltilir) çok daha yüksek. Sarmalayıcı
-    // metin sorunu — bkz promptUret/promptUretBolum'daki "Belgenin başına/sonuna yorum EKLEME" —
-    // ELLE tespit + düzeltme ile ele alınmaya devam ediyor (kapı zaten statüsüz-satır olarak
-    // yakalıyor, sessiz değil).
+    // sessiz veri kaybına yol açtığı GÖZLEMLENDİ ("belgeyi bulmaca gibi kırp" heuristiği doğası
+    // gereği güvensiz: yanlış-pozitif maliyeti çok daha yüksek). 2026-07-09: DAR kapsamlı bir
+    // yeniden-deneme eklendi (executorSarmalayicisiniTemizle) — o hatadan YAPISAL OLARAK farklı:
+    // yalnız BİLİNEN sabit desenleri ("Format confirmed" ön-eki, "kaydedildi/registry updated"
+    // art-eki), YALNIZ metnin MUTLAK başında/sonunda arar (asla ortada bir "başlık" aramaz);
+    // eşleşme yoksa içerik BİREBİR döner. Kapı yine de son savunma hattı (statüsüz-satır olarak
+    // yakalar) — bu yalnız BİLİNEN gürültüyü kapıya varmadan temizler.
+    const temizlik = executorSarmalayicisiniTemizle(sonuc.metin)
+    if (temizlik.degisti) {
+      log(`${asama}: executor çıktısından sarmalayıcı soyuldu` +
+          (temizlik.onSoyuldu ? ` [ön: "${temizlik.onSoyuldu.trim().slice(0, 60)}"]` : '') +
+          (temizlik.artSoyuldu ? ` [art: "${temizlik.artSoyuldu.trim().slice(0, 60)}"]` : ''))
+    }
+    const icerikTemiz = temizlik.temiz
+
     const dosyaYolu = opts.hedefDosya ?? join(nsYolu, ASAMA_DOSYALARI[asama])
-    guvenliYaz(dosyaYolu, sonuc.metin, nsYolu)
-    baglamlar[asama] = sonuc.metin
+    guvenliYaz(dosyaYolu, icerikTemiz, nsYolu)
+    baglamlar[asama] = icerikTemiz
 
     return {
-      icerik:       sonuc.metin,
+      icerik:       icerikTemiz,
       cikti_pointer: dosyaYolu,
       maliyet_usd:  sonuc.maliyet_usd,
       sure_ms:      sonuc.sure_ms,
