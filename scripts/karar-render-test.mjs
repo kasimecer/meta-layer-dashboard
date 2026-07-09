@@ -160,7 +160,15 @@ assert(registrySonraki === registryOnceki, 'registry.json DEĞİŞMEDİ')
 
 const registry = JSON.parse(registrySonraki)
 const projeBilgileri = registry.projeler ?? []
-assert(projeBilgileri.length === 4, 'portföy tam 4 proje')
+// Sayı-agnostik: portföy canlı olarak büyür (yeni proje eklendikçe) — sabit bir rakama SAPLANMAK
+// (ör. "tam 4") her yeni projede kaçınılmaz olarak bozulur ve bu testle İLGİSİZ bir başarısızlık
+// üretir. Asıl kanıtlanmak istenen zaten satır 159'da BİREBİR string-eşitlikle var: bu test
+// registry.json'ı DEĞİŞTİRMEDİ. Burada onu PARSE edilmiş düzeyde de teyit ediyoruz — proje SAYISI
+// testin KENDİ öncesi anlık-görüntüsüyle (registryOnceki) uyuşuyor mu (yalnız bu testin dosyayı
+// büyütüp/küçültmediğinin bağımsız bir kanıtı, gerçek portföy büyüklüğü hakkında bir iddia DEĞİL).
+const projeBilgileriOnceki = (JSON.parse(registryOnceki).projeler ?? [])
+assert(projeBilgileri.length === projeBilgileriOnceki.length,
+  `portföy büyüklüğü test öncesiyle uyuşuyor (${projeBilgileri.length} proje, sabit bir sayıya kilitlenmedi)`)
 assert(!projeBilgileri.some(p => p.id.startsWith('wire-test')), 'registry\'de wire-test-* YOK')
 const beklenenler = ['baris', 'mustafa', 'yakup', 'noaval']
 assert(beklenenler.every(id => projeBilgileri.some(p => p.id === id)),
@@ -207,10 +215,10 @@ console.log('  3. #/partner/wire-test-yakinsama → sentez(read-only) + onay(inp
 console.log('  4. #/partner/wire-test-deadlock  → sentez(read-only) + ⚠ escalation banner')
 console.log('  (test JSON\'larını commit\'leme; baris kartları etkilenmez)')
 
-// meta-kanal.md
+// test-kanal-log.md (İZOLE — gerçek meta-kanal.md'ye ASLA yazılmaz, bkz _mekanik-test/wire-test/)
 import { appendFileSync } from 'fs'
 const now = new Date().toISOString().slice(0, 16).replace('T', ' ')
-const kanalYol = join(META_DATA_ROOT, 'meta-kanal.md')
+const kanalYol = join(TEST_ROOT, 'test-kanal-log.md')
 const kanalNot = `
 --- [${now}] karar-render-yolu doğrulama ---
 Test: scripts/karar-render-test.mjs
@@ -230,15 +238,15 @@ Render görüntüleme (dev — canlıya commit/deploy etme):
   → #/partner/wire-test-yakinsama: sentez(read-only) + onay(input lu girdi-talebi)
   → #/partner/wire-test-deadlock : sentez(read-only) + ⚠ escalation banner
 
-Değişmeyenler: cards-baris.json ✓ | registry.json ✓ | portföy 4 proje ✓ | wire-test-* registry'de yok ✓
+Değişmeyenler: cards-baris.json ✓ | registry.json ✓ | portföy büyüklüğü test-öncesiyle aynı (${projeBilgileri.length} proje) ✓ | wire-test-* registry'de yok ✓
 
 Önerilen sonraki adım: Gerçek proje (baris) için kararCiftiOlustur çağrısı hazırla (k16 veya yeni bir karar-noktası); kararWire.mjs'i drive/projeler/baris üzerinde ilk canlı turda test et.
 `
 try {
   appendFileSync(kanalYol, kanalNot, 'utf8')
-  console.log('meta-kanal.md güncellendi.')
+  console.log('test-kanal-log.md güncellendi (izole, gerçek kanal DEĞİL).')
 } catch (e) {
-  console.warn('meta-kanal.md yazılamadı:', e.message)
+  console.warn('test-kanal-log.md yazılamadı:', e.message)
 }
 
 if (failed > 0) process.exit(1)
