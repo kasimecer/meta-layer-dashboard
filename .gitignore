@@ -8,9 +8,13 @@ dist/
 # Internal/operator Meta-Layer project data — regenerated fresh from Drive (META_DATA_ROOT) at
 # build time by scripts/build-card-data.js. Repo is public: a git-tracked copy is fetchable via
 # raw.githubusercontent.com regardless of the deploy-time public trim (scripts/deploy-public-trim.mjs),
-# so these must never be committed. card-data.json / cards-*.json are the intentionally-public
-# partner-facing outputs and are NOT listed here — those stay tracked.
+# so these must never be committed. Only card-data.json (the single allowlisted-partner summary)
+# is intentionally public and stays tracked — cards-*.json covers EVERY project (including
+# non-allowlisted ones), not just the one deploy-public-trim.mjs actually serves, so it is
+# internal-by-default here too: PUBLIC_PARTNER_IDS in deploy-public-trim.mjs is what decides which
+# single cards-<id>.json actually reaches the live public site, regenerated fresh at build time.
 /public/registry.json
 /public/operator-*.json
 /public/sorular-*.json
 /public/strateji-*.json
+/public/cards-*.json
