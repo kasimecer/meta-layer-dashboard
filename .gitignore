@@ -4,3 +4,13 @@ dist/
 .env.local
 .dev.vars
 .wrangler/
+
+# Internal/operator Meta-Layer project data — regenerated fresh from Drive (META_DATA_ROOT) at
+# build time by scripts/build-card-data.js. Repo is public: a git-tracked copy is fetchable via
+# raw.githubusercontent.com regardless of the deploy-time public trim (scripts/deploy-public-trim.mjs),
+# so these must never be committed. card-data.json / cards-*.json are the intentionally-public
+# partner-facing outputs and are NOT listed here — those stay tracked.
+/public/registry.json
+/public/operator-*.json
+/public/sorular-*.json
+/public/strateji-*.json
