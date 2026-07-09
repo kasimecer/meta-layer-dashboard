@@ -10,6 +10,7 @@ import { BOLUM_TANIMLARI } from './planlamaBolumTanimlari.mjs'
 import {
   bolumIcerikGovdesiKontrolEt, iddialariCikar, iddiaEtiketVarMi, kaynakGercekMi,
 } from './planlamaIddiaDurumu.mjs'
+import { bolumButunlukKontrolEt } from './planlamaBolumButunluk.mjs'
 
 // ── Bölüme-özgü ek kontroller (registry'de string-anahtarla referans edilir — döngüsel import yok) ──
 
@@ -71,6 +72,14 @@ export function bolumKapidanGecerMi(bolumId, icerik, baglam = null) {
   if (!tanim) throw new Error(`Bölüm tanımı yok: ${bolumId}`)
 
   if (tanim.mekanik) return provenansKapisi(icerik, baglam)
+
+  // YAPISAL BÜTÜNLÜK — satır-etiketi kuralından ÖNCE: bir dosya KIRPILMIŞ/EKSİK olsa bile
+  // GERİYE KALAN kuyruğu tamamen temiz-etiketli olabilir (gözlemlenen gerçek vaka: bütçe/
+  // finansal bölüm 4436 bayta kırpıldı, ilk kalemleri eksikti, ilk satırı cümle-ortası bir
+  // parçaydı — ama etiketleme kuralından GEÇTİ). bkz planlamaBolumButunluk.mjs — bilerek
+  // lenient (paraphrase-toleranslı, az sayıda merkezi konu, bölüm-türüne göre kalibre eşik).
+  const butunluk = bolumButunlukKontrolEt(bolumId, icerik, tanim)
+  if (!butunluk.gecti) return butunluk
 
   if (tanim.iddiaMuaf) {
     // TERS kural (yalnız ozet-yonetici): SIFIR yeni iddia-etiketi VE sıfır çıplak sayı.

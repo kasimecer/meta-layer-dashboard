@@ -22,7 +22,8 @@ import { boslukState, statePersist, stateYukle, asamaDosyaAdi } from '../tools/p
 import { BOLUM_SIRASI, BOLUM_TANIMLARI } from '../tools/planlamaBolumTanimlari.mjs'
 import { bolumKapidanGecerMi } from '../tools/planlamaBolumKapilari.mjs'
 import { bolumeGeriDon, provenansEkRenderla } from '../tools/planlamaBolumLoop.mjs'
-import { iddialariCikar, iddialariCozumle } from '../tools/planlamaIddiaDurumu.mjs'
+import { birimAcikDurum } from '../tools/planlamaBirimMotoru.mjs'
+import { iddialariCikar, iddialariCozumle, bolumIcerikGovdesiKontrolEt } from '../tools/planlamaIddiaDurumu.mjs'
 import {
   dataRequestAdaylari, varsayilanSoruUretici, yanitKaydet, sorulariYaz, sorulariOku,
   topluAtla, yanitButunluk, yanitlariHamOku,
@@ -89,11 +90,11 @@ function bolumluExecutor(overrides = {}) {
 
 // Tam bölüm-yürüyüşünü (+ nihai onay) invokasyon invokasyon sürer — her çağrı EN ÇOK bir
 // birim işler (bkz tools/planlamaBirimMotoru.mjs birimKostur), tıpkı aşama-seviyesinde olduğu gibi.
-async function tumYuruyusuTamamla(ns, id, executor, { maxAdim = 25 } = {}) {
+async function tumYuruyusuTamamla(ns, id, executor, { maxAdim = 25, soruUretici = null } = {}) {
   let sonuc, adim = 0
   do {
     sonuc = await planlamaLoopV2Calistir(ns, id, executor, {
-      mod: 'ileri', soruUretici: null, masterPlanBolumleri: BOLUM_TANIMLARI, log: () => {},
+      mod: 'ileri', soruUretici, masterPlanBolumleri: BOLUM_TANIMLARI, log: () => {},
     })
     adim++
     if (adim > maxAdim) throw new Error(`tumYuruyusuTamamla: ${maxAdim} adımda bitmedi (son durdu: ${sonuc.durdu})`)
@@ -159,6 +160,33 @@ bolum('T — İddia-statüsü: etiketsiz satır mekanik olarak REDDEDİLİR')
 `
   const g3 = bolumKapidanGecerMi('urun-tanimi', tabloIcerik)
   ok('T: tablo BAŞLIK satırı (kolon adları) etiketsiz olsa da kapıdan GEÇER (iddia değildir)', g3.gecti)
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+bolum('BT — Bütünlük (completeness): kırpılmış bölüm REDDEDİLİR, tam bölüm GEÇER')
+{
+  // NEGATİF (görevin zorunlu kıldığı): gerçek gözlemlenen vakanın küçültülmüş temsili — başlık +
+  // ilk kalem (başlangıç maliyeti) kırpılmış, ilk hayatta kalan satır cümle-ortası bir parça,
+  // GERİYE KALAN kuyruk kendi içinde tam etiketli (satır-etiketi kuralından TEK BAŞINA GEÇERDİ).
+  const gKirpik = bolumKapidanGecerMi('butce-finansal', BOZUK_BOLUM.butceKirpilmis)
+  ok('BT-NEG: kırpılmış bölüm (eksik ilk kalem + cümle-ortası ilk satır) ARTIK REDDEDİLİR', !gKirpik.gecti, gKirpik.neden ?? '')
+  ok('BT-NEG: red nedeni bütünlük sorununu işaret eder (konu-eksik VEYA ilk-satır-parça)',
+    /beklenen konu\(lar\)|ilk satır/.test(gKirpik.neden ?? ''), gKirpik.neden ?? '')
+
+  // Yalnız satır-etiketi kuralına göre bu kuyruk GEÇERDİ (regresyon-kanıtı: eski kural TEK
+  // BAŞINA bunu yakalayamazdı — govde kontrolü BİLEREK doğrudan çağrılıyor, gate'in tamamı değil).
+  const govdeYalniz = bolumIcerikGovdesiKontrolEt(BOZUK_BOLUM.butceKirpilmis, { iddiaMuaf: false })
+  ok('BT-NEG (regresyon-kanıtı): eski satır-etiketi kuralı TEK BAŞINA bu kırpılmayı YAKALAYAMAZDI (kuyruk tam etiketli)', govdeYalniz.gecti)
+
+  // POZİTİF (kontrol): AYNI bölümün TAM/enriched hâli hâlâ normal GEÇER — yeni kontrol
+  // legitimately-complete içeriği yanlış-reddetmiyor.
+  const gTam = bolumKapidanGecerMi('butce-finansal', FIKSTUR_BOLUM['butce-finansal'])
+  ok('BT-POS: AYNI bölümün TAM hâli (başlık + tüm kalemler + düzgün ilk satır) normal GEÇER', gTam.gecti, gTam.neden ?? '')
+
+  // Tüm 13 asıl bölüm fikstürü (F0 zaten bunu doğruluyor, burada AÇIKÇA bütünlük-kontrolü
+  // AÇISINDAN da tekrar teyit) — hiçbiri minBayt/ilk-satır/konu kontrolüyle yanlış-reddedilmiyor.
+  ok('BT-POS: TÜM geçerli bölüm fikstürleri bütünlük kontrolünden de sorunsuz geçiyor (yanlış-red YOK)',
+    Object.entries(FIKSTUR_BOLUM).every(([id, icerik]) => bolumKapidanGecerMi(id, icerik).gecti))
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -270,6 +298,49 @@ bolum('G — Bölüm-seviyesi --geri (spiral, stage-seviyesiyle AYNI birimGeriDo
     try { bolumeGeriDon(stateYukle(ns, id), 'bilinmeyen-bolum-xyz') } catch { hataAtildi = true }
     ok('G: bilinmeyen hedef REDDEDİLİR', hataAtildi)
     ok('G: geçersiz geri-dönüş state\'i DEĞİŞTİRMEDİ (persist edilmedi)', JSON.stringify(stateYukle(ns, id)) === oncekiJSON)
+  } finally { temizle(ns) }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+bolum('SS — --geri (regenerate) sorular_surum\'u DOĞRU sıfırlar (yalnız hedef birim, başkasına DOKUNMAZ)')
+{
+  // GERÇEK (null OLMAYAN) sorular_surum üretmek için GERÇEK varsayilanSoruUretici kullanılır —
+  // D1/D2/G ailesinin soruUretici:null deseninin AKSİNE (orada sorular_surum zaten hep null'dur,
+  // reset'in bir şey yapıp yapmadığını KANITLAYAMAZ). Not: FIKSTUR_BOLUM operator-beyan/operator-
+  // onayli-tahmin etiketleriyle DOLU — gerçek üretici bunlar için de (onemli-tier, blocker DEĞİL)
+  // sorular üretir; hiçbiri burada yanıtlanmadığından TÜM yürüyüş sonunda 'donduruldu'da (Layer-2:
+  // yanıtsız onemli-tier sorular) durur — bu test için ÖNEMSİZ (PE testi bu senaryoyu AYRICA, tam
+  // yanıt-döngüsüyle sınıyor). Burada tek gereken: pazar-analizi'nin KENDİSİ 'gecti' olsun + GERÇEK
+  // bir sorular_surum alsın — ikisi de bölüm kendi kapısından geçer geçmez, Layer-2'den BAĞIMSIZ olur.
+  const { ns, id } = yeniNs('ss-reset')
+  try {
+    dortAsamaTamamlaSeed(ns, id)
+    await tumYuruyusuTamamla(ns, id, bolumluExecutor(), { soruUretici: varsayilanSoruUretici, maxAdim: 60 })
+
+    let state = stateYukle(ns, id)
+    ok('SS: kurulum — pazar-analizi kendi kapısından GEÇTİ (gerçek soru-üretimi altında)',
+      state.asamalar['master-plan'].bolumler['pazar-analizi'].durum === 'gecti')
+    const pazarOnce = state.asamalar['master-plan'].bolumler['pazar-analizi'].sorular_surum
+    const rekabetOnce = state.asamalar['master-plan'].bolumler['rekabet-konumlandirma'].sorular_surum
+    ok('SS: kurulum — pazar-analizi GERÇEK (null OLMAYAN) bir sorular_surum taşıyor', pazarOnce != null, `sorular_surum=${pazarOnce}`)
+    ok('SS: kurulum — rekabet-konumlandirma DA GERÇEK bir sorular_surum taşıyor (karşılaştırma tabanı)', rekabetOnce != null, `sorular_surum=${rekabetOnce}`)
+
+    bolumeGeriDon(state, 'pazar-analizi')
+    statePersist(ns, state)
+    state = stateYukle(ns, id)
+
+    ok('SS: --geri SONRASI pazar-analizi.sorular_surum NULL\'A SIFIRLANDI (eski sürümün soru paketine artık işaret ETMİYOR)',
+      state.asamalar['master-plan'].bolumler['pazar-analizi'].sorular_surum === null)
+    ok('SS: --geri SONRASI pazar-analizi.durum=bekliyor (yeniden koşacak)',
+      state.asamalar['master-plan'].bolumler['pazar-analizi'].durum === 'bekliyor')
+    ok('SS: DOKUNULMAYAN rekabet-konumlandirma\'nın sorular_surum\'u KORUNDU (yalnız hedef birim resetlenir, başkası KLOBLANMAZ)',
+      state.asamalar['master-plan'].bolumler['rekabet-konumlandirma'].sorular_surum === rekabetOnce)
+
+    // birimAcikDurum'un YENİ (null) durumu doğru yorumladığını da doğrudan kanıtla: sorular_surum
+    // null iken 'engelli'/açık-soru YOKTUR (eskiyi hayaletçe taşımaz) — bkz birimAcikDurum ss==null dalı.
+    const dPazar = birimAcikDurum(ns, state.asamalar['master-plan'].bolumler, 'pazar-analizi')
+    ok('SS: sıfırlama SONRASI birimAcikDurum bu birim için "engelsiz/boş" görür (eski paketi HAYALETÇE taşımıyor)',
+      dPazar.engelli === false && dPazar.acik.length === 0 && dPazar.sorularSurum === null)
   } finally { temizle(ns) }
 }
 

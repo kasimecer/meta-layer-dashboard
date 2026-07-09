@@ -67,6 +67,8 @@ Başlangıç maliyeti tedarikçi teklifiyle doğrulanmıştır. [dogrulandi:teda
 Aylık operasyonel gider tahmini operatör tarafından onaylanmıştır. [operator-onayli-tahmin:opex-tahmini] [tip:icbilgi]
 
 Başabaş noktası, doğrulanmış başlangıç maliyeti ve onaylı opex tahminine dayanır. [operator-onayli-tahmin:basabas-hesabi] [tip:icbilgi]
+
+Nakit akışı projeksiyonu, başabaş noktasına kadarki dönemi operatör onaylı tahminle kapsar. [operator-onayli-tahmin:nakit-akisi-tahmini] [tip:icbilgi]
 `,
 
   'gtm-pazarlama': `# Pazara Giriş ve Pazarlama/Reklam Operasyonları — Test Projesi
@@ -100,6 +102,8 @@ Vergi yükümlülükleri aynı kaynakta tanımlanmıştır. [dogrulandi:ticaret-
 `,
 
   'risk-varsayimlar': `# Riskler ve Varsayımlar — Test Projesi
+
+En büyük risk, tedarikçi sürekliliğinin kesintiye uğramasıdır. [operator-beyan:risk-tedarik-sureklilik]
 
 En kritik varsayım, kullanıcının kurulumsuz forma alışacağıdır. [operator-beyan:varsayim-benimseme]
 
@@ -194,6 +198,16 @@ Toplam adreslenebilir pazar sektör raporuyla doğrulanmıştır. [dogrulandi:se
 Hedef segment, düşük-bakım çözümlere açık şehirli yetişkinlerden oluşuyor. [dogrulandi:sektor-raporu-2026] [tip:masabasi]
 
 Kullanıcı başına ortalama yıllık harcama HENÜZ doğrulanamadı. [acik-soru:kullanici-basi-harcama] [tip:masabasi]
+`,
+
+  // BÜTÜNLÜK testi (gerçek gözlemlenen vaka): bütçe/finansal bölüm KIRPILDI — başlık VE ilk
+  // kalem (başlangıç maliyeti) tamamen eksik, ilk hayatta kalan satır cümle-ortası bir parça
+  // (küçük harfle başlıyor, önceki — artık var olmayan — satırın devamı). GERİYE KALAN kuyruk
+  // KENDİ İÇİNDE tam etiketli (satır-etiketi kuralından GEÇER) — bu TAM OLARAK 2026-07-08'de
+  // gözlemlenen 4436-bayt kırpılma vakasının küçültülmüş bir temsili (bkz planlamaBolumButunluk.mjs).
+  butceKirpilmis: `tedarikçi teklifiyle doğrulanmıştır ve bu maliyet kalemi ayrıca operatör tarafından da teyit edilmiştir. [dogrulandi:tedarikci-teklifi-2026] [tip:icbilgi]
+
+Aylık operasyonel gider tahmini operatör tarafından onaylanmıştır. [operator-onayli-tahmin:opex-tahmini] [tip:icbilgi]
 `,
 
   // TIP testi: urun-tanimi'nde bir [dogrulandi:...] iddiası co-located [tip:...] TAŞIMIYOR —

@@ -74,6 +74,18 @@ export function birimlerBayat(sira, birimler) {
 // `tamamlandiDegeri` verilirse ve ebeveyn[aktifAlan] o değere eşitse, "mevcut konum" sıranın
 // SONU sayılır (ör. stage-seviyesinde 'tamamlandi'). Geçersiz hedef HATA fırlatır, hiçbir şeyi
 // değiştirmez. Hedefi yeniden-açar (durum='bekliyor'); surum/cikti_pointer KORUNUR.
+//
+// sorular_surum BİLEREK null'a resetlenir (KORUNMAZ — surum/cikti_pointer'ın AKSİNE): bu alan
+// ESKİ (yeniden-açılmadan ÖNCEKİ) sürümün soru/yanıt paketini işaret eder — birimKostur yeniden
+// çalıştığında zaten YENİ bir paket üretip bu alanı doğru değere ayarlayacaktır (bkz
+// birimSorulariUretVeYaz çağrısı), ama executor İLK denemede BAŞARISIZ olursa (hata fırlatırsa)
+// birimKostur o satıra hiç ULAŞAMADAN erken döner — bu ARADA (ve executor tekrar başarılı oluncaya
+// kadar) state, artık YOK OLMAK ÜZERE olan içeriğin ESKİ sorular_surum'unu taşımaya devam ederdi
+// (gözlemlenen gerçek belirti: "regenerate path does not reset sorular_surum correctly"). BURADA
+// SIFIRLAMAK, birimAcikDurum'un (ss==null → bos/engelsiz) bu geçiş penceresinde YANLIŞ biçimde
+// eskiye-ait açık/blocker soru göstermesini yapısal olarak engeller. YALNIZ bu fonksiyon (regenerate
+// yolu — hem geriAsamaya HEM bolumeGeriDon AYNI çekirdeği kullanır) sıfırlar; normal ilerleme
+// (birimKostur) kendi sorular_surum'unu kendi tazeler, burada DOKUNULMAZ.
 export function birimGeriDon(sira, birimler, ebeveyn, aktifAlan, hedef, tamamlandiDegeri = null) {
   const hedefIdx = sira.indexOf(hedef)
   if (hedefIdx === -1) {
@@ -95,6 +107,7 @@ export function birimGeriDon(sira, birimler, ebeveyn, aktifAlan, hedef, tamamlan
   hedefState.durum = 'bekliyor'
   hedefState.kapi_sonuc = null
   hedefState.blok_nedeni = null
+  hedefState.sorular_surum = null
   ebeveyn[aktifAlan] = hedef
   return ebeveyn
 }
