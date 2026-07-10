@@ -34,10 +34,15 @@ const TOPLANTI_TASK  = 'btest-olay-task-002'
 const DESTEK_TASK    = 'btest-olay-task-003'
 
 // ── Baseline (izolasyon teyidi) ───────────────────────────────────────────────
+// cards-baris.json / operator-baris.json: baris retire edilebilir (bkz meta-kanal.md
+// 2026-07-10 baris-retirement-diagnosis-only) — existsSync guard, yoksa null (izolasyon
+// kontrolü aşağıda N/A olarak atlanır, testi çökertmez).
+const CARDS_BARIS_PATH = join(PUBLIC_DIR, 'cards-baris.json')
+const OPERATOR_BARIS_PATH = join(PUBLIC_DIR, 'operator-baris.json')
 const BASELINE = {
-  baris: readFileSync(join(PUBLIC_DIR, 'cards-baris.json'), 'utf8'),
+  baris: existsSync(CARDS_BARIS_PATH) ? readFileSync(CARDS_BARIS_PATH, 'utf8') : null,
   registry: readFileSync(join(PUBLIC_DIR, 'registry.json'), 'utf8'),
-  operatorBaris: readFileSync(join(PUBLIC_DIR, 'operator-baris.json'), 'utf8'),
+  operatorBaris: existsSync(OPERATOR_BARIS_PATH) ? readFileSync(OPERATOR_BARIS_PATH, 'utf8') : null,
   cardData: readFileSync(join(PUBLIC_DIR, 'card-data.json'), 'utf8'),
 }
 
@@ -438,9 +443,17 @@ assert(existsSync(operatorBoardYolu), 'output/operator-board-olay.json yazıldı
 // ── 5) Regresyon: gerçek dosyalar değişmedi ───────────────────────────────────
 section('5) Regresyon: public/ baseline dosyaları değişmedi')
 
-assert(readFileSync(join(PUBLIC_DIR, 'cards-baris.json'), 'utf8') === BASELINE.baris, 'cards-baris.json DEĞİŞMEDİ')
+if (BASELINE.baris !== null) {
+  assert(readFileSync(join(PUBLIC_DIR, 'cards-baris.json'), 'utf8') === BASELINE.baris, 'cards-baris.json DEĞİŞMEDİ')
+} else {
+  console.log('  (cards-baris.json yok — DEĞİŞMEDİ kontrolü N/A, atlandı)')
+}
 assert(readFileSync(join(PUBLIC_DIR, 'registry.json'), 'utf8') === BASELINE.registry, 'registry.json DEĞİŞMEDİ')
-assert(readFileSync(join(PUBLIC_DIR, 'operator-baris.json'), 'utf8') === BASELINE.operatorBaris, 'operator-baris.json DEĞİŞMEDİ')
+if (BASELINE.operatorBaris !== null) {
+  assert(readFileSync(join(PUBLIC_DIR, 'operator-baris.json'), 'utf8') === BASELINE.operatorBaris, 'operator-baris.json DEĞİŞMEDİ')
+} else {
+  console.log('  (operator-baris.json yok — DEĞİŞMEDİ kontrolü N/A, atlandı)')
+}
 assert(readFileSync(join(PUBLIC_DIR, 'card-data.json'), 'utf8') === BASELINE.cardData, 'card-data.json DEĞİŞMEDİ')
 
 const registry = JSON.parse(BASELINE.registry)

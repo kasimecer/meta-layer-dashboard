@@ -21,10 +21,15 @@ const BUILD_TEST_ROOT = join(PROJELER_ROOT, '_build-test')
 const PUBLIC_DIR = join(__dirname, '..', 'public')
 
 // ── Baseline (izolasyon teyidi) ───────────────────────────────────────────────
+// cards-baris.json / operator-baris.json: baris retire edilebilir (bkz meta-kanal.md
+// 2026-07-10 baris-retirement-diagnosis-only) — existsSync guard, yoksa null (izolasyon
+// kontrolü aşağıda N/A olarak atlanır, testi çökertmez).
+const CARDS_BARIS_PATH = join(PUBLIC_DIR, 'cards-baris.json')
+const OPERATOR_BARIS_PATH = join(PUBLIC_DIR, 'operator-baris.json')
 const BASELINE = {
-  baris: readFileSync(join(PUBLIC_DIR, 'cards-baris.json'), 'utf8'),
+  baris: existsSync(CARDS_BARIS_PATH) ? readFileSync(CARDS_BARIS_PATH, 'utf8') : null,
   registry: readFileSync(join(PUBLIC_DIR, 'registry.json'), 'utf8'),
-  operatorBaris: readFileSync(join(PUBLIC_DIR, 'operator-baris.json'), 'utf8'),
+  operatorBaris: existsSync(OPERATOR_BARIS_PATH) ? readFileSync(OPERATOR_BARIS_PATH, 'utf8') : null,
   cardData: readFileSync(join(PUBLIC_DIR, 'card-data.json'), 'utf8'),
 }
 
@@ -75,11 +80,21 @@ console.log('  _build-test/ oluşturuldu')
 // ── 1) Bölücü: master-plan-v2.md → build-task kartları ───────────────────────
 section('1) Master-plan bölücü')
 
-const MASTER_PLAN_YOL = join(PROJELER_ROOT, 'baris', 'master-plan-v2.md')
-assert(existsSync(MASTER_PLAN_YOL), 'master-plan-v2.md erişilebilir')
+// Sentetik master-plan fikstürü — canlı proje verisine bağımlı DEĞİL (herhangi bir projenin
+// var/yok olmasından etkilenmez); masterPlanBol'un 3 çıkarım deseninin (checkbox · numaralı-bold
+// · inline-yapılacaklar) hepsini kapsar (bkz masterPlanBolucu.mjs, proje-agnostik).
+const MASTER_PLAN_SENTETIK = `## Yapılacaklar
 
-const masterPlanIcerik = readFileSync(MASTER_PLAN_YOL, 'utf8')
-const kartlar = masterPlanBol(masterPlanIcerik, { projeId: 'btest', kaynak: 'master-plan-v2.md' })
+- [x] İlk adım tamamlandı
+- [ ] İkinci adım bekliyor
+- [ ] Üçüncü adım bekliyor
+
+1. **Planlama başlığı:** kapsamı belirle
+
+**Sonraki yapılacaklar:** görev A · görev B · görev C
+`
+
+const kartlar = masterPlanBol(MASTER_PLAN_SENTETIK, { projeId: 'btest', kaynak: 'sentetik-master-plan' })
 
 assert(kartlar.length >= 1, `bölücü ≥1 kart üretdi (üretilen: ${kartlar.length})`)
 
@@ -378,29 +393,42 @@ assert(yayin2.atlandı === true, 'fasilitasyonuYayinla idempotent (ikinci çağr
 // ── 10) İzolasyon teyidi ──────────────────────────────────────────────────────
 section('10) İzolasyon teyidi: canlı veriler dokunulmadı')
 
-assert(
-  readFileSync(join(PUBLIC_DIR, 'cards-baris.json'), 'utf8') === BASELINE.baris,
-  'cards-baris.json DEĞİŞMEDİ'
-)
+if (BASELINE.baris !== null) {
+  assert(
+    readFileSync(join(PUBLIC_DIR, 'cards-baris.json'), 'utf8') === BASELINE.baris,
+    'cards-baris.json DEĞİŞMEDİ'
+  )
+} else {
+  console.log('  (cards-baris.json yok — DEĞİŞMEDİ kontrolü N/A, atlandı)')
+}
 assert(
   readFileSync(join(PUBLIC_DIR, 'registry.json'), 'utf8') === BASELINE.registry,
   'registry.json DEĞİŞMEDİ'
 )
-assert(
-  readFileSync(join(PUBLIC_DIR, 'operator-baris.json'), 'utf8') === BASELINE.operatorBaris,
-  'operator-baris.json DEĞİŞMEDİ'
-)
+if (BASELINE.operatorBaris !== null) {
+  assert(
+    readFileSync(join(PUBLIC_DIR, 'operator-baris.json'), 'utf8') === BASELINE.operatorBaris,
+    'operator-baris.json DEĞİŞMEDİ'
+  )
+} else {
+  console.log('  (operator-baris.json yok — DEĞİŞMEDİ kontrolü N/A, atlandı)')
+}
 assert(
   readFileSync(join(PUBLIC_DIR, 'card-data.json'), 'utf8') === BASELINE.cardData,
   'card-data.json DEĞİŞMEDİ'
 )
 
-// Canlı projeler/baris/ altında _build-test yok
-const barisAltDizinler = readdirSync(join(PROJELER_ROOT, 'baris'))
-assert(
-  !barisAltDizinler.some(d => d === '_build-test'),
-  'projeler/baris/ altında _build-test dizini YOK'
-)
+// Canlı projeler/baris/ altında _build-test yok (baris yoksa N/A — atlanır)
+const barisProjeDir = join(PROJELER_ROOT, 'baris')
+if (existsSync(barisProjeDir)) {
+  const barisAltDizinler = readdirSync(barisProjeDir)
+  assert(
+    !barisAltDizinler.some(d => d === '_build-test'),
+    'projeler/baris/ altında _build-test dizini YOK'
+  )
+} else {
+  console.log('  (projeler/baris/ yok — izolasyon kontrolü N/A, atlandı)')
+}
 
 // _build-test/ yalnız projeler/ altında
 assert(existsSync(BUILD_TEST_ROOT), '_build-test/ projeler/ altında var')

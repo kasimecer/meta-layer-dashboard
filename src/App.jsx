@@ -13,13 +13,13 @@ import SoruYanitView from './views/SoruYanitView.jsx'
 function rota() {
   const h = (window.location.hash || '').replace(/^#\/?/, '')
   const [view, projeId] = h.split('/')
-  return { view: view || 'portfoy', projeId: projeId || 'baris' }
+  return { view: view || 'portfoy', projeId: projeId || 'mustafa' }
 }
 
 const SEKMELER = [
   { key: 'portfoy', label: 'Portföy',    hash: '#/portfoy' },
-  { key: 'proje',   label: 'Proje',      hash: '#/proje/baris' },
-  { key: 'partner', label: 'Partner',    hash: '#/partner/baris' },
+  { key: 'proje',   label: 'Proje',      hash: '#/proje/mustafa' },
+  { key: 'partner', label: 'Partner',    hash: '#/partner/mustafa' },
   { key: 'baslat',  label: '+ Yeni',     hash: '#/baslat' },
 ]
 

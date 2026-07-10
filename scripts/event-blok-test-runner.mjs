@@ -27,8 +27,11 @@ const TEST_ROOT = join(PROJELER_ROOT, '_build-test-event-blok')
 const PUBLIC_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'public')
 
 // ── Baseline ──────────────────────────────────────────────────────────────────
+// cards-baris.json: baris retire edilebilir (bkz meta-kanal.md 2026-07-10
+// baris-retirement-diagnosis-only) — existsSync guard, yoksa null.
+const CARDS_BARIS_PATH = join(PUBLIC_DIR, 'cards-baris.json')
 const BASELINE = {
-  baris: readFileSync(join(PUBLIC_DIR, 'cards-baris.json'), 'utf8'),
+  baris: existsSync(CARDS_BARIS_PATH) ? readFileSync(CARDS_BARIS_PATH, 'utf8') : null,
   registry: readFileSync(join(PUBLIC_DIR, 'registry.json'), 'utf8'),
 }
 
@@ -358,10 +361,14 @@ assert(r5.sebep.includes('temizlendi'), 'helper: açma sebebi mesajı doğru')
 // ── 7) Regresyon ──────────────────────────────────────────────────────────────
 section('7) Regresyon: canlı veriler dokunulmadı')
 
-assert(
-  readFileSync(join(PUBLIC_DIR, 'cards-baris.json'), 'utf8') === BASELINE.baris,
-  'cards-baris.json DEĞİŞMEDİ'
-)
+if (BASELINE.baris !== null) {
+  assert(
+    readFileSync(join(PUBLIC_DIR, 'cards-baris.json'), 'utf8') === BASELINE.baris,
+    'cards-baris.json DEĞİŞMEDİ'
+  )
+} else {
+  console.log('  (cards-baris.json yok — DEĞİŞMEDİ kontrolü N/A, atlandı)')
+}
 assert(
   readFileSync(join(PUBLIC_DIR, 'registry.json'), 'utf8') === BASELINE.registry,
   'registry.json DEĞİŞMEDİ'

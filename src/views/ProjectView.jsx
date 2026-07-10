@@ -103,7 +103,7 @@ function BoardKolon({ label, items }) {
   )
 }
 
-export default function ProjectView({ projeId = 'baris' }) {
+export default function ProjectView({ projeId = 'mustafa' }) {
   const [proje, setProje] = useState(undefined)   // undefined = yükleniyor, null = bulunamadı
   const [kartlar, setKartlar] = useState(null)
   const [operator, setOperator] = useState(null)

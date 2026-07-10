@@ -149,34 +149,6 @@ if (existsSync(registryPath)) {
 // ============================================================
 // 2) BARIŞ PARTNER ÇIKTILARI (partner-view DOLU) — slice-1, değişmedi
 // ============================================================
-const baris = join(projelerDir, 'baris')
-const signal = okJSON(join(baris, 'signal.json'))
-
-let partnerOzet = null
-const kartPath = join(baris, 'kart.md')
-if (existsSync(kartPath)) partnerOzet = readFileSync(kartPath, 'utf8')
-
-let arsivLink = null
-const arsivPath = join(baris, 'arsiv')
-if (existsSync(arsivPath)) {
-  const files = readdirSync(arsivPath).filter(f => !f.startsWith('.')).sort()
-  if (files.length > 0) arsivLink = files[files.length - 1]
-}
-
-const cardData = {
-  proje: signal.proje,
-  tarih: signal.tarih,
-  momentum: signal.momentum,
-  son_ilerleme: signal.son_ilerleme,
-  sonraki_kritik_adim: signal.sonraki_kritik_adim,
-  bekleyen_insan_girdisi: signal.bekleyen_insan_girdisi ?? null,
-  partner_ozet: partnerOzet,
-  arsiv_link: arsivLink,
-}
-writeFileSync(join(outDir, 'card-data.json'), JSON.stringify(cardData, null, 2), 'utf8')
-console.log('card-data.json yazıldı')
-
-// yolculuk-partner.md → KART ŞEMASI v1 → cards-baris.json
 function parseYolculuk(content) {
   const kartlar = []
   const blocks = content.split(/(?=^## KART \d)/m)
@@ -212,17 +184,54 @@ function toSchemaV1(k, tarih) {
   }
 }
 
-const yolculukPath = join(baris, 'yolculuk-partner.md')
-if (existsSync(yolculukPath)) {
-  const raw = readFileSync(yolculukPath, 'utf8')
-  const bazKartlar = parseYolculuk(raw).map(k => toSchemaV1(k, signal.tarih))
-  const kartlar = [...bazKartlar, ...sentezKartlariOku(baris)]
-  writeFileSync(join(outDir, 'cards-baris.json'), JSON.stringify({ proje: signal.proje, kartlar }, null, 2), 'utf8')
-  console.log(`cards-baris.json yazıldı (${kartlar.length} kart, şema v1)`)
-  const eski = join(outDir, 'journey-data.json')
-  if (existsSync(eski)) { rmSync(eski); console.log('journey-data.json kaldırıldı') }
+const baris = join(projelerDir, 'baris')
+const barisSignalPath = join(baris, 'signal.json')
+
+// existsSync guard: proje dizini (baris ya da ileride retire edilecek başka biri) yoksa
+// bu bölüm sessizce atlanır — korumasız okuma TÜM build script'ini çökertiyordu (bkz
+// meta-kanal.md 2026-07-10 baris-retirement-diagnosis-only bulgu #2).
+if (existsSync(barisSignalPath)) {
+  const signal = okJSON(barisSignalPath)
+
+  let partnerOzet = null
+  const kartPath = join(baris, 'kart.md')
+  if (existsSync(kartPath)) partnerOzet = readFileSync(kartPath, 'utf8')
+
+  let arsivLink = null
+  const arsivPath = join(baris, 'arsiv')
+  if (existsSync(arsivPath)) {
+    const files = readdirSync(arsivPath).filter(f => !f.startsWith('.')).sort()
+    if (files.length > 0) arsivLink = files[files.length - 1]
+  }
+
+  const cardData = {
+    proje: signal.proje,
+    tarih: signal.tarih,
+    momentum: signal.momentum,
+    son_ilerleme: signal.son_ilerleme,
+    sonraki_kritik_adim: signal.sonraki_kritik_adim,
+    bekleyen_insan_girdisi: signal.bekleyen_insan_girdisi ?? null,
+    partner_ozet: partnerOzet,
+    arsiv_link: arsivLink,
+  }
+  writeFileSync(join(outDir, 'card-data.json'), JSON.stringify(cardData, null, 2), 'utf8')
+  console.log('card-data.json yazıldı')
+
+  // yolculuk-partner.md → KART ŞEMASI v1 → cards-baris.json
+  const yolculukPath = join(baris, 'yolculuk-partner.md')
+  if (existsSync(yolculukPath)) {
+    const raw = readFileSync(yolculukPath, 'utf8')
+    const bazKartlar = parseYolculuk(raw).map(k => toSchemaV1(k, signal.tarih))
+    const kartlar = [...bazKartlar, ...sentezKartlariOku(baris)]
+    writeFileSync(join(outDir, 'cards-baris.json'), JSON.stringify({ proje: signal.proje, kartlar }, null, 2), 'utf8')
+    console.log(`cards-baris.json yazıldı (${kartlar.length} kart, şema v1)`)
+    const eski = join(outDir, 'journey-data.json')
+    if (existsSync(eski)) { rmSync(eski); console.log('journey-data.json kaldırıldı') }
+  } else {
+    console.log('yolculuk-partner.md bulunamadı — cards-baris.json atlandı')
+  }
 } else {
-  console.log('yolculuk-partner.md bulunamadı — cards-baris.json atlandı')
+  console.log('signal.json bulunamadı (projeler/baris) — §2 (baris partner çıktıları) atlandı')
 }
 
 // ============================================================
