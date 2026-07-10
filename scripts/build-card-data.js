@@ -5,6 +5,7 @@ import { META_DATA_ROOT } from './config.js'
 import { stateYukle, bayatAsamalar } from '../tools/planlamaDurumMakinesiV2.mjs'
 import { sorulariOku, sorulariDogrula, VERI_KARARLARI } from '../tools/planlamaSorular.mjs'
 import { acikSoruDurum } from '../tools/planlamaDurumOzeti.mjs'
+import { projeKartlariniTuret, projeDokumanlariniTuret, dosyaHref } from '../tools/planlamaKartTuretici.mjs'
 
 // ── Karar-fasilitasyon eklentileri ──────────────────────────────────────────
 // sentez-kartlar/<karar_id>.json → partner-görünür kartlar (render-hazır v1).
@@ -120,9 +121,13 @@ if (existsSync(registryPath)) {
     const sp = join(pdir, 'signal.json')
     if (!existsSync(sp)) continue
     let s; try { s = okJSON(sp) } catch { continue }
+    // href = tıklanabilir file:// URL (gerçekten diskte var olan dosyalar); önceki şema
+    // (relative 'yol') hiçbir zaman servis edilmeyen bir yola işaret ediyordu (kırık link) —
+    // bkz tools/planlamaKartTuretici.mjs dosyaHref (planlama-projeleri ile AYNI mekanizma).
     const dokumanlar = readdirSync(pdir)
       .filter(f => f.endsWith('.md')).sort()
-      .map(f => ({ ad: f, yol: `projeler/${p.id}/${f}` }))
+      .map(f => ({ ad: f, asama: null, href: dosyaHref(join(pdir, f)) }))
+      .filter(d => d.href)
     const taslaklar = fasilitasyonTaslakMetalariOku(pdir)
     const operator = {
       proje: p.id,
@@ -323,11 +328,33 @@ if (existsSync(projelerDir)) {
     .filter(id => existsSync(join(projelerDir, id, 'planlama-durum.json')))
 
   let sorularYazilanSayisi = 0
+  let kartYazilanSayisi = 0
+  let operatorYazilanSayisi = 0
   for (const id of adaylar) {
     try {
       const nsYolu = join(projelerDir, id)
       const state = stateYukle(nsYolu, id)
       const bayatlar = bayatAsamalar(state)
+
+      // cards-<id>.json + operator-<id>.json — GERÇEK pipeline artefaktlarından türetilir
+      // (elle bakımlı signal.json/cards-<id>.json YERİNE; bkz tools/planlamaKartTuretici.mjs).
+      // Bu build her koşumda YENİDEN türetir → "backfill" ayrı bir araç DEĞİL, bu script'in
+      // kendisi (npm run build-data): eski projeler için de tekrar koşmak yeter.
+      const { kartlar } = projeKartlariniTuret(nsYolu, id, state)
+      writeFileSync(join(outDir, `cards-${id}.json`), JSON.stringify({ proje_id: id, kartlar }, null, 2), 'utf8')
+      kartYazilanSayisi++
+
+      // operator-<id>.json: yalnız signal.json YOKSA (o projede zaten §1 yazdı — dokunma).
+      if (!existsSync(join(nsYolu, 'signal.json'))) {
+        const dokumanlar = projeDokumanlariniTuret(nsYolu, id, state)
+        writeFileSync(join(outDir, `operator-${id}.json`), JSON.stringify({
+          proje: id,
+          momentum: null, son_ilerleme: null, sonraki_kritik_adim: null, bekleyen_insan_girdisi: null,
+          acik_bayraklar: [],
+          dokumanlar,
+        }, null, 2), 'utf8')
+        operatorYazilanSayisi++
+      }
 
       const anlikGoruntu = {
         proje_id: id,
@@ -376,6 +403,8 @@ if (existsSync(projelerDir)) {
     }
   }
   if (sorularYazilanSayisi) console.log(`sorular-<id>.json yazıldı (${sorularYazilanSayisi} proje, registry-bağımsız)`)
+  if (kartYazilanSayisi) console.log(`cards-<id>.json türetildi (${kartYazilanSayisi} proje, gerçek pipeline artefaktlarından)`)
+  if (operatorYazilanSayisi) console.log(`operator-<id>.json türetildi (${operatorYazilanSayisi} proje, doküman pointer'ları)`)
 } else {
   console.log('projeler/ dizini bulunamadı — soru anlık-görüntüsü atlandı')
 }

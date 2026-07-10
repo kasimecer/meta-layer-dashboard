@@ -37,8 +37,15 @@ function FlagChip({ children }) {
 function DocRow({ d }) {
   return (
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: '5px 0', borderBottom: '1px solid #f4f4f5' }}>
-      <span style={{ fontSize: 13, fontWeight: 600, color: '#3f3f46' }}>{d.ad}</span>
-      <span style={{ fontSize: 11, color: '#a1a1aa', fontFamily: 'ui-monospace, monospace' }}>{d.yol}</span>
+      {d.href ? (
+        <a href={d.href} target="_blank" rel="noopener noreferrer"
+          style={{ fontSize: 13, fontWeight: 600, color: '#4338ca', textDecoration: 'none' }}>
+          {d.ad}
+        </a>
+      ) : (
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#3f3f46' }}>{d.ad}</span>
+      )}
+      {d.asama && <span style={{ fontSize: 11, color: '#a1a1aa', fontFamily: 'ui-monospace, monospace' }}>{d.asama}</span>}
     </div>
   )
 }
@@ -263,7 +270,7 @@ export default function ProjectView({ projeId = 'baris' }) {
       {/* OPERATÖR-EK: kanonik doküman pointer'ları (Drive yolları) */}
       {operator?.dokumanlar?.length > 0 && (
         <Section title="dokümanlar — Drive (operatör)">
-          <div>{operator.dokumanlar.map(d => <DocRow key={d.yol} d={d} />)}</div>
+          <div>{operator.dokumanlar.map(d => <DocRow key={d.href ?? d.ad} d={d} />)}</div>
         </Section>
       )}
 
