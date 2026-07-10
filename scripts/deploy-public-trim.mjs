@@ -17,7 +17,7 @@ const distDir = join(__dirname, '..', 'dist')
 // Widen by adding an id here; err toward exclusion when unsure (see task notes in worker/README.md).
 const PUBLIC_PARTNER_IDS = []
 
-const ALWAYS_KEEP = new Set(['index.html', 'assets', 'card-data.json'])
+const ALWAYS_KEEP = new Set(['index.html', 'assets'])
 const partnerCardFiles = new Set(PUBLIC_PARTNER_IDS.map(id => `cards-${id}.json`))
 
 const kept = [], removed = []
