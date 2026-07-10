@@ -15,7 +15,7 @@ const distDir = join(__dirname, '..', 'dist')
 
 // Real, invited partners only — not-yet-invited/demo/test ids stay excluded by default.
 // Widen by adding an id here; err toward exclusion when unsure (see task notes in worker/README.md).
-const PUBLIC_PARTNER_IDS = ['baris']
+const PUBLIC_PARTNER_IDS = []
 
 const ALWAYS_KEEP = new Set(['index.html', 'assets', 'card-data.json'])
 const partnerCardFiles = new Set(PUBLIC_PARTNER_IDS.map(id => `cards-${id}.json`))
