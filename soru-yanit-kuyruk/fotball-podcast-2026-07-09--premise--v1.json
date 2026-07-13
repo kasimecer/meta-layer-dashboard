@@ -1,0 +1,16 @@
+{
+  "projeId": "fotball-podcast-2026-07-09",
+  "asama": "premise",
+  "surum": 1,
+  "soruImza": "80cbfac0a2679c2b",
+  "yanitlar": [
+    {
+      "anahtar": "veri:kitle-arastirmasi-asama-2",
+      "karar": "tahmin"
+    },
+    {
+      "anahtar": "veri:operator-onayli",
+      "karar": "tahmin"
+    }
+  ]
+}
