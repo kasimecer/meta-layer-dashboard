@@ -1,0 +1,21 @@
+{
+  "projeId": "fotball-podcast-2026-07-09",
+  "asama": "genesis",
+  "surum": 2,
+  "soruImza": "a8c26dd05400f6ce",
+  "yanitlar": [
+    {
+      "anahtar": "secim:aday",
+      "atlandi": true,
+      "gerekce": "Sonra bulalım."
+    },
+    {
+      "anahtar": "veri:spotify-youtube-video-podcast-buyume-raporlari-2",
+      "karar": "tahmin"
+    },
+    {
+      "anahtar": "serbest:genesis-baglam",
+      "metin": "Futbol hikayeleri, taktik strateji içerikleri, basit UI, en sevilen / beklenen özellikler, short içerikleri, özet haberler, gerçek / sağlam temelli fotbol ekollerinin taktik / strateji bilgisini alıp, basitleştirip scale yapmak, geniş takipçiye göre uyarlamak, temeli çok hesaplı, dış kabuğu basit, kısa öz içerikler, ayrı olarak da destansı anlatım ile - kelimelerin kalplere işleyip titrettiği, hitabet sanatı ile anlatıma bagimli edecek beyan gücü ile hikayeler. Shorts içerikleri Viral odaklı, arama odaklı, talebe göre degisken / üretilen içerikler, sosyal medya, YouTube, podcast ve web sitesi."
+    }
+  ]
+}
