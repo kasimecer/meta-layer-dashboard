@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import DocumentView from './views/DocumentView.jsx'
 import IntakeView from './views/IntakeView.jsx'
 import PartnerView from './views/PartnerView.jsx'
 import PortfolioView from './views/PortfolioView.jsx'
@@ -6,14 +7,17 @@ import ProjectView from './views/ProjectView.jsx'
 import SoruYanitView from './views/SoruYanitView.jsx'
 
 // meta-layer-core — hash-tabanlı scoped router (GH-Pages-güvenli, ek bağımlılık yok).
-//   #/portfoy            → portföy
-//   #/proje/<id>         → proje
-//   #/partner/<id>       → partner — temiz sayfa (iç başlık/nav gizlenir)
-//   #/sorular/<id>       → planlama soru-yanıt (ProjectView'den drill-down; ayrı nav-tab YOK)
+//   #/portfoy                  → portföy
+//   #/proje/<id>                → proje
+//   #/partner/<id>               → partner — temiz sayfa (iç başlık/nav gizlenir)
+//   #/sorular/<id>                → planlama soru-yanıt (ProjectView'den drill-down; ayrı nav-tab YOK)
+//   #/dokuman/<id>/<docKeyEncoded> → gömülü doküman içeriği (ProjectView DocRow'dan drill-down;
+//                                    docKey encodeURIComponent'lı — bkz DocumentView.jsx, '/' içerebilir
+//                                    ör. bölüm asama'ları "master-plan/pazar-analizi" gibi)
 function rota() {
   const h = (window.location.hash || '').replace(/^#\/?/, '')
-  const [view, projeId] = h.split('/')
-  return { view: view || 'portfoy', projeId: projeId || 'mustafa' }
+  const [view, projeId, docKeyEncoded] = h.split('/')
+  return { view: view || 'portfoy', projeId: projeId || 'mustafa', docKeyEncoded: docKeyEncoded ?? null }
 }
 
 const SEKMELER = [
@@ -61,10 +65,11 @@ export default function App() {
         })}
       </nav>
 
-      {r.view === 'portfoy' && <PortfolioView />}
-      {r.view === 'proje'   && <ProjectView projeId={r.projeId} />}
-      {r.view === 'sorular' && <SoruYanitView projeId={r.projeId} />}
-      {r.view === 'baslat'  && <IntakeView />}
+      {r.view === 'portfoy'  && <PortfolioView />}
+      {r.view === 'proje'    && <ProjectView projeId={r.projeId} />}
+      {r.view === 'sorular'  && <SoruYanitView projeId={r.projeId} />}
+      {r.view === 'dokuman'  && <DocumentView projeId={r.projeId} docKey={r.docKeyEncoded ? decodeURIComponent(r.docKeyEncoded) : null} />}
+      {r.view === 'baslat'   && <IntakeView />}
     </div>
   )
 }

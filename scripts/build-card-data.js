@@ -3,7 +3,7 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { META_DATA_ROOT } from './config.js'
 import { stateYukle, bayatAsamalar } from '../tools/planlamaDurumMakinesiV2.mjs'
-import { sorulariOku, sorulariDogrula, VERI_KARARLARI } from '../tools/planlamaSorular.mjs'
+import { sorulariDogrula, VERI_KARARLARI } from '../tools/planlamaSorular.mjs'
 import { acikSoruDurum } from '../tools/planlamaDurumOzeti.mjs'
 import { projeKartlariniTuret, projeDokumanlariniTuret, dosyaHref } from '../tools/planlamaKartTuretici.mjs'
 
@@ -124,10 +124,21 @@ if (existsSync(registryPath)) {
     // href = tıklanabilir file:// URL (gerçekten diskte var olan dosyalar); önceki şema
     // (relative 'yol') hiçbir zaman servis edilmeyen bir yola işaret ediyordu (kırık link) —
     // bkz tools/planlamaKartTuretici.mjs dosyaHref (planlama-projeleri ile AYNI mekanizma).
+    // icerik = dosyanın TAM metni, build-time'da GÖMÜLÜR — planlama-projeleri (projeDokumanlariniTuret)
+    // ile AYNI gerekçe: deploy çıktısı .md TAŞIMAZ, in-app görüntüleyici (#/dokuman) başka türlü
+    // içeriğe erişemezdi. Okuma başarısız olursa (nadiren — existsSync zaten dosyaHref'te
+    // doğrulandı) icerik null kalır, girdi yine de (href ile) yayınlanır — çökme YOK.
     const dokumanlar = readdirSync(pdir)
       .filter(f => f.endsWith('.md')).sort()
-      .map(f => ({ ad: f, asama: null, href: dosyaHref(join(pdir, f)) }))
-      .filter(d => d.href)
+      .map(f => {
+        const mutlakYol = join(pdir, f)
+        const href = dosyaHref(mutlakYol)
+        if (!href) return null
+        let icerik = null
+        try { icerik = readFileSync(mutlakYol, 'utf8') } catch { /* noop — icerik null kalır */ }
+        return { ad: f, asama: null, href, icerik }
+      })
+      .filter(Boolean)
     const taslaklar = fasilitasyonTaslakMetalariOku(pdir)
     const operator = {
       proje: p.id,
@@ -374,6 +385,7 @@ if (existsSync(projelerDir)) {
         soru_turu: 'yok',             // 'yok' | 'gecerli' | 'defekt' — snapshot render edilebilir mi
         yanit_butunluk: null,         // acikSoruDurum().butunluk — 'gecerli'|'yok'|'bozuk'|null
         asama: null, surum: null, soru_imza: null,
+        bolum: null,                  // master-plan bölüm-yürüyüşü sürüyorsa bölüm id'si, aksi null
         acik_sorular: [], ertelenen_sorular: [], atlanan_sorular: [],
         reddedilen_gonderimler: reddedilenGonderimleriOku(id),
       }
@@ -382,26 +394,34 @@ if (existsSync(projelerDir)) {
         const A = state.aktif_asama
         const As = state.asamalar[A]
         anlikGoruntu.durum_etiketi = As?.durum ?? null
-        const ss = As?.sorular_surum
-        if (ss != null) {
-          const paket = sorulariOku(nsYolu, A, ss)
-          if (paket) {
-            try {
-              sorulariDogrula(paket) // defekt paket (ör. önerisiz CHOICE) ASLA normal render edilmez
-              const asd = acikSoruDurum(nsYolu, state)
-              anlikGoruntu.soru_turu = 'gecerli'
-              anlikGoruntu.yanit_butunluk = asd?.butunluk ?? null
-              anlikGoruntu.asama = A
-              anlikGoruntu.surum = ss
-              anlikGoruntu.soru_imza = paket.imza
-              anlikGoruntu.acik_sorular = (asd?.acik ?? []).map(soruyuTarayiciyaUyarla)
-              anlikGoruntu.ertelenen_sorular = (paket.ertelenen ?? []).map(soruyuTarayiciyaUyarla)
-              anlikGoruntu.atlanan_sorular = asd?.atlanan ?? []
-            } catch (e) {
-              anlikGoruntu.soru_turu = 'defekt'
-              anlikGoruntu.defekt_nedeni = e.message
-            }
+        // acikSoruDurum(nsYolu, state) KENDİSİ bölüm-farkında (bkz tools/planlamaDurumOzeti.mjs):
+        // A==='master-plan' VE bölüm-yürüyüşü SÜRÜYORSA (walk bitmemiş — aktifBolumBilgisi≠null)
+        // aktif BÖLÜMÜN kendi soru paketine delege eder; aksi halde (diğer 4 aşama, VEYA
+        // master-plan'ın walk'ı bitmiş nihai-onay anı) eskisiyle BİREBİR AYNI üst-seviye
+        // As.sorular_surum'u okur. Önceki kod burada ÖNCE üst-seviye ss'yi manuel okuyup sıfırsa
+        // acikSoruDurum'u HİÇ ÇAĞIRMIYORDU — tam da master-plan bölüm-yürüyüşü sırasında ss her
+        // zaman null olduğu için bölüm sorularını hiç göremiyordu (bkz meta-kanal.md 2026-07-16
+        // 16:35 recon kaydı). Artık acikSoruDurum HER ZAMAN çağrılır, paket de ONUN döndürdüğü
+        // (zaten doğru birime çözülmüş) paket'ten alınır — diğer 4 aşama için davranış DEĞİŞMEDİ
+        // (acikSoruDurumJenerik aynı As.sorular_surum'u aynı şekilde okur).
+        try {
+          const asd = acikSoruDurum(nsYolu, state)
+          if (asd) {
+            const paket = asd.paket
+            sorulariDogrula(paket) // defekt paket (ör. önerisiz CHOICE) ASLA normal render edilmez
+            anlikGoruntu.soru_turu = 'gecerli'
+            anlikGoruntu.yanit_butunluk = asd.butunluk ?? null
+            anlikGoruntu.asama = asd.asama       // aşama id'si VEYA (master-plan ise) bölüm id'si
+            anlikGoruntu.bolum = asd.bolum ?? null // YENİ: hangi master-plan bölümü (null=aşama-seviyesi) — saf ekleme
+            anlikGoruntu.surum = paket.surum
+            anlikGoruntu.soru_imza = paket.imza
+            anlikGoruntu.acik_sorular = (asd.acik ?? []).map(soruyuTarayiciyaUyarla)
+            anlikGoruntu.ertelenen_sorular = (paket.ertelenen ?? []).map(soruyuTarayiciyaUyarla)
+            anlikGoruntu.atlanan_sorular = asd.atlanan ?? []
           }
+        } catch (e) {
+          anlikGoruntu.soru_turu = 'defekt'
+          anlikGoruntu.defekt_nedeni = e.message
         }
       }
 

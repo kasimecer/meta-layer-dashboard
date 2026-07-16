@@ -12,7 +12,7 @@
 // "karar:*" anahtarlı sorulara verdiği gerçek yanıt — bugün yalnız elestiri, ama JENERİK: hangi
 // aşamada "karar:" önekli bir CHOICE sorusu + geçerli yanıtı varsa otomatik yakalanır).
 
-import { existsSync, statSync } from 'fs'
+import { existsSync, statSync, readFileSync } from 'fs'
 import { basename } from 'path'
 import { sorulariOku, yanitlariHamOku, tumAdaylar, yanitlandiMi } from './planlamaSorular.mjs'
 import { GERCEK_ASAMALAR } from './planlamaDurumMakinesiV2.mjs'
@@ -35,6 +35,14 @@ export function dosyaHref(mutlakYol) {
 
 function gercekZamanDamgasi(mutlakYol, yedek) {
   try { return statSync(mutlakYol).mtime.toISOString() } catch { return yedek }
+}
+
+// Dosya İÇERİĞİNİ build-time'da okur (deploy çıktısı .md TAŞIMAZ — yalnız META_DATA_ROOT'ta
+// yaşarlar; bkz meta-kanal.md 2026-07-16 12:19/16:35 recon kayıtları). dosyaHref ile AYNI
+// negatif-vaka disiplini: dosya yoksa/okunamazsa null (çökme YOK, kırık girdi YOK).
+function dosyaIcerigiOku(mutlakYol) {
+  if (!mutlakYol || typeof mutlakYol !== 'string' || !existsSync(mutlakYol)) return null
+  try { return readFileSync(mutlakYol, 'utf8') } catch { return null }
 }
 
 // Bir aşamanın 'ilerleme' kartı — yalnız GERÇEKTEN geçmiş (durum:gecti) VE çıktı dosyası
@@ -106,6 +114,20 @@ export function kararKartiUret(projeId, nsYolu, asama, asamaState) {
   }
 }
 
+// Master-plan bölüm-yürüyüşü SÜRERKEN olası bir "karar:" sorusu aktif BÖLÜMÜN kendi soru
+// paketinde olur — outer'ın (asamaState'in kendi) sorular_surum'u yalnız walk bitince (nihai
+// onay sorusu) dolar; bkz tools/planlamaDurumOzeti.mjs acikSoruDurum/aktifBolumBilgisi (AYNI üç
+// alanı — aktif_bolum/bolumler/durum — AYNI koşulla okur). O fonksiyon burada import EDİLMEDİ:
+// tam `state` gerektirir, burada yalnız asamaState (=mp) var — döngüsel-import riski almadan
+// aynı üç alanı doğrudan okumak yeterli (bkz meta-kanal.md 2026-07-16 16:35 recon kaydı).
+function masterPlanKararBirimi(asama, asamaState) {
+  const mp = asamaState
+  if (mp?.bolumler && mp.aktif_bolum && mp.durum !== 'onay-bekliyor' && mp.durum !== 'gecti') {
+    return { asama: mp.aktif_bolum, asamaState: mp.bolumler[mp.aktif_bolum] }
+  }
+  return { asama, asamaState }
+}
+
 // Tüm proje için stage-kart akışı — GERÇEK_ASAMALAR sırasıyla (genesis→premise→arastirma→
 // strateji→master-plan), her aşamanın ardından (varsa) o aşamanın karar-kartı; sonda elestiri
 // (ASAMA_SIRASI'nın bilerek DIŞINDA — bkz planlamaDurumMakinesiV2.mjs) + kendi karar-kartı.
@@ -113,9 +135,11 @@ export function kararKartiUret(projeId, nsYolu, asama, asamaState) {
 export function projeKartlariniTuret(nsYolu, projeId, state) {
   const kartlar = []
   for (const asama of GERCEK_ASAMALAR) {
-    const ak = asamaKartiUret(projeId, asama, state.asamalar?.[asama])
+    const asamaState = state.asamalar?.[asama]
+    const ak = asamaKartiUret(projeId, asama, asamaState)
     if (ak) kartlar.push(ak)
-    const kk = kararKartiUret(projeId, nsYolu, asama, state.asamalar?.[asama])
+    const karaBirim = asama === 'master-plan' ? masterPlanKararBirimi(asama, asamaState) : { asama, asamaState }
+    const kk = kararKartiUret(projeId, nsYolu, karaBirim.asama, karaBirim.asamaState)
     if (kk) kartlar.push(kk)
   }
   const ea = asamaKartiUret(projeId, 'elestiri', state.elestiri)
@@ -128,12 +152,16 @@ export function projeKartlariniTuret(nsYolu, projeId, state) {
 // Operatör "dokümanlar" pointer listesi — AYNI state'ten, kart listesinden bağımsız tüketim
 // için (operator-<id>.json → ProjectView "dokümanlar — Drive" bölümü). Master-plan bölümleri
 // dahil, düz liste; her girdi gerçekten diskte var olan bir dosyaya işaret eder.
+// `icerik` — dosyanın TAM metni, build-time'da GÖMÜLÜR (deploy çıktısı .md dosyalarını
+// TAŞIMADIĞI için in-app görüntüleyici — #/dokuman/<proje>/<anahtar> — başka türlü içeriğe
+// erişemezdi; bkz dosyaIcerigiOku). `href` (file://) GERİYE-UYUMLULUK için KORUNUYOR (mevcut
+// tüketiciler/testler) ama artık SPA tarafından KULLANILMIYOR (DocRow #/dokuman'a yönlendirir).
 export function projeDokumanlariniTuret(nsYolu, projeId, state) {
   const dokumanlar = []
   const ekle = (asama, cikti_pointer) => {
     const href = dosyaHref(cikti_pointer)
     if (!href) return
-    dokumanlar.push({ ad: basename(cikti_pointer), asama, href })
+    dokumanlar.push({ ad: basename(cikti_pointer), asama, href, icerik: dosyaIcerigiOku(cikti_pointer) })
   }
   for (const asama of GERCEK_ASAMALAR) {
     const s = state.asamalar?.[asama]

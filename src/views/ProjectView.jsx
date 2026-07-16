@@ -34,17 +34,18 @@ function FlagChip({ children }) {
   )
 }
 
-function DocRow({ d }) {
+// docKey — DocumentView.jsx'teki eşleşmeyle AYNI kural (d.asama ?? d.ad); '/' içerebilir (bölüm
+// asama'ları "master-plan/pazar-analizi" gibi), bu yüzden route segmentine encodeURIComponent'lı
+// gömülür (App.jsx rota() bunu decode eder).
+function DocRow({ d, projeId }) {
+  const docKey = d.asama ?? d.ad
+  const dokumanHref = `#/dokuman/${projeId}/${encodeURIComponent(docKey)}`
   return (
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: '5px 0', borderBottom: '1px solid #f4f4f5' }}>
-      {d.href ? (
-        <a href={d.href} target="_blank" rel="noopener noreferrer"
-          style={{ fontSize: 13, fontWeight: 600, color: '#4338ca', textDecoration: 'none' }}>
-          {d.ad}
-        </a>
-      ) : (
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#3f3f46' }}>{d.ad}</span>
-      )}
+      <a href={dokumanHref}
+        style={{ fontSize: 13, fontWeight: 600, color: '#4338ca', textDecoration: 'none' }}>
+        {d.ad}
+      </a>
       {d.asama && <span style={{ fontSize: 11, color: '#a1a1aa', fontFamily: 'ui-monospace, monospace' }}>{d.asama}</span>}
     </div>
   )
@@ -270,7 +271,7 @@ export default function ProjectView({ projeId = 'mustafa' }) {
       {/* OPERATÖR-EK: kanonik doküman pointer'ları (Drive yolları) */}
       {operator?.dokumanlar?.length > 0 && (
         <Section title="dokümanlar — Drive (operatör)">
-          <div>{operator.dokumanlar.map(d => <DocRow key={d.href ?? d.ad} d={d} />)}</div>
+          <div>{operator.dokumanlar.map(d => <DocRow key={d.asama ?? d.ad} d={d} projeId={projeId} />)}</div>
         </Section>
       )}
 
