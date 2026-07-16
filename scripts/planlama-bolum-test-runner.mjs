@@ -18,7 +18,7 @@ import { existsSync, rmSync, mkdtempSync, writeFileSync, readFileSync } from 'fs
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { planlamaLoopV2Calistir } from '../tools/planlamaLoopV2.mjs'
-import { boslukState, statePersist, stateYukle, asamaDosyaAdi } from '../tools/planlamaDurumMakinesiV2.mjs'
+import { boslukState, statePersist, stateYukle, asamaDosyaAdi, bayatAsamalar } from '../tools/planlamaDurumMakinesiV2.mjs'
 import { BOLUM_SIRASI, BOLUM_TANIMLARI } from '../tools/planlamaBolumTanimlari.mjs'
 import { bolumKapidanGecerMi } from '../tools/planlamaBolumKapilari.mjs'
 import { bolumeGeriDon, provenansEkRenderla } from '../tools/planlamaBolumLoop.mjs'
@@ -281,6 +281,47 @@ bolum('D2 — Layer-2 (tüm-plan) done-when + ürün-seviyesi zorunluluk')
       sonState.asamalar['master-plan'].bolumler['yasal-uyumluluk'].durum === 'gecti')
     ok('D2b: pipeline TAMAMLANDI (aktif_asama=tamamlandi)', sonState.aktif_asama === 'tamamlandi')
   } finally { temizle(ns2) }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+bolum('SC — master-plan bayat-stale-check: onay-bekliyor penceresi ARTIK yanlış-bayat GÖSTERMEZ (P3 Fix C)')
+{
+  const { ns, id } = yeniNs('stale-onay-bekliyor')
+  try {
+    dortAsamaTamamlaSeed(ns, id)
+    // Walk'ı, dış master-plan kaydı TAM OLARAK 'onay-bekliyor'a geçtiği ANDA durdur — nihai
+    // APPROVAL sorusunu TÜKETME (bkz tumYuruyusuTamamla: o 'tamamlandi'ya kadar gider; burada
+    // BİLEREK bir adım erken duruyoruz, çünkü sınanan tam olarak BU pencere).
+    let sonuc, adim = 0
+    do {
+      sonuc = await planlamaLoopV2Calistir(ns, id, bolumluExecutor(), {
+        mod: 'ileri', soruUretici: null, masterPlanBolumleri: BOLUM_TANIMLARI, log: () => {},
+      })
+      adim++
+      if (adim > 25) throw new Error(`SC kurulum: 25 adımda onay-bekliyor'a ulaşılamadı (son durdu: ${sonuc.durdu})`)
+    } while (stateYukle(ns, id).asamalar['master-plan'].durum !== 'onay-bekliyor')
+
+    const state = stateYukle(ns, id)
+    const mp = state.asamalar['master-plan']
+    ok('SC: kurulum — master-plan GERÇEKTEN onay-bekliyor durumunda (nihai onay HENÜZ tüketilmedi)', mp.durum === 'onay-bekliyor')
+    ok('SC: kurulum — strateji surum=1 (üst referans)', state.asamalar['strateji'].surum === 1)
+
+    // ASIL NEGATİF (görevin done-when'i): yazıcı artık BURADA (durum='onay-bekliyor'a geçiş
+    // anı) kabul_edilen_ust_surum'u ayarlıyor mu?
+    ok('SC-NEG: master-plan.kabul_edilen_ust_surum ARTIK strateji.surum\'a EŞİT (eskiden null/0 kalırdı)',
+      mp.kabul_edilen_ust_surum === state.asamalar['strateji'].surum)
+    ok('SC-NEG: bayatAsamalar(state) master-plan\'ı ARTIK İÇERMİYOR (eskiden bu pencerede hep bayat gösterirdi)',
+      !bayatAsamalar(state).includes('master-plan'))
+    ok('SC-NEG (yapısal kanıt): kabul_edilen_ust_surum RAW state\'te bile dolu (normalizeState maskelemesine GEREK YOK)',
+      JSON.parse(JSON.stringify(state)).asamalar['master-plan'].kabul_edilen_ust_surum != null)
+
+    // TESTİN KENDİSİNİN ANLAMLI OLDUĞUNUN kanıtı (yanlış-pozitif "her zaman geçer" test
+    // DEĞİL): kabul zorla null'a döndürülürse bayat-check GERÇEKTEN bunu yakalar.
+    const bozukKopya = JSON.parse(JSON.stringify(state))
+    bozukKopya.asamalar['master-plan'].kabul_edilen_ust_surum = null
+    ok('SC (test-kanıtı): kabul zorla null olursa bayat-check GERÇEKTEN yakalar (recon\'daki yapısal senaryo)',
+      bayatAsamalar(bozukKopya).includes('master-plan'))
+  } finally { temizle(ns) }
 }
 
 // ════════════════════════════════════════════════════════════════════════════

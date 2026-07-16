@@ -8,6 +8,7 @@ import { join } from 'path'
 import { claudeCalistirRetry, guvenliYaz } from './canliYurutucu.mjs'
 import { TUM_BOLUMLER_ISARETI } from './planlamaBolumTanimlari.mjs'
 import { executorSarmalayicisiniTemizle } from './planlamaSarmalayiciTemizle.mjs'
+import { slug } from './planlamaSorular.mjs'
 
 const ASAMA_DOSYALARI = {
   genesis:        'genesis.md',
@@ -55,7 +56,7 @@ bu aşamanın tempo hedefini (turda ≤7 rahat soru) gereksiz bozar.
 // Bir önceki aşamada operatörün verdiği yanıtları BAĞLAYICI bağlam bloğuna çevir.
 // tuketim: loop'un ustYanitlariTuket çıktısı — { ust, surum, kayitlar, paket } veya boş.
 // Bu, "yanıtlar bir sonraki koşuma izlenebilir girdi olarak akar" (#4) yolunun metin ucudur.
-function yanitlarMetni(tuketim) {
+export function yanitlarMetni(tuketim) {
   if (!tuketim || tuketim.surum == null || !tuketim.kayitlar || !tuketim.paket) return ''
   const soruHarita = new Map(tuketim.paket.sorular.map(s => [s.anahtar, s]))
   const satirlar = []
@@ -76,9 +77,20 @@ function yanitlarMetni(tuketim) {
         // KESİN olarak operator-beyan'a yönlendir; aksi halde modele iki olasılığı da göster.
         const kaynakStr = e.kaynak ? `; kaynak: ${e.kaynak}` : ''
         const operatorBeyaniMi = !e.kaynak || /operat[öo]r/i.test(e.kaynak)
+        // KISA KONTROLLÜ ANAHTAR (2026-07-16 P3 Fix B): e.kaynak operatörün/soru-yanıt-app'in
+        // SERBEST METNİdir — bir URL+açıklama gibi 90+ karakter olabilir (gerçek gözlemlenen
+        // vaka, bkz recon). [dogrulandi:...] param'ına bu HAM metni YAZDIRMAK YERİNE, aynı
+        // slug() ile (planlamaSorular.mjs'de veri:${slug(kaynak)} anahtarları İÇİN ZATEN
+        // kullanılan, 48-karakter tavanlı, tek fonksiyon) türetilmiş KISA bir anahtar öneriyoruz
+        // — modele HEM tam kaynak metni (kaynakStr, okunabilirlik için) HEM bu KISA anahtar
+        // (tag'e YAZILACAK olan) gösterilir. Tam kaynak metni AYRICA provenans-ek'in "kaynak:"
+        // listesine (efektifKaynak — planlamaIddiaDurumu.mjs, BU DEĞİŞİKLİKTEN ETKİLENMEDİ, o
+        // hâlâ yanit.kaynak'ı HAM okur) akmaya devam eder — burada yalnız MODELE tag-içi
+        // kullanım için önerilen değer kısaltılıyor.
+        const kaynakAnahtari = operatorBeyaniMi ? null : `kaynak-${slug(e.kaynak)}`
         const rehber = operatorBeyaniMi
           ? `Bu bir DIŞ KAYNAK DEĞİL — operatörün kendi kararı/beyanı. [operator-beyan:...] etiketiyle kullan; ASLA [dogrulandi:...] ile KULLANMA (araştırmanın doğrulamadığı bir "kaynak" gate'i reddettirir).`
-          : `Bu araştırma aşamasının GERÇEKTEN doğruladığı bir kaynaksa [dogrulandi:${e.kaynak}] etiketiyle kullan; değilse (operatörün kendi kararıysa) [operator-beyan:...] kullan.`
+          : `Bu araştırma aşamasının GERÇEKTEN doğruladığı bir kaynaksa [dogrulandi:${kaynakAnahtari}] etiketiyle kullan — bu KISA ANAHTARI AYNEN kullan, yukarıdaki uzun kaynak metnini KÖŞELİ PARANTEZ İÇİNE YAZMA (tag param'ı kısa/kontrollü bir anahtar olmalı, tam cümle/URL DEĞİL); değilse (operatörün kendi kararıysa) [operator-beyan:...] kullan.`
         satirlar.push(`- VERİ: «${konu}» → değer: ${e.deger}${kaynakStr}. ${rehber}`)
       }
       else if (e.karar === 'tahmin') satirlar.push(`- TAHMİN (operatör-onaylı): «${konu}» → operatör tahmini onayladı. [tahmin-doğrulanacak:operatör-onaylı] etiketiyle kullan.`)

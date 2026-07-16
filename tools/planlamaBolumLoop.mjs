@@ -24,7 +24,7 @@
 import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { bosAsama, statePersist, asamaDosyaAdi, ilerlet, GERCEK_ASAMALAR } from './planlamaDurumMakinesiV2.mjs'
-import { birimIlerlet, birimGeriDon, birimBayatMi, birimKostur, birimAcikDurum, birimSorulariUretVeYaz } from './planlamaBirimMotoru.mjs'
+import { birimIlerlet, birimGeriDon, birimBayatMi, birimKostur, birimAcikDurum, birimSorulariUretVeYaz, birimUst } from './planlamaBirimMotoru.mjs'
 import { BOLUM_SIRASI, BOLUM_TANIMLARI, TUM_BOLUMLER_ISARETI } from './planlamaBolumTanimlari.mjs'
 import { bolumKapidanGecerMi } from './planlamaBolumKapilari.mjs'
 import { iddialariCikar, gercekKaynaklariCikar, iddialariCozumle } from './planlamaIddiaDurumu.mjs'
@@ -402,6 +402,17 @@ function layer2VeSonrasi(nsYolu, projeId, state, ctx) {
   const paket = birimSorulariUretVeYaz(nsYolu, ctx.soruUretici, MP, yeniSurum, composedIcerik, projeId)
   mp.sorular_surum = paket ? yeniSurum : null
   mp.durum = 'onay-bekliyor'
+  // P3 Fix C: outer master-plan kaydı ASLA birimKostur'dan GEÇMEZ (yalnız 15 bölüm tek tek onun
+  // içinden geçer) — bu yüzden kabul_edilen_ust_surum (birimBayatMi'nin okuduğu alan) hiç
+  // YAZILMIYORDU; normalizeState'in geri-doldurması da yalnız durum='gecti' anını kapsadığından,
+  // bu UZUN 'onay-bekliyor' penceresinde (insan nihai onayı verene kadar) alan boş kalıp
+  // master-plan'ı strateji'ye karşı hep BAYAT gösteriyordu (bkz meta-kanal.md 2026-07-16 22:52
+  // recon kaydı). Yazıcıyı BURADA, TAM okuyucunun (birimBayatMi) bayat-uygun saydığı ANDA
+  // (durum='onay-bekliyor'a geçiş) ayarlamak yazıcı/okuyucu durum-kapsamını hizalar —
+  // normalizeState'in koşulunu genişletmeye GEREK KALMAZ (birimUst ile AYNI "üst" hesaplaması,
+  // birimBayatMi'nin kendisiyle TUTARLI — ayrı bir sabit-string VARSAYIMI YOK).
+  const ustAsama = birimUst(GERCEK_ASAMALAR, MP)
+  mp.kabul_edilen_ust_surum = ustAsama ? (state.asamalar[ustAsama]?.surum ?? 0) : null
   statePersist(nsYolu, state)
   ctx.log(`LAYER-2 GEÇTİ — nihai master-plan onayı bekleniyor (bileşik sürüm ${yeniSurum})`)
 

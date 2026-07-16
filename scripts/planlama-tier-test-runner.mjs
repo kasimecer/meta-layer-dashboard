@@ -38,9 +38,9 @@ import {
 import {
   varsayilanSoruUretici, soruSetiKur, soruOnay, soruCHOICE, soruSerbest, soruVeriIstek, soruPaketiKur,
   sorulariDogrula, sorulariOku, sorulariYaz, atlaYaz, yanitKaydet, yanitButunluk, yanitlariHamOku,
-  tumAcikAdaylar, acikBlokerler, topluAtla, soruYenidenDerecele, dataRequestAdaylari,
+  tumAcikAdaylar, acikBlokerler, topluAtla, soruYenidenDerecele, dataRequestAdaylari, slug,
 } from '../tools/planlamaSorular.mjs'
-import { promptUretBolum } from '../tools/canliExecutor.mjs'
+import { promptUretBolum, yanitlarMetni } from '../tools/canliExecutor.mjs'
 import { FIKSTUR } from './planlama-test-fikstur.mjs'
 import { FIKSTUR_BOLUM, BOZUK_BOLUM } from './planlama-bolum-fikstur.mjs'
 
@@ -134,6 +134,133 @@ bolum('F0 — Tier: varsayılanlar + co-located etiket ayrıştırma (temel sağ
   ok('F0: iddialariCikar co-located tier etiketini ayrıştırır', ic[0]?.tier === 'blocker')
   const ic2 = iddialariCikar('Etiketsiz tier ile iddia. [operator-beyan:soru-x]')
   ok('F0: iddialariCikar tier etiketsizse onemli varsayar', ic2[0]?.tier === 'onemli')
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+bolum('DR — dataRequestAdaylari: per-tag pozisyonel önizleme + sessiz-kayıp YOK (P3 Fix A)')
+{
+  // NEGATİF (görevin zorunlu kıldığı, önceden UNCOVERED sınıf): AYNI SATIRDA 2 farklı-kaynaklı
+  // [tahmin-doğrulanacak:...] etiketi, İKİ AYRI cümlede — eskiden İKİSİ DE satırın BAŞINDAN
+  // kırpılmış AYNI önizlemeyi paylaşırdı; artık her biri YALNIZ KENDİ cümlesini görmeli.
+  const drTahmin2 = dataRequestAdaylari(
+    'Pazar büyüme oranı [tahmin-doğrulanacak:kaynak-A] yıllık %18 civarındadır. ' +
+    'Rakip fiyatı [tahmin-doğrulanacak:kaynak-B] 350 birimdir.'
+  )
+  ok('DR-NEG(tahmin): AYNI satırdaki 2 farklı-kaynaklı etiket 2 AYRI aday üretir', drTahmin2.length === 2)
+  ok('DR-NEG(tahmin): anahtarlar FARKLI (kaynak-a / kaynak-b)',
+    drTahmin2[0]?.anahtar === 'veri:kaynak-a' && drTahmin2[1]?.anahtar === 'veri:kaynak-b')
+  ok('DR-NEG(tahmin): 1. adayın önizlemesi YALNIZ kendi cümlesi (2. cümleyi İÇERMEZ)',
+    drTahmin2[0]?.iddia?.includes('büyüme oranı') && !drTahmin2[0]?.iddia?.includes('Rakip fiyatı'))
+  ok('DR-NEG(tahmin): 2. adayın önizlemesi YALNIZ kendi cümlesi (1. cümleyi İÇERMEZ)',
+    drTahmin2[1]?.iddia?.includes('Rakip fiyatı') && !drTahmin2[1]?.iddia?.includes('büyüme oranı'))
+
+  // NEGATİF (asıl raporlanan vaka — [eksik] anahtar-çakışması): AYNI SATIRDA 2 [eksik] etiketi,
+  // İKİ AYRI cümlede. Eskiden anahtar `veri:eksik-${slug(TÜM-SATIR)}` ikisi için de AYNIYDI →
+  // 2. SESSİZCE KAYBOLURDU (gorulen Set çakışması). Artık her ikisi de AYRI bir aday üretmeli.
+  const drEksik2 = dataRequestAdaylari(
+    'Kullanıcı edinme maliyeti [eksik] henüz ölçülmedi. Yıllık churn oranı [eksik] de bilinmiyor.'
+  )
+  ok('DR-NEG(eksik): AYNI satırdaki 2 [eksik] etiketi 2 AYRI aday üretir (eskiden 1\'e düşerdi)', drEksik2.length === 2)
+  ok('DR-NEG(eksik): anahtarlar FARKLI (çakışma YOK)', drEksik2[0]?.anahtar !== drEksik2[1]?.anahtar)
+  ok('DR-NEG(eksik): 1. adayın önizlemesi kendi gövdesi ("edinme maliyeti"), 2.yi İÇERMEZ ("churn")',
+    drEksik2[0]?.iddia?.includes('edinme maliyeti') && !drEksik2[0]?.iddia?.includes('churn'))
+  ok('DR-NEG(eksik): 2. adayın önizlemesi kendi gövdesi ("churn"), 1.i İÇERMEZ ("edinme maliyeti")',
+    drEksik2[1]?.iddia?.includes('churn') && !drEksik2[1]?.iddia?.includes('edinme maliyeti'))
+
+  // EDGE-CASE: AYNI CÜMLEDE 2 [eksik] etiketi (ayırt edici metin YOK, ikisi de aynı tümceyi
+  // paylaşır) — "distinct occurrences must not collide" sert şartı: yine de SESSİZCE
+  // KAYBOLMAMALI, ayırt edici son-ekle (−2) AYRI bir aday olarak eklenmeli.
+  const drAyniCumle = dataRequestAdaylari('Fiyat [eksik] ve maliyet [eksik] henüz netleşmedi.')
+  ok('DR-EDGE: aynı cümledeki 2 etiket bile SESSİZCE KAYBOLMAZ (2 aday, ayırt edici son-ek)',
+    drAyniCumle.length === 2 && drAyniCumle[1]?.anahtar === `${drAyniCumle[0]?.anahtar}-2`)
+
+  // POZİTİF (regresyon-kanıtı — "genuinely identical claim+gap still folds to one"): AYNI iddia
+  // BAŞKA bir SATIRDA (farklı yerde) birebir tekrar ederse hâlâ TEK adaya katlanmalı (zararsız
+  // dedup KORUNDU, aşırı-genişletilmedi).
+  const drCaprazSatir = dataRequestAdaylari(
+    'Kullanıcı edinme maliyeti [eksik] henüz ölçülmedi.\nKullanıcı edinme maliyeti [eksik] henüz ölçülmedi.'
+  )
+  ok('DR-POS: farklı satırlarda birebir AYNI iddia hâlâ TEK adaya katlanır (aşırı-genişletme YOK)', drCaprazSatir.length === 1)
+
+  // Tablo-satırı deseni (nokta/cümle-sınırı YOK) — YENİ mantık ESKİ tüm-satır fallback'ini korur.
+  const drTablo = dataRequestAdaylari('AI metin/içerik üretimi API (LLM) | 50 | 200 | [acik-soru:ai-api-maliyet] [tier:onemli]')
+  ok('DR-POS: cümle-sınırsız (tablo-satırı) içerikte önizleme TÜM satıra düşer (eski davranış KORUNDU)',
+    drTablo[0]?.iddia === 'AI metin/içerik üretimi API (LLM) | 50 | 200 | [acik-soru:ai-api-maliyet] [tier:onemli]')
+
+  // Tek-etiket REGRESYON: mevcut F0 vakaları (trailing-etiket deseni: cümle biter, ETİKET
+  // HEMEN SONRA gelir) önceki davranışla AYNI (tüm cümle+trailing-etiketler) sonucu üretmeli —
+  // bu, GERÇEK baskın deseni (bkz canliExecutor.mjs IDDIA_KURALI şablonları) TEMSİL EDER.
+  const drTekTrailing = dataRequestAdaylari('Kritik karar henüz alınmadı. [acik-soru:kritik-karar] [tier:blocker]')
+  ok('DR-POS: tek-etiket trailing-desen önizlemesi TÜM cümleyi (+trailing etiketleri) kapsar',
+    drTekTrailing[0]?.iddia === 'Kritik karar henüz alınmadı. [acik-soru:kritik-karar] [tier:blocker]')
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+bolum('YM — yanitlarMetni: dogrulandi KISA anahtar, ham kaynak metni HİÇBİR ZAMAN tag param\'ına gömülmez (P3 Fix B)')
+{
+  const uzunKaynak = 'https://www.football-data.org/pricing (doğrudan fetch, 2026-07-15) + destekleyici karşılaştırma kaynakları'
+  const veriSorusu = soruVeriIstek({
+    anahtar: 'veri:api-lisans-maliyeti',
+    metin: 'Bu iddia kaynakla desteklenemedi: “API lisans maliyeti”. Nasıl ilerleyelim?',
+    iddia: 'API lisans maliyeti henüz doğrulanmadı.',
+  })
+  const paket = soruPaketiKur({ projeId: 'test-ym', asama: 'yasal-uyumluluk', surum: 1, sorular: [veriSorusu] })
+
+  // NEGATİF (asıl raporlanan risk): uzun/serbest-metin bir kaynakla karar='veri' — HAM metin
+  // [dogrulandi:...] tag talimatına GÖMÜLMEMELİ, yalnız KISA/kontrollü bir anahtar önerilmeli.
+  const tuketimUzun = { ust: 'yasal-uyumluluk', surum: 1, paket, kayitlar: [
+    { anahtar: 'veri:api-lisans-maliyeti', karar: 'veri', deger: '50 USD/ay', kaynak: uzunKaynak },
+  ] }
+  const metinUzun = yanitlarMetni(tuketimUzun)
+  const beklenenAnahtar = `kaynak-${slug(uzunKaynak)}`
+  ok('YM-NEG: tag talimatı KISA anahtarı kullanıyor', metinUzun.includes(`[dogrulandi:${beklenenAnahtar}]`))
+  ok('YM-NEG: KISA anahtar gerçekten kısa (≤64 karakter — 90+ karakterlik ham kaynaktan KÜÇÜK)', beklenenAnahtar.length <= 64)
+  ok('YM-NEG: [dogrulandi:...] PARAM\'I ham/uzun kaynak metnini TAŞIMIYOR',
+    !metinUzun.includes(`[dogrulandi:${uzunKaynak}]`))
+  ok('YM-POS: tam kaynak metni YİNE DE bağlamda okunabilir (traceability — yalnız tag param\'ından çıkarıldı)',
+    metinUzun.includes(uzunKaynak))
+
+  // POZİTİF (regresyon): operatör-beyanı dalı (kaynak boş/"operatör" içeriyor) DEĞİŞMEDİ —
+  // hâlâ [dogrulandi:...] ASLA kullanma talimatı veriyor, kısa-anahtar üretmiyor.
+  const tuketimOperator = { ust: 'yasal-uyumluluk', surum: 1, paket, kayitlar: [
+    { anahtar: 'veri:api-lisans-maliyeti', karar: 'veri', deger: 'Hibrit model', kaynak: 'operatör kararı (2026-07-16)' },
+  ] }
+  const metinOperator = yanitlarMetni(tuketimOperator)
+  ok('YM-POS: operatör-beyanı dalı DEĞİŞMEDİ — ASLA [dogrulandi:...] kullanma talimatı hâlâ var',
+    metinOperator.includes('ASLA [dogrulandi:...] ile KULLANMA'))
+  ok('YM-POS: operatör-beyanı dalında [dogrulandi:kaynak-...] önerisi YOK', !metinOperator.includes('[dogrulandi:kaynak-'))
+
+  // POZİTİF (regresyon): 'tahmin' dalı DEĞİŞMEDİ — sabit literal etiket, downgrade YOK.
+  const tuketimTahmin = { ust: 'yasal-uyumluluk', surum: 1, paket, kayitlar: [
+    { anahtar: 'veri:api-lisans-maliyeti', karar: 'tahmin' },
+  ] }
+  const metinTahmin = yanitlarMetni(tuketimTahmin)
+  ok('YM-POS: \'tahmin\' dalı DEĞİŞMEDİ — [tahmin-doğrulanacak:operatör-onaylı] sabit etiketi hâlâ var',
+    metinTahmin.includes('[tahmin-doğrulanacak:operatör-onaylı]'))
+
+  // POZİTİF (regresyon): 'dusur' dalı DEĞİŞMEDİ.
+  const tuketimDusur = { ust: 'yasal-uyumluluk', surum: 1, paket, kayitlar: [
+    { anahtar: 'veri:api-lisans-maliyeti', karar: 'dusur' },
+  ] }
+  const metinDusur = yanitlarMetni(tuketimDusur)
+  ok('YM-POS: \'dusur\' dalı DEĞİŞMEDİ — “bu iddiayı ÇIKAR” talimatı hâlâ var', metinDusur.includes('ÇIKAR'))
+
+  // POZİTİF (efektifKaynak yolu ETKİLENMEDİ — Fix B YALNIZ prompt-talimatını değiştirdi):
+  // iddialariCozumle hâlâ TAM/ham kaynağı efektifKaynak'a taşıyor (provenans-ek'in "kaynak:"
+  // listesi İÇİN — bkz planlamaIddiaDurumu.mjs, bu görevde HİÇ dokunulmadı).
+  const nsYm = mkdtempSync(join(tmpdir(), 'ym-efektif-kaynak-'))
+  try {
+    const bs = { sorular_surum: 1 }
+    sorulariYaz(nsYm, paket)
+    yanitKaydet(nsYm, paket, { anahtar: 'veri:api-lisans-maliyeti', karar: 'veri', deger: '50 USD/ay', kaynak: uzunKaynak })
+    const cozum = iddialariCozumle(nsYm, 'yasal-uyumluluk', bs, [
+      { satirNo: 1, satir: 'x', tip: 'acik-soru', param: 'api-lisans-maliyeti', tier: 'onemli', claimType: 'masabasi' },
+    ])
+    ok('YM-POS: iddialariCozumle efektifKaynak\'ı HÂLÂ TAM/ham kaynak metnini taşıyor (provenans-ek etkilenmedi)',
+      cozum[0]?.efektifKaynak === uzunKaynak)
+  } finally {
+    rmSync(nsYm, { recursive: true, force: true })
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
