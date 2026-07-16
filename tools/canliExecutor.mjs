@@ -434,6 +434,20 @@ export function promptUretBolum(bolumId, proje, baglamlar, bolumTanim) {
   const projeBaslik = `PROJE: ${ad} — ${aciklama}`
   const baglamBlogu = bolumBaglamBlogu(bolumTanim, baglamlar)
 
+  // Kilitli-kararlar dijesti — YALNIZ üç sentez bölümünde (bolumBaglamlarKur bunu yalnız o üçü
+  // için doldurur; planlamaBolumLoop.mjs/KILITLI_KARAR_BOLUMLERI) dolu gelir, diğer 12 bölümde
+  // (provenans-ek dahil) daima boş kalır — dolayısıyla bolumId'ye göre dallanmaya GEREK YOK,
+  // veri zaten yalnız ilgili bölümlere ULAŞIYOR (bkz __provenansVerisi ile AYNI desen).
+  const kk = baglamlar.__kilitliKararlar
+  const kilitliBlok = kk && (kk.kararlarMetni || kk.durumOzetiMetni)
+    ? `\n\nOPERATÖRÜN KİLİTLİ KARARLARI (bağlayıcı — YUKARIDAKİ bölüm metinleri bazı kararları henüz` +
+      ` yansıtmıyor olabilir çünkü o bölüm dosyası kararın KİLİTLENMESİNDEN ÖNCE üretildi ve o` +
+      ` karardan sonra yeniden yazılmadı; aşağıdakiler GÜNCEL ve kaynak bölümün donmuş` +
+      ` çerçevelemesinden ÖNCELİKLİDİR):\n` +
+      (kk.kararlarMetni ? `\nKilitlenmiş kararlar:\n${kk.kararlarMetni}\n` : '') +
+      (kk.durumOzetiMetni ? `\nPlan geneli güncel iddia statüsü (blocker/onemli tier):\n${kk.durumOzetiMetni}\n` : '')
+    : ''
+
   if (bolumTanim.mekanik) {
     // Provenans-eki: mekanik biçimlendirme — veri planlamaBolumLoop.mjs tarafından
     // baglamlar.__provenansVerisi içine ÖNCEDEN yapılandırılmış olarak konur.
@@ -463,10 +477,13 @@ ${projeBaslik}
 
 BAĞLAM — tüm diğer bölümler:
 ${baglamBlogu}
-
+${kilitliBlok}
 GÖREV: "${bolumTanim.etiket}" başlığı altında 4-6 paragraflık nitel bir sentez yaz. HİÇBİR
 köşeli-parantez statü etiketi KULLANMA, HİÇBİR sayı/figür YAZMA (yeniden ifade edilmiş olsa
 bile) — yalnız düz-yazı sentez. Yukarıdaki bölümlere GÖNDERME yap ama sayı/rakam TEKRARLAMA.
+KİLİTLİ KARARLAR listelendiyse (yukarıda) bunları da düz-yazı içinde (tag'siz, sayısız) yansıt —
+ilgili kaynak bölümün metni hâlâ eski/kararsız bir çerçeveleme taşıyorsa bile, sentezini KİLİTLİ
+KARARA göre yaz, kaynak bölümün eski çerçevelemesine göre DEĞİL.
 Belgenin başına veya sonuna yorum/açıklama EKLEME. Sadece belge içeriği.`
   }
 
@@ -477,9 +494,9 @@ ${projeBaslik}
 
 BAĞLAM:
 ${baglamBlogu || '(bu bölüm için özel üst bağlam yok — proje geneline dayan)'}
-
+${kilitliBlok}
 GÖREV: ${bolumTanim.hedefAciklama}
-
+${kilitliBlok ? '\nKİLİTLİ KARARLAR / GÜNCEL İDDİA STATÜSÜ listelendiyse (yukarıda), iddialarını buna göre statüle — kaynak bölümün donmuş metni hâlâ eski bir statü/çerçeveleme taşıyorsa bile, GÜNCEL efektif statüyü esas al.\n' : ''}
 ${IDDIA_KURALI}
 ${TIER_ZORUNLU_NOTLARI[bolumId] ? `\n${TIER_ZORUNLU_NOTLARI[bolumId]}\n` : ''}
 Belgenin başına veya sonuna yorum/açıklama EKLEME. Sadece "${bolumTanim.etiket}" başlıklı bölüm içeriği.`

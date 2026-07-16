@@ -32,6 +32,11 @@ import { sorulariOku, yanitlariHamOku, yanitButunluk, atlananlar } from './planl
 
 const MP = 'master-plan'
 
+// Sentez bölümleri — bunlar başka bölümlerin DONMUŞ .md metnine ek olarak operatörün kilitli
+// kararlarını da görmeli (bkz kilitliKararlarRenderla). 'provenans-ek' KASITLI OLARAK bu kümede
+// DEĞİL — kendi ayrı __provenansVerisi yolu değişmeden kalır (bkz bolumBaglamlarKur altı).
+const KILITLI_KARAR_BOLUMLERI = new Set(['ozet-yonetici', 'risk-varsayimlar', 'yol-haritasi'])
+
 function readIcerik(yol) {
   if (!yol || !existsSync(yol)) return null
   return readFileSync(yol, 'utf8')
@@ -82,6 +87,13 @@ function bolumBaglamlarKur(nsYolu, state, mp, bolumId) {
     }
   }
   if (bolumId === 'provenans-ek') b.__provenansVerisi = provenansVerisiTopla(nsYolu, state, mp)
+  // KİLİTLİ KARARLAR — provenans-ek'in AYNI provenansVerisiTopla() sonucundan, YALNIZ üç sentez
+  // bölümü İÇİN, deterministik biçimde türetilmiş bir dijest (bkz kilitliKararlarRenderla). Bu,
+  // "bir bölüm dosyası operatör kararından SONRA yeniden yazılmadıysa, sentez o kararı hiç
+  // göremiyordu" sorununun düzeltmesidir — provenansVerisiTopla ZATEN yanıt kayıtlarını (efektif/
+  // çözümlenmiş statü dahil) her bölümün İÇERİĞİNDEN bağımsız olarak topluyordu, yalnız çıktısı
+  // provenans-ek'e HAPSEDİLMİŞTİ (bkz o alandaki eski tek-satırlık koşul).
+  if (KILITLI_KARAR_BOLUMLERI.has(bolumId)) b.__kilitliKararlar = kilitliKararlarRenderla(provenansVerisiTopla(nsYolu, state, mp))
   return b
 }
 
@@ -122,6 +134,51 @@ function provenansVerisiTopla(nsYolu, state, mp) {
     }
   }
   return { tumIddialar, tumAtlananlar }
+}
+
+// Kilitli-kararlar dijesti — provenansVerisiTopla'nın AYNI tumIddialar'ından, MODELSİZ/
+// DETERMİNİSTİK biçimde iki ayrı metin üretir (provenansEkRenderla ile AYNI disiplin: yalnız
+// verilen veriyi sadakatle biçimlendirir, yeni içerik İCAT ETMEZ):
+//   kararlarMetni    — operatörün GERÇEKTEN karara bağladığı (closure='cevaplandi', skip/açık
+//                       DEĞİL) kalemler, düz-yazı biçiminde (statü etiketi TAŞIMAZ) — ozet-yonetici
+//                       İÇİN de güvenli (iddiaMuaf kuralını bozmaz). Yalnız İKİ kaynaktan gelir:
+//                       (a) bir acik-soru'nun efektifDeger'i (operatörün DATA-REQUEST'e girdiği
+//                       asıl değer metni — bkz planlamaIddiaDurumu.mjs), (b) operator-beyan (zaten
+//                       kararı doğrudan taşıyan, tag'siz-okunabilir cümle). efektifDeger'siz bir
+//                       'tahmin' kabulü BURAYA girmez — orijinal cümle zaten güncel sayıyı taşır,
+//                       tekrar etmek "kararlar" dijestini ŞİŞİRİR, faydası yok.
+//   durumOzetiMetni  — etiket-taşıyan iki sentez bölümü (risk-varsayimlar/yol-haritasi) İÇİN,
+//                       önceden-açık (tip='acik-soru') HER blocker/onemli-tier iddianın GÜNCEL
+//                       efektif statüsü — kaynak bölümün DONMUŞ metni bunu yansıtmıyor olabilir.
+//                       skip-kapatılmış bir kalem burada "izlenen-varsayım" olarak İŞARETLENİR,
+//                       KARAR gibi sunulmaz (rubric: "skip-tracked assumptions stay as
+//                       assumptions").
+export function kilitliKararlarRenderla(veri) {
+  const tumIddialar = veri?.tumIddialar ?? []
+
+  const kararSatirlari = tumIddialar
+    .filter(i => i.closure === 'cevaplandi' && (
+      (i.tip === 'acik-soru' && i.efektifDeger) ||
+      i.tip === 'operator-beyan'
+    ))
+    .map(i => {
+      const etiket = BOLUM_TANIMLARI[i.bolumId]?.etiket ?? i.bolumId
+      const deger = i.tip === 'operator-beyan' ? i.satir : i.efektifDeger
+      return `- **${etiket}**: ${deger}`
+    })
+
+  const durumSatirlari = tumIddialar
+    .filter(i => i.tip === 'acik-soru' && i.tier !== 'opsiyonel')
+    .map(i => {
+      const etiket = BOLUM_TANIMLARI[i.bolumId]?.etiket ?? i.bolumId
+      const durum = i.closure === 'skip' ? 'izlenen-varsayım (skip ile kapatıldı — KARAR DEĞİL)' : i.efektifTip
+      return `- **${etiket}** [tier:${i.tier}] "${i.satir.slice(0, 160)}" → güncel statü: ${durum}`
+    })
+
+  return {
+    kararlarMetni: kararSatirlari.length ? kararSatirlari.join('\n') : null,
+    durumOzetiMetni: durumSatirlari.length ? durumSatirlari.join('\n') : null,
+  }
 }
 
 // provenans-ek'in İÇERİĞİNİ provenansVerisiTopla'nın çıktısından DETERMİNİSTİK olarak üretir —

@@ -204,8 +204,11 @@ export function kaynakGercekMi(kaynak, gercekKaynaklar) {
 
 // Bir bölümün iddialarını (iddialariCikar çıktısı) KENDİ soru/yanıt artefaktına karşı
 // ÇÖZÜMLE. Metin ASLA değişmez — yalnız gate/Layer-2'nin SAYDIĞI "efektif" statü değişir:
-//   acik-soru + yanıt karar='veri'   → efektifTip='dogrulandi', efektifKaynak=operatörün girdiği kaynak
-//   acik-soru + yanıt karar='tahmin' → efektifTip='operator-onayli-tahmin'
+//   acik-soru + yanıt karar='veri'   → efektifTip='dogrulandi', efektifKaynak=operatörün girdiği kaynak,
+//                                      efektifDeger=operatörün girdiği DEĞER metni (varsa)
+//   acik-soru + yanıt karar='tahmin' → efektifTip='operator-onayli-tahmin', efektifDeger=operatörün
+//                                      override ettiği değer metni (varsa; çoğu zaman null — orijinal
+//                                      tahmin zaten satırın içinde, ayrı bir değer GİRİLMEMİŞ demektir)
 //   acik-soru + yanıt karar='dusur'  → efektifTip='dusuruldu' (ne açık ne doğrulanmış; saymaz, bloklamaz)
 //   acik-soru + yanıtsız/atlanmamış  → efektifTip='acik-soru' (DEĞİŞMEDİ — hâlâ açık, bloklar)
 //   dogrulandi/operator-beyan/operator-onayli-tahmin (ham) → dokunulmadan geçer
@@ -246,9 +249,13 @@ export function iddialariCozumle(nsYolu, bolumId, bolumState, iddialar) {
     }
     if (yanit.karar === 'veri') {
       const kaynak = (yanit.kaynak && String(yanit.kaynak).trim()) || 'operatör-girdisi'
-      return cozum(i, { efektifTip: 'dogrulandi', efektifKaynak: kaynak, closure: 'cevaplandi' })
+      const deger = (yanit.deger && String(yanit.deger).trim()) || null
+      return cozum(i, { efektifTip: 'dogrulandi', efektifKaynak: kaynak, efektifDeger: deger, closure: 'cevaplandi' })
     }
-    if (yanit.karar === 'tahmin') return cozum(i, { efektifTip: 'operator-onayli-tahmin', efektifKaynak: null, closure: 'cevaplandi' })
+    if (yanit.karar === 'tahmin') {
+      const deger = (yanit.deger && String(yanit.deger).trim()) || null
+      return cozum(i, { efektifTip: 'operator-onayli-tahmin', efektifKaynak: null, efektifDeger: deger, closure: 'cevaplandi' })
+    }
     if (yanit.karar === 'dusur') return cozum(i, { efektifTip: 'dusuruldu', efektifKaynak: null, closure: 'atildi' })
     return cozum(i, { efektifTip: 'acik-soru', efektifKaynak: null, closure: 'acik' })
   })
