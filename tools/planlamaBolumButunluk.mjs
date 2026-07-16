@@ -8,12 +8,24 @@
 // KASITLI OLARAK LENIENT: 2026-07-06'da (bkz canliExecutor.mjs'deki executor fonksiyonu üstündeki
 // yorum) genel bir "ilk #-başlığından öncesini kırp" sarmalayıcı-temizleme heuristiği GERİ ALINDI —
 // risk-varsayimlar'da içeriğin ORTASINDAN bir kelimeyi keserek sessiz veri kaybına yol açtığı
-// gözlemlendi. Bu kontrol AYNI hataya düşmemek için: (a) konu-anahtar-kelimeleri TEK bir sabit
-// başlık metniyle DEĞİL, eş-anlamlı gruplarla eşleşir (paraphrase toleranslı), (b) her bölüm için
-// yalnız 1-2 EN merkezi konu istenir (hedefAciklama'nın HER cümlesini zorunlu KILMAZ), (c) minBayt
-// eşiği her bölüm türü için ayrı ayarlanır (tek küresel sabit DEĞİL) ve mevcut hermetik test
-// fikstürlerinin GERÇEK boyutunun altında kalacak şekilde kalibre edilir — birincil kırpılma-
-// dedektörü konu/ilk-satır kontrolleridir, minBayt yalnız EK bir savunma katmanıdır.
+// gözlemlendi. Bu kontrol AYNI hataya düşmemek için: (a) beklenen-başlık anahtar-kelimeleri TEK
+// bir sabit başlık metniyle DEĞİL, eş-anlamlı gruplarla eşleşir (paraphrase toleranslı), (b) her
+// bölüm için yalnız 1-2 EN merkezi konu istenir (hedefAciklama'nın HER cümlesini zorunlu KILMAZ),
+// (c) minBayt eşiği her bölüm türü için ayrı ayarlanır (tek küresel sabit DEĞİL) ve mevcut
+// hermetik test fikstürlerinin GERÇEK boyutunun altında kalacak şekilde kalibre edilir — birincil
+// kırpılma-dedektörü başlık/ilk-satır kontrolleridir, minBayt yalnız EK bir savunma katmanıdır.
+//
+// 2026-07-16 GÜÇLENDİRME (P2): eksikKonularBul eskiden anahtar-kelimeyi belgenin TAMAMINDA (her
+// yerde, .includes()) arıyordu — bu, kırpılmış bir bölümün HAYATTA KALAN kuyruğunda beklenen
+// kelimenin ALAKASIZ bir cümlede geçmesi durumunda GEÇTİ vermesine yol açtı (gerçek vaka:
+// bütce-finansal 4436 bayta kırpıldı, "başlangıç" ve "nakit" kelimeleri kuyrukta alakasız
+// bağlamda geçtiği için kapı YANLIŞLIKLA geçti verdi). Artık arama yüzeyi yalnız BAŞLIK
+// SATIRLARI (basliklariCikar) — bir konunun kelimesi gövde metninde HERHANGİ BİR YERDE geçmesi
+// ARTIK YETMEZ, o konuyu TANIMLAYAN bir başlık satırının GERÇEKTEN var olması gerekir (yapısal/
+// konumsal farkındalık). Gerçek üretilmiş bölüm çıktıları (fotball-podcast-2026-07-09 üzerinde
+// doğrulandı — her 15 bölüm de model tarafından zengin ##/### başlık yapısıyla üretiliyor, prompt
+// bunu ZORUNLU KILMASA bile) bu değişiklikten ETKİLENMEDİ; yalnız "kelime var ama o bölümü
+// tanımlayan başlık YOK" sınıfı artık doğru biçimde REDDEDİLİYOR.
 
 const BASLIK_KARAKTERI_DESENI = /^[#*"'„«\d(]/
 
@@ -36,22 +48,58 @@ export function ilkSatirParcaMi(icerik) {
   return !buyukMu
 }
 
-// Beklenen konu gruplarından HANGİLERİ içerikte hiç geçmiyor (grup İÇİNDE herhangi bir eş-anlamlı
-// yeterli — OR). Her grup {grup[0]} etiketiyle raporlanır (ilk eleman = insan-okunur temsilci ad).
-export function eksikKonularBul(icerik, beklenenKonular) {
-  const metin = String(icerik ?? '').toLocaleLowerCase('tr')
+// Markdown BAŞLIK satırı deseni (## / ### / #### ... — H1 "#" DAHİL, bölümün KENDİ üst başlığı
+// da geçerli bir eşleşme yüzeyidir).
+const BASLIK_SATIRI_DESENI = /^#{1,6}\s+(.+)$/
+
+// İçerikteki TÜM başlık satırlarının METNİNİ çıkarır (# işaretleri + baştaki/sondaki boşluk
+// temizlenmiş) — eksikBasliklarBul'un ARAMA YÜZEYİ budur, gövde metninin TAMAMI DEĞİL. RAW
+// (büyük/küçük harf DÖNÜŞTÜRÜLMEMİŞ) döner — karşılaştırma basliktaGecerMi'de, İKİ ayrı
+// büyük/küçük-harf stratejisiyle yapılır (bkz orada). Numaralandırma önekleri ("1. ", "§1 — ",
+// "2.1 ") KASITLI OLARAK KIRPILMADI — arama zaten alt-dize (includes) ile yapıldığı için önek
+// eşleşmeyi ETKİLEMEZ; bir önek-kırpma denemesi modelin farklı numaralandırma biçimlerine
+// (1. / §1 / 1a / hiç) karşı kırılgan ek bir varsayım katmanı eklerdi (bkz F0 "makine
+// büyümesin" ilkesiyle aynı ruh).
+export function basliklariCikar(icerik) {
+  const basliklar = []
+  for (const satir of String(icerik ?? '').split('\n')) {
+    const m = BASLIK_SATIRI_DESENI.exec(satir)
+    if (m) basliklar.push(m[1].trim())
+  }
+  return basliklar
+}
+
+// Bir başlık metninde bir kelimenin geçip geçmediğini İKİ büyük/küçük-harf stratejisiyle dener:
+// TR-locale (Türkçe İ/I/ı/i kurallarını doğru uygular — Türkçe kelimeler için GEREKLİ) VE düz
+// ASCII toLowerCase() (TR-locale'in yabancı KISALTMALARDA — KPI, MVP, SPEC gibi — 'I'yı Türkçe
+// noktasız 'ı'ya çevirip yanlış-red ÜRETTİĞİ durumu yakalar; ör. "KPI".toLocaleLowerCase('tr')
+// === "kpı" ("kpi" DEĞİL) — gerçek gözlemlenen vaka: olcumleme-kpi'nin "# Ölçümleme (KPI)"
+// başlığı, TR-locale TEK BAŞINA kullanılsaydı kendi "kpi" eş-anlamlısıyla YANLIŞ-REDDEDİLİRDİ).
+// İkisinden HERHANGİ BİRİ eşleşirse yeterli — Türkçe kelime + yabancı kısaltma karışık başlıklı
+// içerikte (bu kod tabanının GERÇEK içeriğinde norm) HİÇBİRİ yanlış-red ÜRETMEZ.
+function basliktaGecerMi(baslikRaw, kelimeRaw) {
+  if (baslikRaw.toLocaleLowerCase('tr').includes(kelimeRaw.toLocaleLowerCase('tr'))) return true
+  return baslikRaw.toLowerCase().includes(kelimeRaw.toLowerCase())
+}
+
+// Beklenen başlık gruplarından HANGİLERİ belgenin BAŞLIK SATIRLARINDA hiç geçmiyor (grup İÇİNDE
+// herhangi bir eş-anlamlı yeterli — OR, paraphrase-toleranslı — ama artık yalnız başlık
+// satırlarına karşı, bkz dosya-üstü 2026-07-16 notu). Her grup {grup[0]} etiketiyle raporlanır
+// (ilk eleman = insan-okunur temsilci ad).
+export function eksikBasliklarBul(icerik, beklenenBasliklar) {
+  const basliklar = basliklariCikar(icerik)
   const eksik = []
-  for (const grup of (beklenenKonular ?? [])) {
-    const varMi = grup.some(kelime => metin.includes(kelime.toLocaleLowerCase('tr')))
+  for (const grup of (beklenenBasliklar ?? [])) {
+    const varMi = grup.some(kelime => basliklar.some(b => basliktaGecerMi(b, kelime)))
     if (!varMi) eksik.push(grup[0])
   }
   return eksik
 }
 
 // Ana bütünlük kontrolü — bolumKapidanGecerMi tarafından SATIR-ETİKETİ kuralından ÖNCE çağrılır.
-// tanim: BOLUM_TANIMLARI[bolumId] (minBayt, beklenenKonular alanlarını taşır — ikisi de yoksa/boşsa
-// o kontrol atlanır, bölüm türüne göre farklı sıkılıkta olması BEKLENİR — bkz görev notu: "tek
-// küresel sabit değil, bölüm-türüne göre kalibre").
+// tanim: BOLUM_TANIMLARI[bolumId] (minBayt, beklenenBasliklar alanlarını taşır — ikisi de
+// yoksa/boşsa o kontrol atlanır, bölüm türüne göre farklı sıkılıkta olması BEKLENİR — bkz görev
+// notu: "tek küresel sabit değil, bölüm-türüne göre kalibre").
 export function bolumButunlukKontrolEt(bolumId, icerik, tanim) {
   const metin = String(icerik ?? '')
   const bayt = Buffer.byteLength(metin, 'utf8')
@@ -71,11 +119,12 @@ export function bolumButunlukKontrolEt(bolumId, icerik, tanim) {
     }
   }
 
-  const eksikKonular = eksikKonularBul(metin, tanim?.beklenenKonular)
-  if (eksikKonular.length > 0) {
+  const eksikBasliklar = eksikBasliklarBul(metin, tanim?.beklenenBasliklar)
+  if (eksikBasliklar.length > 0) {
     return {
       gecti: false,
-      neden: `${bolumId}: beklenen konu(lar) içerikte hiç geçmiyor: ${eksikKonular.join(', ')} — bölüm eksik/kırpılmış olabilir`,
+      neden: `${bolumId}: beklenen başlık(lar) belge başlıklarında hiç geçmiyor: ${eksikBasliklar.join(', ')} — ` +
+             `bölüm eksik/kırpılmış olabilir (kelime gövde metninde geçse bile, o bölümü tanımlayan bir başlık satırı YOK)`,
     }
   }
 

@@ -37,6 +37,8 @@ Müşteri profili, tekrar eden günlük sürtünmeden rahatsız olan konfor odak
 
   'rekabet-konumlandirma': `# Rekabet ve Konumlandırma — Test Projesi
 
+## Rakip Seti
+
 Mevcut rakipler ya mevcut ürünü değiştiriyor ya da kurulum gerektiriyor. [dogrulandi:rakip-taramasi-2026] [tip:masabasi]
 
 Kurulumsuz kalıcı forma odaklanan güçlü bir rakip şu an görünmüyor. [dogrulandi:rakip-taramasi-2026] [tip:masabasi]
@@ -53,6 +55,8 @@ MVP kapsamı, tek bir kalıcı form varyantı ve temel kurulum kılavuzudur. [op
 
   'is-modeli-fiyatlama': `# İş Modeli ve Fiyatlama — Test Projesi
 
+## Gelir Modeli
+
 Gelir modeli, tek seferlik satış artı isteğe bağlı bakım paketidir. [operator-beyan:gelir-modeli]
 
 Birim başına üretim maliyeti operatör tarafından kabul edilmiştir. [operator-onayli-tahmin:birim-maliyet-tahmini] [tip:icbilgi]
@@ -62,7 +66,11 @@ Hedef kâr marjı operatör tarafından belirlenmiştir. [operator-beyan:marj-he
 
   'butce-finansal': `# Bütçe ve Finansallar — Test Projesi
 
+## Başlangıç Maliyeti
+
 Başlangıç maliyeti tedarikçi teklifiyle doğrulanmıştır. [dogrulandi:tedarikci-teklifi-2026] [tip:icbilgi]
+
+## Opex ve Nakit Akışı
 
 Aylık operasyonel gider tahmini operatör tarafından onaylanmıştır. [operator-onayli-tahmin:opex-tahmini] [tip:icbilgi]
 
@@ -73,12 +81,16 @@ Nakit akışı projeksiyonu, başabaş noktasına kadarki dönemi operatör onay
 
   'gtm-pazarlama': `# Pazara Giriş ve Pazarlama/Reklam Operasyonları — Test Projesi
 
+## Kanal Planı
+
 Birincil kanal olarak organik içerik ve sosyal medya seçilmiştir. [operator-beyan:kanal-secimi]
 
 Sosyal medya reklam maliyeti kıyaslama verisiyle doğrulanmıştır. [dogrulandi:reklam-kiyaslama-2026] [tip:masabasi]
 `,
 
   'dijital-varlik-spec': `# Dijital Varlık SPEC — Test Projesi
+
+## Web Sitesi
 
 Web sitesi tek sayfalık bir tanıtım ve ön-kayıt formu içerir. [operator-beyan:site-kapsami]
 
@@ -89,12 +101,16 @@ Temel analitik olarak ziyaretçi sayısı ve form dönüşüm oranı izlenir. [o
 
   'operasyon-plani': `# Operasyon Planı — Test Projesi
 
+## Tedarik Süreci
+
 Tedarik süreci, doğrulanmış tek bir tedarikçi üzerinden yürütülecektir. [dogrulandi:tedarikci-teklifi-2026] [tip:icbilgi]
 
 Teslimat süreci operatör tarafından yerel kargo üzerinden planlanmıştır. [operator-beyan:teslimat-plani]
 `,
 
   'yasal-uyumluluk': `# Yasal ve Uyumluluk — Test Projesi
+
+## Kuruluş ve Vergi
 
 Şirket kuruluş süreci resmi kaynakla doğrulanmıştır. [dogrulandi:ticaret-odasi-rehberi-2026] [tip:masabasi]
 
@@ -111,6 +127,8 @@ Gizli varsayım taraması, tedarik sürekliliğinin garanti sayıldığını ort
 `,
 
   'yol-haritasi': `# Yol Haritası ve Yapılacaklar — Test Projesi
+
+## İlk 90 Gün Planı
 
 İlk 90 gün, tedarik onayı, prototip üretimi ve pilot lansmanını kapsar. [operator-beyan:ilk-90-gun-plani]
 
@@ -148,6 +166,8 @@ Bu satır kasıtlı olarak hiçbir statü etiketi taşımıyor ve bu yüzden red
   // bu fikstür yalnız denylist'i tetiklemeli, genel govde kuralını DEĞİL).
   insaArtefakti: `# Dijital Varlık SPEC — Test Projesi
 
+## Web Sitesi
+
 Web sitesi aşağıdaki gibi kurulacaktır. [operator-beyan:site-kapsami]
 
 <!DOCTYPE html> ana sayfa taslağı budur. [operator-beyan:html-taslak]
@@ -164,6 +184,8 @@ Pazar fırsatı gerçek bir kaynakla doğrulanmıştır. [dogrulandi:sektor-rapo
   // D1 testi: yasal-uyumluluk'un YEREL toleransı — açık-soru etiketiyle BİRLİKTE de bölüm
   // kendi kapısından geçmeli (sifirAcikGerekli=false bu bölüm için).
   yasalUyumlulukAcik: `# Yasal ve Uyumluluk — Test Projesi
+
+## Kuruluş ve Vergi
 
 Şirket kuruluş süreci resmi kaynakla doğrulanmıştır. [dogrulandi:ticaret-odasi-rehberi-2026] [tip:masabasi]
 
@@ -219,6 +241,22 @@ Aylık operasyonel gider tahmini operatör tarafından onaylanmıştır. [operat
 MVP kapsamı, tek bir kalıcı form varyantı ve temel kurulum kılavuzudur. [operator-beyan:mvp-sinir]
 
 Rakip ürünlerin ortalama fiyatı pazar taramasıyla doğrulanmıştır. [dogrulandi:rakip-fiyat-taramasi-2026]
+`,
+
+  // P2 BÜTÜNLÜK testi (eksikBasliklarBul'un YENİ yakaladığı sınıf): bölüm KIRPILMAMIŞ — düzgün
+  // başlıkla başlıyor, minBayt'ı rahatça aşıyor, ilk satır bir cümle-parçası DEĞİL — ama beklenen
+  // konunun ("gelir modeli"/"gelir") kelimesi yalnız GÖVDE METNİNDE geçiyor, o konuyu TANIMLAYAN
+  // hiçbir başlık satırı YOK ("## Maliyet Yapısı" tek alt-başlık, "gelir" içermiyor). ESKİ
+  // eksikKonularBul (belge-geneli .includes()) bunu YANLIŞLIKLA geçirirdi — "gelir" kelimesi
+  // "Toplam gelir hedefi..." cümlesinde geçtiği için. YENİ (başlık-satırı-kapsamlı) kontrol bunu
+  // doğru biçimde REDDETMELİ.
+  basliksizKonu: `# İş Modeli ve Fiyatlama — Test Projesi
+
+## Maliyet Yapısı
+
+Toplam gelir hedefi operatör tarafından üçüncü çeyreğe kadar gözden geçirilecektir. [operator-beyan:gelir-hedefi-notu]
+
+Birim başına üretim maliyeti operatör tarafından kabul edilmiştir. [operator-onayli-tahmin:birim-maliyet-tahmini] [tip:icbilgi]
 `,
 }
 

@@ -187,6 +187,21 @@ bolum('BT — Bütünlük (completeness): kırpılmış bölüm REDDEDİLİR, ta
   // AÇISINDAN da tekrar teyit) — hiçbiri minBayt/ilk-satır/konu kontrolüyle yanlış-reddedilmiyor.
   ok('BT-POS: TÜM geçerli bölüm fikstürleri bütünlük kontrolünden de sorunsuz geçiyor (yanlış-red YOK)',
     Object.entries(FIKSTUR_BOLUM).every(([id, icerik]) => bolumKapidanGecerMi(id, icerik).gecti))
+
+  // P2 NEGATİF (görevin zorunlu kıldığı YENİ vaka — eski eksikKonularBul'un KAÇIRDIĞI sınıf):
+  // bölüm KIRPILMAMIŞ (minBayt aşılıyor, ilk satır düzgün bir başlık) ama beklenen konunun
+  // ("gelir modeli"/"gelir") kelimesi yalnız GÖVDE METNİNDE geçiyor — o konuyu TANIMLAYAN hiçbir
+  // başlık satırı YOK. Eski (belge-geneli .includes()) kontrol bunu YANLIŞLIKLA geçirirdi.
+  const gBasliksiz = bolumKapidanGecerMi('is-modeli-fiyatlama', BOZUK_BOLUM.basliksizKonu)
+  ok('BT-NEG (P2): kelime gövdede var AMA başlık satırı YOK → YENİ kontrol REDDEDER (eski kontrol geçirirdi)', !gBasliksiz.gecti, gBasliksiz.neden ?? '')
+  ok('BT-NEG (P2): red nedeni başlık-eksikliğini işaret eder', /beklenen başlık\(lar\)/.test(gBasliksiz.neden ?? ''), gBasliksiz.neden ?? '')
+
+  // Regresyon-kanıtı: minBayt VE ilk-satır kontrolleri bu fikstürü YAKALAMIYOR (yalnız başlık
+  // kontrolü yakalıyor) — kanıtlamak için ikisini izole çağır, ikisi de geçmeli.
+  const baytOk = Buffer.byteLength(BOZUK_BOLUM.basliksizKonu, 'utf8') >= (BOLUM_TANIMLARI['is-modeli-fiyatlama'].minBayt ?? 0)
+  ok('BT-NEG (P2) regresyon-kanıtı: fikstür minBayt eşiğini AŞIYOR (kırpılma-boyutu DEĞİL)', baytOk)
+  const ilkSatirDuzgun = /^#\s/.test(BOZUK_BOLUM.basliksizKonu.trimStart())
+  ok('BT-NEG (P2) regresyon-kanıtı: ilk satır düzgün bir başlık (cümle-ortası parça DEĞİL)', ilkSatirDuzgun)
 }
 
 // ════════════════════════════════════════════════════════════════════════════
