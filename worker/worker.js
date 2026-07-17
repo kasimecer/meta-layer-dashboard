@@ -145,10 +145,21 @@ async function handleIntakeQueue(request, env, origin) {
 // Worker BURADA yanıt artefaktına YAZMAZ / kapı/bütünlük/bayatlık DEĞERLENDİRMEZ — yalnız
 // git'e commit eder. Gerçek doğrulama (sürüm/imza tazeliği, tip-özgü yanıt şekli, tüm-ya-da-
 // hiç uygulama) scripts/soru-yanit-queue-watch.mjs'de, kullanıcının kendi makinesinde koşar.
-// Doğrulama burada BİLEREK sığ (varlık/tip/whitelist) — derin anlam kontrolü izleyicinin işi
+// Doğrulama burada BİLEREK sığ (varlık/tip/biçim) — derin anlam kontrolü izleyicinin işi
 // (bkz worker.js dosya başı yorumu; "Worker = saf git-yazma rölesi").
-// ============================================================
-const GECERLI_ASAMALAR = new Set(['genesis', 'premise', 'arastirma', 'strateji', 'master-plan'])
+//
+// 2026-07-17 DÜZELTME: `asama` eskiden sabit 5-aşama whitelist'ine (GECERLI_ASAMALAR Set) karşı
+// doğrulanıyordu — master-plan bölüm-yürüyüşü AKTİFKEN dashboard artık bölüm-seviyesi açık
+// soruları da doğru gösteriyor (ör. "ozet-yonetici"), ve SoruYanitView bu bölüm id'sini AYNEN
+// `asama` alanına koyup gönderiyor — ama bölüm id'leri bu whitelist'te HİÇ YOKTU → GERÇEK bir
+// operatör gönderimi burada 400 ile REDDEDİLDİ (canlı-gözlemlenen vaka). Worker'ın KENDİSİ
+// (yukarıdaki yorum) "derin anlam kontrolü izleyicinin işi" diyor — 15 bölüm id'sini BURADA
+// AYRICA bir sabit listede TUTMAK (tools/planlamaBolumTanimlari.mjs'den BAĞIMSIZ, bu dosya hiçbir
+// modül import ETMİYOR — tek-dosya Worker) iki listenin GELECEKTE birbirinden KAYMASI riskini
+// taşırdı. Bunun yerine BİÇİM-bazlı bir sınır: her aşama/bölüm id'si ZATEN küçük-harf-Latin +
+// rakam + tire bir slug'tır (5 aşama adı DA bu kalıba uyar) — GERÇEK varlık/tazelik kontrolü
+// (bu asama GERÇEKTEN var mı, açık soru VAR mı) yine YALNIZ izleyicide yapılır, DEĞİŞMEDİ.
+const ASAMA_BICIM_DESENI = /^[a-z][a-z0-9-]{0,60}$/
 
 async function handleSoruYanitQueue(request, env, origin) {
   if (origin && !originAllowed(origin, env)) {
@@ -176,7 +187,7 @@ async function handleSoruYanitQueue(request, env, origin) {
   if (!/^[a-z0-9_][a-z0-9_-]{0,80}$/.test(projeId)) {
     return json({ ok: false, hata: 'geçersiz projeId biçimi' }, 400, origin, env)
   }
-  if (!GECERLI_ASAMALAR.has(asama)) {
+  if (!ASAMA_BICIM_DESENI.test(asama)) {
     return json({ ok: false, hata: 'geçersiz asama' }, 400, origin, env)
   }
   if (!Number.isInteger(surum) || surum < 1) {

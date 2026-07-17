@@ -243,6 +243,59 @@ bolum('T7 — Sıfır pipeline-çağrısı: state değişmez + izleyici yasaklı
      importSatirlari.some(s => s.includes('planlamaSorular.mjs')) && importSatirlari.some(s => s.includes('planlamaDurumMakinesiV2.mjs')))
 }
 
+// ══ T8 — master-plan BÖLÜM-yürüyüşü: asama bir bölüm id'si olabilir (2026-07-17 düzeltme) ══
+bolum('T8 — asama bir master-plan BÖLÜM id\'si olduğunda doğru birime çözümlenir')
+{
+  // Canlı-gözlemlenen vaka: dashboard (P1 fix) bölüm-seviyesi açık soruları doğru gösterip
+  // `asama: "ozet-yonetici"` gönderdiğinde, gonderimiIsle eskiden yalnız state.asamalar['ozet-
+  // yonetici']'ye (hiç yok) bakardı ve "aktif soru turu yok" ile reddederdi — Worker'ın 400'ü
+  // düzeltilse BİLE burada İKİNCİ bir ret oluşurdu.
+  const { root, ns, id, isle } = yeniNs('t8')
+  try {
+    const bolumSorular = [
+      soruOnay('ozet-yonetici'),
+      soruSerbest({ anahtar: 'serbest:ozet-yonetici-baglam', metin: 'Ek bağlam?' }),
+    ]
+    const bolumPaket = soruPaketiKur({ projeId: id, asama: 'ozet-yonetici', surum: 2, sorular: bolumSorular })
+    sorulariYaz(ns, bolumPaket)
+
+    const state = boslukState(id)
+    state.aktif_asama = 'master-plan'
+    state.asamalar['master-plan'].durum = 'kosuyor'
+    state.asamalar['master-plan'].aktif_bolum = 'ozet-yonetici'
+    state.asamalar['master-plan'].bolumler = {
+      'ozet-yonetici': { durum: 'onay-bekliyor', cikti_pointer: null, kapi_sonuc: 'gecti', blok_nedeni: null, surum: 2, kabul_edilen_ust_surum: 1, sorular_surum: 2, tuketilen_ust_yanit_surum: 1 },
+    }
+    statePersist(ns, state)
+
+    const gonderim = { projeId: id, asama: 'ozet-yonetici', surum: 2, soruImza: bolumPaket.imza, yanitlar: [
+      { anahtar: 'serbest:ozet-yonetici-baglam', metin: 'Özet anlaşılır, doğru. Projeyi bu hal ile tamamla.' },
+    ] }
+    const sonuc = isle(gonderim)
+    ok('T8a: bölüm-seviyesi gönderim UYGULANDI (artık reddedilmiyor)', sonuc.sonuc === 'uygulandi', sonuc.neden ?? '')
+
+    const yb = yanitlariHamOku(ns, 'ozet-yonetici', 2)
+    ok('T8a: yanıt DOĞRU dosyaya (ozet-yonetici-yanitlar-v2) yazıldı', yb.durum === 'var')
+    const h = Object.fromEntries((yb.ham?.yanitlar ?? []).map(e => [e.anahtar, e]))
+    ok('T8a: FREE-TEXT içeriği doğru kaydedildi', h['serbest:ozet-yonetici-baglam']?.metin === 'Özet anlaşılır, doğru. Projeyi bu hal ile tamamla.')
+
+    // Kontrol: BAYAT bölüm-sürümüne karşı gönderim hâlâ reddedilir (aynı bölüm-çözümleme
+    // yolunda tazelik kontrolü de doğru çalışıyor — yalnız "bulundu" değil, "GÜNCEL mi" de).
+    const bayatGonderim = { projeId: id, asama: 'ozet-yonetici', surum: 1, soruImza: 'eskiimza', yanitlar: [{ anahtar: 'serbest:ozet-yonetici-baglam', metin: 'x' }] }
+    const bayatSonuc = isle(bayatGonderim)
+    ok('T8b: bölüm-seviyesinde de BAYAT sürüm reddedilir', bayatSonuc.sonuc === 'reddedildi' && /BAYAT/.test(bayatSonuc.neden))
+  } finally { temizle(root) }
+
+  // Kontrol: üst-seviye aşama çözümlemesi (state.asamalar[asama]) DEĞİŞMEDİ — bölüm-yolu SAF
+  // EKLEME, mevcut önceliği (üst-seviye ÖNCE denenir) BOZMADI.
+  const { root: root2, ns: ns2, id: id2, paket, isle: isle2 } = kurulum('t8-ust-seviye-kontrol')
+  try {
+    const gonderim = { projeId: id2, asama: 'genesis', surum: 1, soruImza: paket.imza, yanitlar: [{ anahtar: 'secim:x', secim: 'A' }] }
+    const sonuc = isle2(gonderim)
+    ok('T8c (regresyon): üst-seviye aşama (genesis) hâlâ normal ÇALIŞIYOR (bölüm-yolu önceliği bozmadı)', sonuc.sonuc === 'uygulandi')
+  } finally { temizle(root2) }
+}
+
 // ══ Özet ═══════════════════════════════════════════════════════════════════════
 console.log(`\nSONUÇ: ${gecti} geçti, ${kaldi} kaldı`)
 process.exit(kaldi === 0 ? 0 : 1)

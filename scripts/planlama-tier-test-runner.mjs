@@ -193,6 +193,26 @@ bolum('DR — dataRequestAdaylari: per-tag pozisyonel önizleme + sessiz-kayıp 
   const drTekTrailing = dataRequestAdaylari('Kritik karar henüz alınmadı. [acik-soru:kritik-karar] [tier:blocker]')
   ok('DR-POS: tek-etiket trailing-desen önizlemesi TÜM cümleyi (+trailing etiketleri) kapsar',
     drTekTrailing[0]?.iddia === 'Kritik karar henüz alınmadı. [acik-soru:kritik-karar] [tier:blocker]')
+
+  // REGRESYON-KANITI (2026-07-17 canlı-vaka): provenans-ek'in KENDİ render'ı AYNI iddiayı
+  // BİLEREK birden çok BÖLÜMDE, HER SEFERİNDE FARKLI çevre-metinle tekrar basar (İddialar
+  // listesi formatı ≠ Doğrulama Tablosu formatı). KİMLİKLİ anahtarlar (tahmin-doğrulanacak →
+  // kaynak, acik-soru → konu) için içerik/konum farkı KATLAMAYI ENGELLEMEMELİ — engellerse
+  // provenans-ek'in KENDİ yeniden-üretimi düzinelerce SAHTE blocker sorusu doğurur (gerçek
+  // gözlemlenen vaka: fotball-podcast-2026-07-09'da provenans-ek-v2 46 sahte blocker üretti,
+  // kök neden buydu — fold mantığı SAF anahtar yerine içerik-farkındaydı).
+  const drAyniKaynakFarkliCevre = dataRequestAdaylari(
+    '- **Ölçümleme (KPI)** — ham: `acik-soru:wtp-segment-fark-olcumu` → efektif-statü: acik-soru\n' +
+    '- **Ölçümleme (KPI)** — Segment bazlı WTP [acik-soru:wtp-segment-fark-olcumu] [tier:blocker] — statü: acik-soru'
+  )
+  ok('DR-POS (regresyon): AYNI konu, FARKLI çevre-metinle İKİ AYRI satırda → yine de TEK adaya katlanır (acik-soru — kimlikli anahtar)',
+    drAyniKaynakFarkliCevre.length === 1)
+
+  const drTahminAyniKaynakFarkliCevre = dataRequestAdaylari(
+    'Toplam maliyet [tahmin-doğrulanacak:kaynak-X] belirsiz.\nAyrıca yıllık gider de [tahmin-doğrulanacak:kaynak-X] olarak işaretli.'
+  )
+  ok('DR-POS (regresyon): AYNI kaynak, FARKLI çevre-metinle İKİ AYRI satırda → yine de TEK adaya katlanır (tahmin — kimlikli anahtar)',
+    drTahminAyniKaynakFarkliCevre.length === 1)
 }
 
 // ════════════════════════════════════════════════════════════════════════════

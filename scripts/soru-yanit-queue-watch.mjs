@@ -81,8 +81,25 @@ export function gonderimiIsle(gonderim, { log = () => {}, projelerRoot = META_DA
     return { sonuc: 'reddedildi', neden: `proje state okunamadı: ${e.message}` }
   }
 
+  // "asama" İKİ ŞEYDEN biri olabilir: (a) üst-seviye bir aşama (genesis/premise/arastirma/
+  // strateji/master-plan) — state.asamalar[asama]'da doğrudan yaşar, YA DA (b) master-plan
+  // bölüm-yürüyüşü AKTİFKEN bir BÖLÜM id'si (ör. "ozet-yonetici") — bu durumda kendi soru
+  // katmanı state.asamalar['master-plan'].bolumler[asama]'da yaşar (bkz
+  // tools/planlamaBolumLoop.mjs aktifBolumBilgisi ile AYNI ayrım). 2026-07-17 DÜZELTME: bu
+  // dal eskiden HİÇ YOKTU — dashboard artık bölüm-seviyesi açık soruları doğru gösterdiği
+  // (P1 fix) için SoruYanitView bölüm id'sini `asama` alanına koyup gönderiyor, ama bu fonksiyon
+  // yalnız üst-seviye state.asamalar[asama]'ya bakıyordu → GERÇEK bir operatör gönderimi
+  // "aktif soru turu yok" ile reddedilirdi (canlı-gözlemlenen vaka — Worker'ın 400'ünden SONRA
+  // bile, Worker düzeltilse dahi burada İKİNCİ bir ret oluşurdu). sorulariOku/yanitKaydet/atlaYaz
+  // ZATEN `asama` parametresini yalnız dosya-adı öneki olarak kullanıyor (bkz
+  // tools/planlamaSorular.mjs soruDosyaAdi) — bölüm id'leri için de AYNEN doğru dosyalara işaret
+  // eder, o fonksiyonlarda HİÇBİR değişiklik gerekmedi.
+  const ustBirim = state.asamalar?.[asama]
+  const bolumBirim = state.asamalar?.['master-plan']?.bolumler?.[asama]
+  const birimState = ustBirim ?? bolumBirim
+
   // GERÇEK GÜNCEL sürüm — gönderimdeki surum'a ASLA güvenilmez, yalnız KARŞILAŞTIRMA için kullanılır.
-  const guncelSurum = state.asamalar?.[asama]?.sorular_surum
+  const guncelSurum = birimState?.sorular_surum
   if (guncelSurum == null) {
     return { sonuc: 'reddedildi', neden: `"${asama}" için aktif soru turu yok (proje ilerlemiş ya da hiç üretilmemiş olabilir)` }
   }

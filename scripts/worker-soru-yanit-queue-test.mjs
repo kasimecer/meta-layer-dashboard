@@ -70,8 +70,25 @@ ok('path-traversal projeId 400', r.status === 400)
 r = await worker.fetch(istek({ gonderim: { ...GECERLI_GONDERIM, projeId: '_demo-alt-cizgi-izinli' } }, { origin: 'http://localhost:5173' }), { ...ENV, GITHUB_TOKEN: undefined })
 ok('alt-çizgili id (mevcut _demo-* konvansiyonu) 400 DEĞİL', r.status !== 400, `status: ${r.status}`)
 
+// 2026-07-17: asama artık whitelist DEĞİL, BİÇİM ile doğrulanıyor (bkz worker.js
+// ASAMA_BICIM_DESENI notu — master-plan bölüm id'leri de GEÇERLİ asama'dır, gerçek varlık
+// kontrolü izleyicide). "boyle-bir-asama-yok" BİÇİM olarak geçerli bir slug — artık 400 DEĞİL
+// (varlık kontrolü izleyicinin işi); yalnız GERÇEKTEN BİÇİMSİZ değerler (boşluk, büyük harf,
+// özel karakter, boş) 400 almalı.
 r = await worker.fetch(istek({ gonderim: { ...GECERLI_GONDERIM, asama: 'boyle-bir-asama-yok' } }), ENV)
-ok('geçersiz asama 400', r.status === 400)
+ok('biçimce geçerli ama VAROLMAYAN asama artık 400 DEĞİL (varlık kontrolü izleyiciye devredildi)', r.status !== 400, `status: ${r.status}`)
+
+r = await worker.fetch(istek({ gonderim: { ...GECERLI_GONDERIM, asama: 'ozet-yonetici' } }), ENV)
+ok('bölüm-id şeklinde asama (master-plan bölüm-yürüyüşü) artık KABUL EDİLİYOR (canlı-gözlemlenen 400 hatası düzeltmesi)', r.status !== 400, `status: ${r.status}`)
+
+r = await worker.fetch(istek({ gonderim: { ...GECERLI_GONDERIM, asama: 'Büyük Harf Boşluklu' } }), ENV)
+ok('gerçekten BİÇİMSİZ asama (boşluk/büyük harf/Türkçe karakter) hâlâ 400', r.status === 400)
+
+r = await worker.fetch(istek({ gonderim: { ...GECERLI_GONDERIM, asama: '' } }), ENV)
+ok('boş asama hâlâ 400 (eksik-alan kontrolünden geçer)', r.status === 400)
+
+r = await worker.fetch(istek({ gonderim: { ...GECERLI_GONDERIM, asama: '../../etc/passwd' } }), ENV)
+ok('path-traversal biçimli asama hâlâ 400', r.status === 400)
 
 r = await worker.fetch(istek({ gonderim: { ...GECERLI_GONDERIM, surum: 0 } }), ENV)
 ok('surum=0 (pozitif değil) 400', r.status === 400)
