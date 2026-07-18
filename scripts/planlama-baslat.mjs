@@ -196,9 +196,9 @@ function raporYaz(id, sonuc) {
       // duzeltmeTutarliligiKontrolEt / P2, 2026-07-18 kök-neden raporu). BLOKLAMAZ — onay
       // öncesi operatörün DİKKATİNE sunulur.
       if (s.duzeltme_uyarilari?.length) {
-        console.log(`\n  ⚠⚠ DÜZELTME UYARISI — ${s.duzeltme_uyarilari.length} olası uygulanmamış operatör-düzeltmesi:`)
+        console.log(`\n  ⚠⚠ DÜZELTME UYARISI — ${s.duzeltme_uyarilari.length} olası uygulanmamış operatör-cevabı:`)
         for (const u of s.duzeltme_uyarilari) {
-          console.log(`     • [${u.anahtar}] eski iddia hâlâ metinde: "${u.eskiIddiaOzeti}"`)
+          console.log(`     • [${u.anahtar}] beklenen: ${u.beklenen} — ${u.uyari}`)
         }
         console.log(`     Bu, "tüketildi" (yanıt executor'a geçirildi) ile "uygulandı" (belgeye yansıdı)`)
         console.log(`     AYRI şeyler olduğu için var — belgeyi ONAYLAMADAN ÖNCE inceleyin.`)
@@ -228,8 +228,8 @@ function raporYaz(id, sonuc) {
       {
         const sUyari = birimStateOf(state, a)?.duzeltme_uyarilari
         if (sUyari?.length) {
-          console.log(`\n  ⚠⚠ DÜZELTME UYARISI — ${sUyari.length} olası uygulanmamış operatör-düzeltmesi:`)
-          for (const u of sUyari) console.log(`     • [${u.anahtar}] eski iddia hâlâ metinde: "${u.eskiIddiaOzeti}"`)
+          console.log(`\n  ⚠⚠ DÜZELTME UYARISI — ${sUyari.length} olası uygulanmamış operatör-cevabı:`)
+          for (const u of sUyari) console.log(`     • [${u.anahtar}] beklenen: ${u.beklenen} — ${u.uyari}`)
         }
       }
       if (sonuc.butunlukHatasi) {

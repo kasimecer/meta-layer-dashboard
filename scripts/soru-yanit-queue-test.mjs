@@ -296,6 +296,43 @@ bolum('T8 — asama bir master-plan BÖLÜM id\'si olduğunda doğru birime çö
   } finally { temizle(root2) }
 }
 
+// ══ T9 — Priority 4c (2026-07-18): blocker-tier atlama TÜM-YA-DA-HİÇ ön-doğrulamada REDDEDİLİR ══
+// Eskiden ön-doğrulama atlandi:true için tier'e HİÇ bakmıyordu ("atlama her zaman geçerli") —
+// blocker bir kart CLI'nin atlaYaz()'ı REDDETSE de web-kuyruk yolunda ön-doğrulamayı GEÇİYOR,
+// sonra APPLY döngüsünde atlaYaz() fırlatıp "TÜM-YA-DA-HİÇ" garantisini BOZUYORDU (aynı
+// partideki ÖNCEKİ kayıtlar zaten YAZILMIŞ oluyordu) VE net bir "REDDEDİLDİ" yerine belirsiz bir
+// "beklenmeyen hata" üretiyordu.
+bolum('T9 — Priority 4c: blocker-tier atlama TÜM-YA-DA-HİÇ reddedilir (kısmi-yazım YOK)')
+{
+  const { root, ns, id, paket, isle } = kurulum('t9')
+  try {
+    // secim:x soruCHOICE ile kuruldu → tier VARSAYILANI 'blocker' (bkz planlamaSorular.mjs).
+    const gonderim = {
+      projeId: id, asama: 'genesis', surum: 1, soruImza: paket.imza,
+      yanitlar: [
+        { anahtar: 'veri:kaynak1', karar: 'veri', deger: 'yıllık %20', kaynak: 'kaynak1-dogrulandi' }, // GEÇERLİ, blocker'dan ÖNCE dizide
+        { anahtar: 'secim:x', atlandi: true, gerekce: 'test: blocker atlama denemesi' }, // blocker — reddedilmeli
+      ],
+    }
+    const sonuc = isle(gonderim)
+    ok('T9: TÜMÜ reddedildi (uygulandi DEĞİL)', sonuc.sonuc === 'reddedildi')
+    ok('T9: ret gerekçesi blocker/atlanamaz diyor', /blocker/.test(sonuc.neden) && /atlanamaz/.test(sonuc.neden))
+
+    // KRİTİK: partideki ÖNCEKİ geçerli kayıt (veri:kaynak1) da YAZILMAMIŞ olmalı — TÜM-YA-DA-HİÇ.
+    const yb = yanitlariHamOku(ns, 'genesis', 1)
+    ok('T9: TÜM-YA-DA-HİÇ korundu — partideki ÖNCEKİ geçerli kayıt (veri:kaynak1) da YAZILMADI',
+      yb.durum !== 'var' || !yb.ham.yanitlar.some(e => e.anahtar === 'veri:kaynak1'))
+  } finally { temizle(root) }
+
+  // Kontrol: blocker OLMAYAN bir atlama (serbest:x, tier='opsiyonel') HÂLÂ normal kabul ediliyor.
+  const { root: root2, ns: ns2, id: id2, paket: paket2, isle: isle2 } = kurulum('t9-regresyon')
+  try {
+    const gonderim2 = { projeId: id2, asama: 'genesis', surum: 1, soruImza: paket2.imza, yanitlar: [{ anahtar: 'serbest:x', atlandi: true, gerekce: 'ok' }] }
+    const sonuc2 = isle2(gonderim2)
+    ok('T9 (regresyon): blocker OLMAYAN atlama hâlâ normal kabul ediliyor', sonuc2.sonuc === 'uygulandi')
+  } finally { temizle(root2) }
+}
+
 // ══ Özet ═══════════════════════════════════════════════════════════════════════
 console.log(`\nSONUÇ: ${gecti} geçti, ${kaldi} kaldı`)
 process.exit(kaldi === 0 ? 0 : 1)

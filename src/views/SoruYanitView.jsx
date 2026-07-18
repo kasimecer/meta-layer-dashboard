@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { submitSoruYanit } from '../lib/writePath.js'
 import SubmitFailureBanner from '../components/SubmitFailureBanner.jsx'
+import { hazirMi, yanitKaydiUret, hazirDurumuHesapla, atlanabilirMi } from '../lib/soruYanitMantik.js'
 
 // #/sorular/<id> — planlama pipeline'ının açık sorularını gösterip yanıtlar. Operatör-seviyesi
 // (ProjectView'den drill-down, #/proje/<id> ile aynı ruh — jargon-saklama YOK). Dört soru tipi:
@@ -19,6 +20,11 @@ import SubmitFailureBanner from '../components/SubmitFailureBanner.jsx'
 
 const TIP_ETIKET = { CHOICE: 'SEÇİM', 'DATA-REQUEST': 'VERİ İSTEĞİ', 'FREE-TEXT': 'SERBEST METİN', APPROVAL: 'ONAY' }
 const TIP_RENK = { CHOICE: '#4338ca', 'DATA-REQUEST': '#9a3412', 'FREE-TEXT': '#0369a1', APPROVAL: '#71717a' }
+// 2026-07-18 (Priority 4c) — kart tipi gösteriliyordu ama ilerlemeyi DURDURUP durdurmadığı hiç
+// görünmüyordu (veri zaten soru.tier olarak geliyordu, yalnız KULLANILMIYORDU) — bir blocker
+// kart ile bir opsiyonel kart aynı görsel ağırlıktaydı.
+const TIER_ETIKET = { blocker: 'BLOCKER — durduruyor', onemli: 'önemli', opsiyonel: 'opsiyonel' }
+const TIER_RENK = { blocker: '#b91c1c', onemli: '#a16207', opsiyonel: '#71717a' }
 
 const INPUT_STYLE = {
   width: '100%', padding: '8px 11px', border: '1px solid #d4d4d8',
@@ -35,32 +41,20 @@ function TipRozeti({ tip }) {
   )
 }
 
-function hazirMi(soru, deger) {
-  if (!deger) return false
-  if (deger.atlandi) return true
-  if (soru.tip === 'CHOICE') return !!deger.secim
-  if (soru.tip === 'DATA-REQUEST') {
-    if (!deger.karar) return false
-    if (deger.karar === 'veri') return !!(deger.deger && deger.deger.trim())
-    return true
-  }
-  if (soru.tip === 'FREE-TEXT') return !!(deger.metin && deger.metin.trim())
-  return false
+function TierRozeti({ tier }) {
+  if (!tier) return null
+  return (
+    <span style={{
+      fontSize: 10, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase',
+      color: '#fff', background: TIER_RENK[tier] ?? '#71717a',
+      borderRadius: 999, padding: '2px 8px',
+    }}>{TIER_ETIKET[tier] ?? tier}</span>
+  )
 }
 
-function yanitKaydiUret(soru, deger) {
-  if (deger.atlandi) return { anahtar: soru.anahtar, atlandi: true, gerekce: deger.gerekce || null }
-  if (soru.tip === 'CHOICE') return { anahtar: soru.anahtar, secim: deger.secim }
-  if (soru.tip === 'DATA-REQUEST') {
-    const e = { anahtar: soru.anahtar, karar: deger.karar }
-    if (deger.karar === 'veri') {
-      e.deger = deger.deger.trim()
-      if (deger.kaynak?.trim()) e.kaynak = deger.kaynak.trim()
-    }
-    return e
-  }
-  return { anahtar: soru.anahtar, metin: deger.metin.trim() }
-}
+// hazirMi/yanitKaydiUret/hazirDurumuHesapla/atlanabilirMi artık src/lib/soruYanitMantik.js'te —
+// saf/framework-bağımsız mantık, hem bu bileşen hem hermetik Node testleri (bu .jsx dosyası JSX
+// taşıdığı için düz `node` ile import edilemez) tarafından PAYLAŞILIR.
 
 function AtlaKontrolu({ deger, onDegistir }) {
   const [gerekce, setGerekce] = useState('')
@@ -142,15 +136,24 @@ function FreeTextGirdisi({ soru, deger, onDegistir }) {
   )
 }
 
+// 2026-07-18 (Priority 4a) — DATA-REQUEST için soru.metin ZATEN iddiayı tam olarak içeriyordu
+// ("Bu iddia kaynakla desteklenemedi (kaynak: «X»): "iddia". Nasıl ilerleyelim?"),
+// DataRequestGirdisi'nin turuncu kutusu da AYNI iddiayı AYRICA gösteriyordu — operatör aynı
+// cümleyi iki kez okuyordu. DATA-REQUEST'te başlıkta artık sabit/kısa bir çerçeve metni
+// gösterilir, iddia YALNIZ turuncu kutuda (bir kez) görünür.
 function SoruKart({ soru, deger, onDegistir, salt }) {
+  const baslikMetni = soru.tip === 'DATA-REQUEST'
+    ? 'Kaynaklanamayan iddia — aşağıda. Nasıl ilerleyelim?'
+    : soru.metin
   return (
     <div style={{
       background: '#fff', border: '1px solid #e4e4e7', borderRadius: 10, padding: '14px 16px', marginBottom: 10,
       opacity: salt ? 0.75 : 1,
     }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
         <TipRozeti tip={soru.tip} />
-        <span style={{ fontSize: 13.5, color: '#18181b', fontWeight: 600, lineHeight: 1.45 }}>{soru.metin}</span>
+        <TierRozeti tier={soru.tier} />
+        <span style={{ fontSize: 13.5, color: '#18181b', fontWeight: 600, lineHeight: 1.45 }}>{baslikMetni}</span>
       </div>
 
       {soru.tip === 'APPROVAL' && (
@@ -164,7 +167,9 @@ function SoruKart({ soru, deger, onDegistir, salt }) {
       {!salt && soru.tip === 'CHOICE' && <ChoiceGirdisi soru={soru} deger={deger} onDegistir={onDegistir} />}
       {!salt && soru.tip === 'DATA-REQUEST' && <DataRequestGirdisi soru={soru} deger={deger} onDegistir={onDegistir} />}
       {!salt && soru.tip === 'FREE-TEXT' && <FreeTextGirdisi soru={soru} deger={deger} onDegistir={onDegistir} />}
-      {!salt && soru.tip !== 'APPROVAL' && <AtlaKontrolu deger={deger} onDegistir={onDegistir} />}
+      {/* 2026-07-18 (Priority 4c) — blocker kart ASLA atlanamaz (backend/izleyici reddeder,
+          bkz soru-yanit-kuyruk); UI daha önce başaramayacağı bir eylemi SUNUYORDU. */}
+      {!salt && atlanabilirMi(soru) && <AtlaKontrolu deger={deger} onDegistir={onDegistir} />}
     </div>
   )
 }
@@ -209,7 +214,11 @@ export default function SoruYanitView({ projeId }) {
     )
   }
 
-  const hazirSayisi = data.acik_sorular?.filter(s => hazirMi(s, taslaklar[s.anahtar])).length ?? 0
+  // 2026-07-18 (Priority 4d) — eskiden PAYDA opsiyonel/önemli kartları da içeriyordu, yani
+  // sayaç TÜM zorunlu (blocker) kartlar yanıtlandıktan SONRA bile "tam" görünmüyordu (operatör
+  // gerçekte tamamlanmış olan bir turu hâlâ eksik SANABİLİRDİ). Zorunlu-tamlık AYRI gösterilir
+  // (bkz src/lib/soruYanitMantik.js:hazirDurumuHesapla — hermetik test edilebilir).
+  const { hazirSayisi, blockerHazirSayisi, blockerToplam, blockerTamam } = hazirDurumuHesapla(data.acik_sorular, taslaklar)
 
   return (
     <div style={{ maxWidth: 680 }}>
@@ -278,8 +287,14 @@ export default function SoruYanitView({ projeId }) {
                   background: hazirSayisi > 0 && durum !== 'gonderiliyor' ? '#6366f1' : '#c7d2fe', color: '#fff',
                   cursor: hazirSayisi > 0 && durum !== 'gonderiliyor' ? 'pointer' : 'default',
                 }}>
-                  {durum === 'gonderiliyor' ? 'Gönderiliyor…' : `Gönder (${hazirSayisi}/${data.acik_sorular.length} hazır)`}
+                  {durum === 'gonderiliyor' ? 'Gönderiliyor…' : `Gönder (toplam ${hazirSayisi}/${data.acik_sorular.length} hazır)`}
                 </button>
+                {blockerToplam > 0 && (
+                  <div style={{ marginTop: 6, fontSize: 11.5, color: blockerTamam ? '#166534' : '#b91c1c' }}>
+                    {blockerTamam ? '✓' : '○'} Zorunlu (blocker): {blockerHazirSayisi}/{blockerToplam}
+                    {blockerTamam ? ' — tümü hazır, gönderebilirsin.' : ' — ilerlemek için bunlar hazır olmalı.'}
+                  </div>
+                )}
 
                 <SubmitFailureBanner
                   durum={durum}

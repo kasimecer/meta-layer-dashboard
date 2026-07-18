@@ -11,8 +11,9 @@ import { join } from 'path'
 import {
   sorulariOku, yanitButunluk, yanitlariHamOku, acikSorular,
   sorulariYaz, enSonYanitliOncekiSurum, oncekiYanitlariOku,
-  tumAcikAdaylar,
+  tumAcikAdaylar, slug,
 } from './planlamaSorular.mjs'
+import { operatorBeyaniMi } from './canliExecutor.mjs'
 
 // Üst (bir önceki) birim; sıradaki ilk eleman için null (kökün üstü yok).
 export function birimUst(sira, birim) {
@@ -203,29 +204,61 @@ export function birimAcikDurum(nsYolu, birimler, birimId) {
  */
 // "Tüketildi" (bir yanıt paketi executor'a GEÇİRİLDİ) ile "uygulandı" (o yanıtın içeriği
 // üretilen belgeye GERÇEKTEN yansıdı) AYRI şeylerdir — 2026-07-18 kök-neden raporu (sokak-
-// fotografciligi kalibrasyon koşumu): operatör bir iddiayı deger ile düzelttiğinde eski,
-// yanlış iddia metni yeni belgede AYNEN kalabiliyordu, "operatör-onaylı" etiketiyle birlikte.
-// Bu fonksiyon MEKANİK bir güvenlik-ağıdır (model uyumunu GARANTİ ETMEZ): bir yanıt bir iddiayı
-// deger ile değiştirdiyse, eski iddia metninin yeni içerikte hâlâ VERBATIM geçip geçmediğini
-// kontrol eder. Yanlış-negatif mümkündür (eski metin parafraze/kısaltılmış olabilir, o zaman
-// bu kontrol sessiz kalır); yanlış-pozitif riski düşüktür (eski metin bulunduysa gerçekten
-// oradadır) — bu yüzden BLOKLAMAZ, yalnız UYARIR (bkz operatör talebi: "flags it").
+// fotografciligi kalibrasyon koşumu).
+//
+// 2026-07-18 (Priority 5) — YENİDEN TASARIM. Eski sürüm SESSİZ bir kör-nokta taşıyordu: yalnız
+// "eski iddia metni yeni içerikte hâlâ VERBATIM geçiyor mu" diye bakıyordu — ama bir aşama
+// geçişinde (premise cevabı → arastirma'nın YENİ üretimi gibi) sonraki aşama iddiayı HER ZAMAN
+// kendi cümleleriyle YENİDEN YAZAR, eski cümleyi ASLA birebir tekrarlamaz; bu yüzden kontrol,
+// TAM DA korumak için var olduğu senaryoda (aşama-geçişi) YAPISAL OLARAK sessiz kalıyordu (canlı-
+// vaka: 2026-07-18 premise→arastirma turu, kontrol "temiz" döndü ama bu değerin doğru
+// yansıdığının KANITI değildi — yalnız eski metnin aynen kalmadığının kanıtıydı).
+//
+// Yeni tasarım POZİTİF'tir: Group A düzeltmesinden (tools/canliExecutor.mjs:yanitlarMetni) SONRA
+// her cevap türü artık DETERMİNİSTİK, KOD-üretilen TEK bir etiket bekler — kontrol o etiketin
+// GERÇEKTEN üretilen içerikte var olup olmadığına bakar (yokluk = uyarı), model-parafrazından
+// BAĞIMSIZ çalışır (aşama-geçişinde de sessiz KALMAZ, çünkü aradığı şey cümle değil ETİKETTİR,
+// ve etiket parametresi anahtar/slug'tan türediği için aşamalar arasında SABİT kalır).
+// 'dusur' KARARI İSTİSNADIR: orada beklenen "yeni bir etiket" değil, "eski iddianın YOKLUĞU"dur —
+// bu tek durumda eski davranış (verbatim-yokluk kontrolü) hâlâ doğru semantiktir.
+// Yine de BLOKLAMAZ, yalnız UYARIR — model uyumunu GARANTİ ETMEZ, yalnız GÖRÜNÜR kılar.
 export function duzeltmeTutarliligiKontrolEt(icerik, tuketim) {
   const sorunlar = []
   if (!icerik || !tuketim?.kayitlar?.length || !tuketim?.paket?.sorular) return sorunlar
   const soruHarita = new Map(tuketim.paket.sorular.map(s => [s.anahtar, s]))
   for (const e of tuketim.kayitlar) {
-    if (!(e.karar === 'tahmin' || e.karar === 'veri') || !e.deger) continue
+    if (e.atlandi === true) continue
     const s = soruHarita.get(e.anahtar)
-    if (!s) continue
-    const eskiIddia = String(s.iddia ?? s.metin ?? '').trim()
-    // Çok kısa eski-iddia metni (ör. tek kelime) yanlış-pozitif riski taşır — atla.
-    if (eskiIddia.length < 12) continue
-    if (icerik.includes(eskiIddia)) {
+    if (!s || s.tip !== 'DATA-REQUEST') continue // CHOICE/FREE-TEXT bu aşamalarda hiç tag üretmiyor
+
+    if (e.karar === 'dusur') {
+      const eskiIddia = String(s.iddia ?? s.metin ?? '').trim()
+      if (eskiIddia.length < 12) continue // çok kısa metin yanlış-pozitif riski taşır
+      if (icerik.includes(eskiIddia)) {
+        sorunlar.push({
+          anahtar: e.anahtar,
+          beklenen: '(iddianın DÜŞÜRÜLMÜŞ/yok olması)',
+          uyari: 'Operatör bu iddiayı DÜŞÜR dedi ama üretilen içerikte eski iddia metni hâlâ aynen geçiyor — düşürme uygulanmamış olabilir.',
+        })
+      }
+      continue
+    }
+
+    let beklenenEtiket = null
+    if (e.karar === 'veri') {
+      beklenenEtiket = operatorBeyaniMi(e.kaynak)
+        ? `[operator-beyan:${e.anahtar}]`
+        : `[dogrulandi:kaynak-${slug(e.kaynak)}]`
+    } else if (e.karar === 'tahmin') {
+      beklenenEtiket = `[operator-beyan:${e.anahtar}]`
+    }
+    if (!beklenenEtiket) continue
+
+    if (!icerik.includes(beklenenEtiket)) {
       sorunlar.push({
         anahtar: e.anahtar,
-        eskiIddiaOzeti: eskiIddia.length > 140 ? `${eskiIddia.slice(0, 140)}…` : eskiIddia,
-        uyari: 'Operatör bu iddiayı değiştirdi (deger verildi) ama üretilen içerikte ESKİ iddia metni hâlâ aynen geçiyor — düzeltme uygulanmamış olabilir.',
+        beklenen: beklenenEtiket,
+        uyari: `Operatör "${e.karar}" cevabı verdi ama üretilen içerikte beklenen ${beklenenEtiket} etiketi HİÇ geçmiyor — cevap belgeye yansımamış olabilir.`,
       })
     }
   }

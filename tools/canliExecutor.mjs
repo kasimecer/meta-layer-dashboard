@@ -10,6 +10,15 @@ import { TUM_BOLUMLER_ISARETI } from './planlamaBolumTanimlari.mjs'
 import { executorSarmalayicisiniTemizle } from './planlamaSarmalayiciTemizle.mjs'
 import { slug } from './planlamaSorular.mjs'
 
+// Bir DATA-REQUEST 'veri' cevabının kaynak'sız/operatör-beyanı MI, yoksa GERÇEK bir dış kaynak
+// MI olduğunu belirler — tools/planlamaBirimMotoru.mjs:duzeltmeTutarliligiKontrolEt ile
+// PAYLAŞILAN TEK sınıflandırma (2026-07-18, Priority 5): kontrolün hangi tag'i BEKLEMESİ
+// gerektiğini bilmesi için, yanitlarMetni'in modele SÖYLEDİĞİ tag'le AYNI mantığı kullanması
+// şart — iki ayrı kopya driftin garantisi olurdu.
+export function operatorBeyaniMi(kaynak) {
+  return !kaynak || /operat[öo]r/i.test(kaynak)
+}
+
 const ASAMA_DOSYALARI = {
   genesis:        'genesis.md',
   premise:        'premise.md',
@@ -20,14 +29,26 @@ const ASAMA_DOSYALARI = {
 
 const SAYI_KURALI = `\
 SAYILAR İÇİN KRİTİK KURAL — ihlal → belge kapıdan geri döner:
-Rakam içeren her satırda AYNI SATIRDA bir etiket OLMAK ZORUNDA.
+Rakam içeren her cümlede/tablo hücresinde KENDİ etiketi OLMAK ZORUNDA (kapı artık SATIR değil,
+CÜMLE/HÜCRE bazında kontrol eder — bir iddianın çıplak sayısı AYNI paragraftaki BAŞKA bir
+iddianın etiketiyle "kapanmış" sayılmaz; her iddia KENDİ etiketiyle geçer/kalır).
 Kapsam: %, milyon, milyar, bin, ₺, ay, gün, saat, hafta + ondalıklı sayılar + 4+ haneli sayılar (yıllar dahil).
 
 Kabul edilen etiket biçimleri:
   [doğrulanmış:kaynak-adı]         — gerçek kaynağa dayalı veri
-  [tahmin-doğrulanacak:kaynak-adı] — tahmini; doğrulama gerektirir
+  [tahmin-doğrulanacak:kaynak-adı] — tahmini; doğrulama gerektirir (kaynak-adı GERÇEK bir kaynak
+                                      betimlemesi olmalı — "operatör-onaylı" gibi bir yer-tutucu
+                                      YAZMA; operatörün zaten cevapladığı bir konuysa aşağıdaki
+                                      [operator-beyan:...] kullan)
   [eksik]                          — veri bilinmiyor
   [metadata:2026-06]               — yıl / tarih meta bilgisi
+  [operator-beyan:anahtar]         — bu SENİN ürettiğin yeni bir tahmin DEĞİL; operatörün DAHA
+                                      ÖNCE bir soruya verdiği cevabın (OPERATÖR YANITLARI bloğu)
+                                      DOĞRUDAN aktarımı. Parametre HER ZAMAN o cevabın anahtarı
+                                      olmalı (OPERATÖR YANITLARI bloğunda sana AYNEN verilir) —
+                                      kendi parametreni UYDURMA. Bunu KENDİ İLK-GEÇİŞ ürettiğin
+                                      YENİ bir iddia için KULLANMA (o zaman doğru seçim yukarıdaki
+                                      [tahmin-doğrulanacak:kaynak-adı]'dır).
 
 [tahmin-doğrulanacak:...] / [eksik] İÇİN OPSİYONEL EK ETİKET — AYNI SATIRA, ayrı bir etiket
 olarak [tier:blocker|onemli|opsiyonel] ekleyebilirsin (rubric IDDIA-STATÜSÜ kuralıyla AYNI
@@ -76,7 +97,7 @@ export function yanitlarMetni(tuketim) {
         // olmaz. Kaynak metninde "operatör/operator" geçiyorsa ya da kaynak hiç verilmemişse
         // KESİN olarak operator-beyan'a yönlendir; aksi halde modele iki olasılığı da göster.
         const kaynakStr = e.kaynak ? `; kaynak: ${e.kaynak}` : ''
-        const operatorBeyaniMi = !e.kaynak || /operat[öo]r/i.test(e.kaynak)
+        const veriOperatorBeyaniMi = operatorBeyaniMi(e.kaynak)
         // KISA KONTROLLÜ ANAHTAR (2026-07-16 P3 Fix B): e.kaynak operatörün/soru-yanıt-app'in
         // SERBEST METNİdir — bir URL+açıklama gibi 90+ karakter olabilir (gerçek gözlemlenen
         // vaka, bkz recon). [dogrulandi:...] param'ına bu HAM metni YAZDIRMAK YERİNE, aynı
@@ -87,24 +108,39 @@ export function yanitlarMetni(tuketim) {
         // listesine (efektifKaynak — planlamaIddiaDurumu.mjs, BU DEĞİŞİKLİKTEN ETKİLENMEDİ, o
         // hâlâ yanit.kaynak'ı HAM okur) akmaya devam eder — burada yalnız MODELE tag-içi
         // kullanım için önerilen değer kısaltılıyor.
-        const kaynakAnahtari = operatorBeyaniMi ? null : `kaynak-${slug(e.kaynak)}`
-        const rehber = operatorBeyaniMi
-          ? `Bu bir DIŞ KAYNAK DEĞİL — operatörün kendi kararı/beyanı. [operator-beyan:...] etiketiyle kullan; ASLA [dogrulandi:...] ile KULLANMA (araştırmanın doğrulamadığı bir "kaynak" gate'i reddettirir).`
-          : `Bu araştırma aşamasının GERÇEKTEN doğruladığı bir kaynaksa [dogrulandi:${kaynakAnahtari}] etiketiyle kullan — bu KISA ANAHTARI AYNEN kullan, yukarıdaki uzun kaynak metnini KÖŞELİ PARANTEZ İÇİNE YAZMA (tag param'ı kısa/kontrollü bir anahtar olmalı, tam cümle/URL DEĞİL); değilse (operatörün kendi kararıysa) [operator-beyan:...] kullan.`
+        const kaynakAnahtari = veriOperatorBeyaniMi ? null : `kaynak-${slug(e.kaynak)}`
+        // 2026-07-18 P1c/P1d düzeltmesi: parametre KOD tarafından üretilir, modele ASLA "..."
+        // bırakılmaz (eskiden model kendi yer-tutucusunu uyduruyordu — canlı-gözlemlenen vaka:
+        // "operatör-2026-07-18"). e.anahtar KULLANILIR ki belge, hangi cümlenin hangi operatör
+        // cevabına dayandığını anahtar üzerinden İZLENEBİLİR kılsın (bkz Priority 1 raporu).
+        const rehber = veriOperatorBeyaniMi
+          ? `Bu bir DIŞ KAYNAK DEĞİL — operatörün kendi kararı/beyanı. TAM OLARAK [operator-beyan:${e.anahtar}] etiketiyle kullan (başka bir parametre UYDURMA); ASLA [dogrulandi:...] ile KULLANMA (araştırmanın doğrulamadığı bir "kaynak" gate'i reddettirir).`
+          : `Bu araştırma aşamasının GERÇEKTEN doğruladığı bir kaynaksa [dogrulandi:${kaynakAnahtari}] etiketiyle kullan — bu KISA ANAHTARI AYNEN kullan, yukarıdaki uzun kaynak metnini KÖŞELİ PARANTEZ İÇİNE YAZMA (tag param'ı kısa/kontrollü bir anahtar olmalı, tam cümle/URL DEĞİL); değilse (operatörün kendi kararıysa) [operator-beyan:${e.anahtar}] kullan.`
         satirlar.push(`- VERİ: «${konu}» → değer: ${e.deger}${kaynakStr}. ${rehber}`)
       }
       else if (e.karar === 'tahmin') {
-        // 2026-07-18 P1/P2 düzeltmesi: eskiden `deger` burada HİÇ okunmuyordu — operatör bir
-        // iddiayı düzeltmek için tahmin+deger kullandığında düzeltme modele hiç ulaşmıyor,
-        // model ORİJİNAL (yanlış) iddiayı "operatör onayladı" diyerek AYNEN koruyordu (bkz
-        // meta-kanal 2026-07-18 kök-neden raporu, sokak-fotografciligi kalibrasyon koşumu).
-        // `deger` VARSA bu artık saf bir "tahmini onayla" DEĞİL — operatörün kendi belirlediği
-        // bir DEĞİŞTİRME'dir; etiket de buna göre operator-beyan'a yönlendirilir (tag içeriği
-        // soru-ANAHTARINI değil, cevabın GERÇEK içeriğini yansıtsın diye).
+        // 2026-07-18 P1/P2 düzeltmesi (ilk tur): `deger` artık okunuyor. 2026-07-18 P1c/P1d/P3
+        // düzeltmesi (bu tur): `deger` OLSUN OLMASIN, operatör-onaylı her iki durum da AYNI,
+        // TEK etikete ([operator-beyan:${e.anahtar}]) yönlendirilir — eskiden `deger` yokken
+        // jenerik/paylaşılan [tahmin-doğrulanacak:operatör-onaylı] kullanılıyordu: (a) bu etiket
+        // HİÇBİR cevaba özgü değildi (aynı belgede 2+ farklı operatör-onaylı cevap AYNI etikete
+        // düşüp izlenemez oluyordu — canlı-vaka: premise.md'deki 3 özdeş etiket), (b) BİR SONRAKİ
+        // aşamanın kendi soru-üretimi bu jenerik etiketi HÂLÂ "kaynaksız/yeni" sayıp OPERATÖRÜN
+        // ZATEN cevapladığı şeyi TEKRAR soruyordu (canlı-vaka: genesis'te "tahmin" ile kabul
+        // edilen 2 iddia, premise'de 3 özdeş etikete dönüşüp premise'in KENDİ yeni bir sorusuna
+        // katlandı — operatör bunu ASLA ayrı ayrı görmedi). [operator-beyan:...] etiketi
+        // dataRequestAdaylari'nin TAHMIN_DESENI taramasında HİÇ YAKALANMAZ (yalnız [tahmin-
+        // doğrulanacak:...] yakalanır) — yani bu tag türüne geçiş, "operatör zaten cevapladı"
+        // iddialarının bir SONRAKİ aşamada YENİDEN sorulmasını YAPISAL olarak imkânsız kılar,
+        // ayrı bir "zaten-onaylı" tanıma mekanizması GEREKMEZ. Epistemik açıdan da daha dürüst:
+        // "operatör tahmini olduğu gibi onayladı" ile "operatör kendi değerini verdi" arasındaki
+        // fark okuyucu için önemsizdir — ikisi de nihayetinde yalnız operatörün sözüne dayanır,
+        // bağımsız doğrulama YOKTUR; tek bir dürüst etiket bunu yanlış bir kesinlik izlenimi
+        // vermeden yansıtır.
         if (e.deger) {
-          satirlar.push(`- TAHMİN→DÜZELTME (operatör-onaylı): eski iddia «${konu}» → OPERATÖR BUNU ŞUNUNLA DEĞİŞTİRDİ: «${e.deger}». Belgede YALNIZ bu yeni değeri kullan; eski iddiayı AYNEN YAZMA/TEKRARLAMA/KORUMA. Bu artık operatörün kendi belirlediği bir beyandır (ampirik bir tahmin onayı DEĞİL) — [operator-beyan:${e.anahtar}] etiketiyle kullan, [tahmin-doğrulanacak:...] KULLANMA.`)
+          satirlar.push(`- TAHMİN→DÜZELTME (operatör-onaylı): eski iddia «${konu}» → OPERATÖR BUNU ŞUNUNLA DEĞİŞTİRDİ: «${e.deger}». Belgede YALNIZ bu yeni değeri kullan; eski iddiayı AYNEN YAZMA/TEKRARLAMA/KORUMA. TAM OLARAK [operator-beyan:${e.anahtar}] etiketiyle kullan (başka parametre UYDURMA), [tahmin-doğrulanacak:...] KULLANMA.`)
         } else {
-          satirlar.push(`- TAHMİN (operatör-onaylı): «${konu}» → operatör tahmini OLDUĞU GİBİ (değiştirmeden) onayladı. [tahmin-doğrulanacak:operatör-onaylı] etiketiyle kullan.`)
+          satirlar.push(`- TAHMİN (operatör-onaylı): «${konu}» → operatör tahmini OLDUĞU GİBİ (değiştirmeden) onayladı; bu operatörün kendi kararıdır, bağımsız doğrulanmış değildir. TAM OLARAK [operator-beyan:${e.anahtar}] etiketiyle kullan (başka parametre UYDURMA), [tahmin-doğrulanacak:...] KULLANMA.`)
         }
       }
       else if (e.karar === 'dusur') satirlar.push(`- DÜŞÜR: «${konu}» → bu iddiayı ÇIKAR, bu aşamada KULLANMA.${e.deger ? ` (operatör notu: ${e.deger})` : ''}`)

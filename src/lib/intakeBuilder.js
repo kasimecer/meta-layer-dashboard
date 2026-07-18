@@ -3,6 +3,7 @@
 // Saf JS (React bağımlılığı yok); node ve tarayıcıda çalışır.
 
 import { kartDogrula } from './stateMachine.js'
+import { kelimeSiniriKirp } from './metinKirp.js'
 
 // Proje lifecycle'daki faz sınırı: planlama (fikir → plan) | build (build-onayı →)
 const PLANLAMA_DURUMLARI = new Set(['fikir', 'araştırma', 'premise', 'plan'])
@@ -30,9 +31,14 @@ export function idOner(ad, icerik) {
 // ── Proje kaydı ──────────────────────────────────────────────────────────────
 
 export function projeKaydiUret({ id, kip, ad, icerik }) {
+  // 2026-07-18 (Priority 2b) — eskiden koşulsuz `.slice(0,140)`, kelime sınırı FARKINDALIĞI
+  // yok (canlı-vaka: "...Ücret 50-100 s" — "SEK" kelimesinin ortasında kesilmişti). Bu alan
+  // yalnız portföy-görüntüleme İÇİN kısa bir önizlemedir (pipeline artık bunu OKUMUYOR, bkz
+  // 2026-07-18 A/B/C onarımı — kanonik fikir kaynağı intake.md'dir) — ama görüntülendiği için
+  // hâlâ kelime ortasında kesilmemeli.
   const ozet = kip === 'fikir-var'
-    ? (icerik.fikirMetni || '').slice(0, 140)
-    : [icerik.ilgiAlani, icerik.kisit, icerik.varlik].filter(Boolean).join(' · ').slice(0, 140)
+    ? kelimeSiniriKirp(icerik.fikirMetni || '', 140)
+    : kelimeSiniriKirp([icerik.ilgiAlani, icerik.kisit, icerik.varlik].filter(Boolean).join(' · '), 140)
 
   return {
     id,

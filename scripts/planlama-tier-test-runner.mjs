@@ -250,13 +250,20 @@ bolum('YM — yanitlarMetni: dogrulandi KISA anahtar, ham kaynak metni HİÇBİR
     metinOperator.includes('ASLA [dogrulandi:...] ile KULLANMA'))
   ok('YM-POS: operatör-beyanı dalında [dogrulandi:kaynak-...] önerisi YOK', !metinOperator.includes('[dogrulandi:kaynak-'))
 
-  // POZİTİF (regresyon): 'tahmin' dalı DEĞİŞMEDİ — sabit literal etiket, downgrade YOK.
+  // 2026-07-18 (Priority 1c/1d/3a/3b) — 'tahmin' dalı (deger YOK) artık jenerik/paylaşılan
+  // [tahmin-doğrulanacak:operatör-onaylı] DEĞİL, anahtar-türetilmiş [operator-beyan:<anahtar>]
+  // üretiyor (operator-beyan TAHMIN_DESENI taramasında hiç yakalanmadığı için bir SONRAKİ
+  // aşama bunu "hâlâ kaynaksız/yeniden sorulmalı" SAYMIYOR — bkz canlı-vaka: genesis'te tahmin
+  // ile kabul edilen 2 iddia, eski şemada premise'de 3 özdeş etikete dönüşüp premise'in KENDİ
+  // yeni bir sorusuna katlanıyordu).
   const tuketimTahmin = { ust: 'yasal-uyumluluk', surum: 1, paket, kayitlar: [
     { anahtar: 'veri:api-lisans-maliyeti', karar: 'tahmin' },
   ] }
   const metinTahmin = yanitlarMetni(tuketimTahmin)
-  ok('YM-POS: \'tahmin\' dalı DEĞİŞMEDİ — [tahmin-doğrulanacak:operatör-onaylı] sabit etiketi hâlâ var',
-    metinTahmin.includes('[tahmin-doğrulanacak:operatör-onaylı]'))
+  ok('YM-POS: \'tahmin\' dalı (deger yok) artık anahtar-türetilmiş [operator-beyan:<anahtar>] üretiyor',
+    metinTahmin.includes('[operator-beyan:veri:api-lisans-maliyeti]'))
+  ok('YM-POS: \'tahmin\' dalı (deger yok) ARTIK jenerik [tahmin-doğrulanacak:operatör-onaylı] ÜRETMİYOR',
+    !metinTahmin.includes('[tahmin-doğrulanacak:operatör-onaylı]'))
 
   // POZİTİF (regresyon): 'dusur' dalı DEĞİŞMEDİ.
   const tuketimDusur = { ust: 'yasal-uyumluluk', surum: 1, paket, kayitlar: [

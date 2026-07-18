@@ -2,19 +2,40 @@
 // Her kapı: (aşama-çıktı-metni) → { gecti: bool, neden?: string }
 
 // Yardımcı: metin içinde kaynak-etiketsiz çıplak sayı/figür var mı kontrol et.
-// Satır-bazlı: bir satırda sayı varsa aynı satırda etiket de olmalı.
 // Çıplak sayı = ünite taşıyan rakam (%, milyon, ₺ vb.) veya ondalıklı/4+ haneli sayı.
 const SAYI_DESENI = /\b\d[\d.,]*\s*(?:%|milyon|milyar|bin|₺|kr|ay|gün|saat|hafta)|\b\d{4,}\b|\b\d+[.,]\d+\b/
-const ETIKET_DESENI = /\[(?:doğrulanmış|tahmin|eksik|ortak|canlı|metadata)[^\]]*\]/
+// operator-beyan 2026-07-18'de eklendi: tools/canliExecutor.mjs:yanitlarMetni artık operatör-
+// onaylı (kaynaksız/deger'siz) cevapları BU etikete yönlendiriyor (bkz Priority 1b/1c raporu) —
+// eskiden bu etiket burada TANINMIYORDU, yalnız AYNI birimde BAŞKA geçerli bir etiket varsa
+// (tesadüfen) geçiyordu; artık kendi başına GEÇERLİ bir etikettir.
+const ETIKET_DESENI = /\[(?:doğrulanmış|tahmin|eksik|ortak|canlı|metadata|operator-beyan)[^\]]*\]/
+// Cümle sınırı — tools/planlamaSorular.mjs:CUMLE_SINIRI_DESENI ile AYNI basit ruh (kasıtlı-
+// lenient; noktalı-virgül/kısaltma-farkındalığı YOK).
+const CUMLE_SINIRI_DESENI_KAPI = /[.!?]\s+/
+
+// 2026-07-18 (Priority 1b): bir SATIR (paragraf) birden çok iddia taşıyabilir — eskiden kontrol
+// TÜM SATIRDA herhangi bir geçerli etiket var mı diye bakıyordu, yani bir iddianın çıplak sayısı
+// SATIRDAKİ BAŞKA bir iddianın etiketiyle "kapanmış" sayılabiliyordu (canlı-vaka: arastirma.md'de
+// [operator-beyan:...] etiketi kapıdan yalnız AYNI paragraftaki alakasız [tahmin-doğrulanacak:
+// WTP-pilot-verisi] etiketi sayesinde geçmişti). Artık kontrol birimi SATIR değil, satırın alt-
+// birimidir: tablo veri satırlarında HÜCRE, düz-yazı satırlarında CÜMLE — bir iddia yalnız KENDİ
+// biriminde bir etiket varsa geçer.
+function satirBirimleriCikar(satir) {
+  if (/^\s*\|.*\|\s*$/.test(satir)) {
+    return satir.trim().split('|').map(h => h.trim()).filter(h => h.length > 0)
+  }
+  return satir.split(CUMLE_SINIRI_DESENI_KAPI)
+}
 
 export function ciplakSayiVarMi(metin) {
   for (const satir of metin.split('\n')) {
     // Tablo ayırıcı satırı atla (|---|---|)
     if (/^\s*\|[\s\-|]+\|?\s*$/.test(satir)) continue
-    // Sadece tarih/sezon metni — rakam yok
-    if (!SAYI_DESENI.test(satir)) continue
-    // Sayı var ama aynı satırda etiket yok → çıplak sayı
-    if (!ETIKET_DESENI.test(satir)) return true
+    for (const birim of satirBirimleriCikar(satir)) {
+      if (!SAYI_DESENI.test(birim)) continue
+      // Sayı var ama KENDİ biriminde (hücre/cümle) etiket yok → çıplak sayı
+      if (!ETIKET_DESENI.test(birim)) return true
+    }
   }
   return false
 }

@@ -133,7 +133,19 @@ export function gonderimiIsle(gonderim, { log = () => {}, projelerRoot = META_DA
     if (!soru) {
       return { sonuc: 'reddedildi', neden: `yabancı/APPROVAL anahtar (bu soru setinde yok veya onaydır): ${e.anahtar}` }
     }
-    if (e.atlandi === true) continue // atlama her zaman geçerli (APPROVAL hariç — yukarıda elendi)
+    if (e.atlandi === true) {
+      // 2026-07-18 (Priority 4c) — eskiden burada tier hiç kontrol edilmiyordu: bir blocker-tier
+      // atlama bu ön-doğrulamayı GEÇİYOR, sonra APPLY döngüsünde atlaYaz() fırlatıyordu — "TÜM-
+      // YA-DA-HİÇ" garantisini BOZUYORDU (aynı partideki ÖNCEKİ kayıtlar zaten YAZILMIŞ oluyordu,
+      // atlaYaz'ın fırlattığı hata da "REDDEDİLDİ" değil "beklenmeyen hata" olarak loglanıyordu).
+      // Panel tarafında (SoruYanitView.jsx) blocker kartlarda Atla düğmesi artık HİÇ
+      // gösterilmiyor, ama Worker/izleyici kendi başına da AYNI kuralı GEÇERLİ KILMALI — CLI'nin
+      // atlaYaz() zaten reddettiği şeyi burada da (yazmadan ÖNCE) reddetmek gerekir.
+      if (soru.tier === 'blocker') {
+        return { sonuc: 'reddedildi', neden: `"${e.anahtar}" blocker-tier — atlanamaz (tek kapanma yolu: cevapla)` }
+      }
+      continue // atlama (blocker DIŞINDA) her zaman geçerli (APPROVAL hariç — yukarıda elendi)
+    }
     if (!yanitlandiMi(soru, e)) {
       return { sonuc: 'reddedildi', neden: `"${e.anahtar}" (${soru.tip}) için yanıt şekli geçersiz/eksik` }
     }
