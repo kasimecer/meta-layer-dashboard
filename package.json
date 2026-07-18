@@ -21,6 +21,7 @@
     "planlama-bolum-test": "node scripts/planlama-bolum-test-runner.mjs",
     "planlama-tier-test": "node scripts/planlama-tier-test-runner.mjs",
     "planlama-fikir-duzeltme-test": "node scripts/planlama-fikir-duzeltme-test-runner.mjs",
+    "planlama-prompt-intake-proof": "node scripts/planlama-prompt-intake-proof.mjs",
     "planlama-elestiri-test": "node scripts/planlama-elestiri-test-runner.mjs",
     "planlama-kart-test": "node scripts/planlama-kart-turetici-test-runner.mjs",
     "planlama-soru-demo": "node scripts/planlama-soru-demo.mjs",

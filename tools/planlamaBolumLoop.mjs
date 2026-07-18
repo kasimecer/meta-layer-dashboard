@@ -65,7 +65,7 @@ export function aktifBolumBilgisi(state) {
 
 // Bölüm bağlamını (ustBaglamAnahtarlari) kur — aşama-seviyesi VE bölüm-seviyesi anahtarları
 // karışık taşıyabilir; hangi map'te arayacağını GERCEK_ASAMALAR üyeliğine bakarak seçer.
-function bolumBaglamlarKur(nsYolu, state, mp, bolumId) {
+export function bolumBaglamlarKur(nsYolu, state, mp, bolumId) {
   const tanim = BOLUM_TANIMLARI[bolumId]
   const b = {}
   // Kanonik fikir kaynağı — planlamaLoopV2.mjs:baglamlarKur ile AYNI mantık, bölüm-seviyesi
