@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { submitSoruYanit } from '../lib/writePath.js'
 import SubmitFailureBanner from '../components/SubmitFailureBanner.jsx'
-import { hazirMi, yanitKaydiUret, hazirDurumuHesapla, atlanabilirMi } from '../lib/soruYanitMantik.js'
+import { hazirMi, yanitKaydiUret, hazirDurumuHesapla, atlanabilirMi, icEtiketleriTemizle, kartBasligiUret } from '../lib/soruYanitMantik.js'
 
 // #/sorular/<id> — planlama pipeline'ının açık sorularını gösterip yanıtlar. Operatör-seviyesi
 // (ProjectView'den drill-down, #/proje/<id> ile aynı ruh — jargon-saklama YOK). Dört soru tipi:
@@ -97,17 +97,26 @@ function ChoiceGirdisi({ soru, deger, onDegistir }) {
   )
 }
 
+// 2026-07-18 (kart-okunabilirlik turu) — DAHA ÖNCE bu kutu yalnız `!salt` (etkileşimli) kartlarda
+// render ediliyordu; ertelenen (salt) kartlar bu yüzden İDDİANIN KENDİSİNİ HİÇ göstermiyordu —
+// yalnız (artık ayırt edici olsa da) başlığı. Şimdi AYRI bir bileşen: hem etkileşimli hem salt
+// kartlarda gösterilir. Metin `icEtiketleriTemizle` ile temizlenir — iç/belge etiketleri
+// operatöre GÖRÜNMEZ (belgeler bunları taşımaya devam eder, bu yalnız GÖRÜNTÜLEME).
+function IddiaKutusu({ soru }) {
+  if (!soru.iddia) return null
+  return (
+    <div style={{ fontSize: 12.5, color: '#7c2d12', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '8px 10px', marginBottom: 8, lineHeight: 1.5 }}>
+      <strong>Kaynaklanamayan iddia:</strong> {icEtiketleriTemizle(soru.iddia)}
+      {soru.kaynak && <div style={{ marginTop: 2, fontSize: 11, color: '#9a5b3a' }}>denenen kaynak: {icEtiketleriTemizle(soru.kaynak)}</div>}
+    </div>
+  )
+}
+
 function DataRequestGirdisi({ soru, deger, onDegistir }) {
   const karar = deger?.karar
   const secenekler = soru.secenekler_kararli ?? []
   return (
     <div>
-      {soru.iddia && (
-        <div style={{ fontSize: 12.5, color: '#7c2d12', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '8px 10px', marginBottom: 8, lineHeight: 1.5 }}>
-          <strong>Kaynaklanamayan iddia:</strong> {soru.iddia}
-          {soru.kaynak && <div style={{ marginTop: 2, fontSize: 11, color: '#9a5b3a' }}>denenen kaynak: {soru.kaynak}</div>}
-        </div>
-      )}
       {secenekler.map(({ karar: k, etiket }) => (
         <label key={k} style={{
           display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', marginBottom: 6, cursor: 'pointer',
@@ -136,15 +145,14 @@ function FreeTextGirdisi({ soru, deger, onDegistir }) {
   )
 }
 
-// 2026-07-18 (Priority 4a) — DATA-REQUEST için soru.metin ZATEN iddiayı tam olarak içeriyordu
-// ("Bu iddia kaynakla desteklenemedi (kaynak: «X»): "iddia". Nasıl ilerleyelim?"),
-// DataRequestGirdisi'nin turuncu kutusu da AYNI iddiayı AYRICA gösteriyordu — operatör aynı
-// cümleyi iki kez okuyordu. DATA-REQUEST'te başlıkta artık sabit/kısa bir çerçeve metni
-// gösterilir, iddia YALNIZ turuncu kutuda (bir kez) görünür.
+// 2026-07-18 (kart-okunabilirlik turu — canlı-vaka: 23 kartın HEPSİ özdeş sabit başlık
+// taşıyordu, telefonda kaydırırken ayırt edilemiyordu). Başlık artık İDDİANIN KENDİSİNDEN
+// türetilen KISA, AYIRT EDİCİ bir özet (kartBasligiUret — src/lib/soruYanitMantik.js, etiket-
+// temizlenmiş + kelime-sınırı farkında kısaltılmış). İddia kutusu (IddiaKutusu) artık `salt`
+// (ertelenen) kartlarda da gösterilir — eskiden yalnız etkileşimli kartlarda render ediliyordu,
+// ertelenen 13 kart iddiayı HİÇ göstermiyordu.
 function SoruKart({ soru, deger, onDegistir, salt }) {
-  const baslikMetni = soru.tip === 'DATA-REQUEST'
-    ? 'Kaynaklanamayan iddia — aşağıda. Nasıl ilerleyelim?'
-    : soru.metin
+  const baslikMetni = kartBasligiUret(soru)
   return (
     <div style={{
       background: '#fff', border: '1px solid #e4e4e7', borderRadius: 10, padding: '14px 16px', marginBottom: 10,
@@ -164,6 +172,7 @@ function SoruKart({ soru, deger, onDegistir, salt }) {
           </code>{' '}ile onaylanır.
         </div>
       )}
+      {soru.tip === 'DATA-REQUEST' && <IddiaKutusu soru={soru} />}
       {!salt && soru.tip === 'CHOICE' && <ChoiceGirdisi soru={soru} deger={deger} onDegistir={onDegistir} />}
       {!salt && soru.tip === 'DATA-REQUEST' && <DataRequestGirdisi soru={soru} deger={deger} onDegistir={onDegistir} />}
       {!salt && soru.tip === 'FREE-TEXT' && <FreeTextGirdisi soru={soru} deger={deger} onDegistir={onDegistir} />}
