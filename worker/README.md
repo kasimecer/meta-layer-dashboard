@@ -18,11 +18,20 @@ Statik site (GH-Pages) **olduğu gibi kalır**. Bu Worker ayrı bir write/auth e
   insan tarafından ayrı, elle bir terminal komutuyla yapılır (`node scripts/planlama-baslat.mjs
   <id>`). Bkz `soru-yanit-kuyruk/README.md`.
 - `GET /health` — canlılık testi.
+- `GET /failures` — (2026-07-18, C) son N BAŞARISIZ (4xx/5xx) isteğin kalıcı izini listeler
+  (`SUBMIT_TOKEN` kapısı, header `x-submit-token` veya `?token=`). `?limit=` (varsayılan 50,
+  tavan 200). Amaç: "hiç tıklanmadı" ile "tıklandı ama sessizce başarısız oldu" belirsizliğini
+  (bkz meta-kanal.md 2026-07-18 P0 kesinleştirme raporu) bir sonraki sefer YANITLANABİLİR
+  kılmak — GitHub-as-datastore'dan BİLEREK BAĞIMSIZ bir KV kaydı (`META_LOG` binding), GitHub
+  erişilemez olsa bile ayakta kalır. Her başarısız yanıt otomatik (fire-and-forget,
+  `ctx.waitUntil`) buraya yazılır — ayrı bir çağrı GEREKMEZ.
 
 Operatör okuma-yolu artık burada değil: `meta-layer-operator.pages.dev` (Direct-Upload, ayrı Pages
 projesi, Cloudflare Access ile korunur). Eski `GET /operator` (`OPERATOR_TOKEN` iskelet) kaldırıldı.
 
 Yapılandırma `wrangler.toml [vars]` içinde (owner/repo/branch/inbox-path). Secret'ler **repoya girmez**.
+`META_LOG` (KV namespace, `wrangler.toml [[kv_namespaces]]`) — teşhis-amaçlı hata izi, iş verisi
+TAŞIMAZ; namespace `wrangler kv namespace create META_LOG` ile (2026-07-18) bir kez oluşturuldu.
 
 ---
 

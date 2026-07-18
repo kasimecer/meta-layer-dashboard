@@ -48,7 +48,8 @@ export function bosAsama() {
     kabul_edilen_ust_surum: null, // bu aşamanın inşa/kabul edildiği üst-aşama sürümü
     // SORU–YANIT katmanı (additive; eski dosyalar normalizeState ile null'lanır → geriye-uyumlu):
     sorular_surum: null,             // bu koşumun sorular artefaktı sürümü (soru yoksa null)
-    tuketilen_ust_yanit_surum: null, // bu aşama son koştuğunda TÜKETTİĞİ üst-aşama yanıt sürümü (izlenebilirlik)
+    tuketilen_ust_yanit_surum: null, // bu aşama son koştuğunda TÜKETTİĞİ üst-aşama yanıt sürümü (izlenebilirlik — "tüketildi", "uygulandı" DEĞİL)
+    duzeltme_uyarilari: [],          // mekanik kontrol: tüketilen bir düzeltme (deger) eski iddia metnini üzerine YAZAMADIYSA burada görünür (bkz planlamaBirimMotoru.mjs:duzeltmeTutarliligiKontrolEt) — boş = temiz
   }
 }
 

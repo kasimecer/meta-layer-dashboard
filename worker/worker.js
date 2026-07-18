@@ -24,7 +24,7 @@ const GH_API = 'https://api.github.com'
 const UA = 'meta-layer-write-worker'
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url)
     const origin = request.headers.get('Origin') || ''
 
@@ -33,26 +33,80 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders(origin, env) })
     }
 
+    let resp
     try {
       if (url.pathname === '/health') {
-        return json({ ok: true, service: 'meta-layer-write' }, 200, origin, env)
+        resp = json({ ok: true, service: 'meta-layer-write' }, 200, origin, env)
+      } else if (url.pathname === '/submit' && request.method === 'POST') {
+        resp = await handleSubmit(request, env, origin)
+      } else if (url.pathname === '/intake-queue' && request.method === 'POST') {
+        resp = await handleIntakeQueue(request, env, origin)
+      } else if (url.pathname === '/soru-yanit-queue' && request.method === 'POST') {
+        resp = await handleSoruYanitQueue(request, env, origin)
+      } else if (url.pathname === '/failures' && request.method === 'GET') {
+        resp = await handleFailures(request, env, origin)
+      } else {
+        resp = json({ ok: false, hata: 'bulunamadı' }, 404, origin, env)
       }
-      if (url.pathname === '/submit' && request.method === 'POST') {
-        return await handleSubmit(request, env, origin)
-      }
-      if (url.pathname === '/intake-queue' && request.method === 'POST') {
-        return await handleIntakeQueue(request, env, origin)
-      }
-      if (url.pathname === '/soru-yanit-queue' && request.method === 'POST') {
-        return await handleSoruYanitQueue(request, env, origin)
-      }
-      return json({ ok: false, hata: 'bulunamadı' }, 404, origin, env)
     } catch (e) {
       // Beklenmeyen → istemciye sızdırma; logla
       console.error('worker hata:', e && e.stack || e)
-      return json({ ok: false, hata: 'sunucu hatası' }, 500, origin, env)
+      resp = json({ ok: false, hata: 'sunucu hatası' }, 500, origin, env)
     }
+
+    // 2026-07-18 (C — kalıcı hata izi): her BAŞARISIZ (4xx/5xx) yanıt, /health ve /failures
+    // HARİÇ, KV'ye kalıcı bir kayıt bırakır — "hiç tıklanmadı" ile "tıklandı ama sessizce
+    // başarısız oldu" belirsizliği (bkz meta-kanal 2026-07-18 P0 kesinleştirme raporu) bir
+    // daha ele alınamaz olmasın diye. ctx.waitUntil ile yanıtı GECİKTİRMEZ; KV yazımı
+    // başarısız olsa bile (logFailure kendi try/catch'i) asıl yanıt ETKİLENMEZ.
+    if (resp.status >= 400 && url.pathname !== '/health' && url.pathname !== '/failures' && ctx?.waitUntil) {
+      ctx.waitUntil(logFailure(env, { yol: url.pathname, status: resp.status, origin }))
+    }
+
+    return resp
   },
+}
+
+// ============================================================
+// Kalıcı hata izi — KV (META_LOG binding). GitHub-as-datastore'dan BİLEREK BAĞIMSIZ: GitHub'a
+// yazım BAŞARISIZ olduğunda bile (ör. GH kendisi erişilemez) bu iz hâlâ tutulabilir. Yazım
+// başarısız olursa (env.META_LOG yoksa / KV hatası) SESSİZCE yutulur — asıl HTTP yanıtını asla
+// etkilemez (bu yalnız TEŞHİS amaçlı ikincil bir iz, birincil işlevi bloklayamaz).
+// ============================================================
+async function logFailure(env, { yol, status, origin }) {
+  if (!env.META_LOG) return
+  try {
+    const ts = new Date().toISOString()
+    const anahtar = `fail:${ts}:${Math.random().toString(36).slice(2, 8)}`
+    const kayit = { ts, yol, status, origin: origin || null }
+    await env.META_LOG.put(anahtar, JSON.stringify(kayit), { expirationTtl: 60 * 60 * 24 * 30 })
+  } catch (e) {
+    console.error('logFailure hata (yutuldu):', e && e.stack || e)
+  }
+}
+
+// ============================================================
+// GET /failures — son N başarısız-istek kaydını listeler (teşhis amaçlı, token-gated).
+// header x-submit-token VEYA ?token= — operatör/CC terminalden curl ile sorgular.
+// ============================================================
+async function handleFailures(request, env, origin) {
+  const url = new URL(request.url)
+  const token = request.headers.get('x-submit-token') || bearer(request) || url.searchParams.get('token')
+  if (!env.SUBMIT_TOKEN || !safeEqual(token, env.SUBMIT_TOKEN)) {
+    return json({ ok: false, hata: 'yetkisiz' }, 401, origin, env)
+  }
+  if (!env.META_LOG) return json({ ok: true, kayitlar: [], not: 'META_LOG binding yok' }, 200, origin, env)
+
+  const limit = Math.min(Number(url.searchParams.get('limit')) || 50, 200)
+  const liste = await env.META_LOG.list({ prefix: 'fail:', limit })
+  const kayitlar = []
+  for (const k of liste.keys) {
+    const deger = await env.META_LOG.get(k.name)
+    if (deger) { try { kayitlar.push(JSON.parse(deger)) } catch { /* noop */ } }
+  }
+  // en-yeni-önce (anahtar ISO-zaman-damgalı → sözlüksel sıralama = kronolojik)
+  kayitlar.sort((a, b) => (a.ts < b.ts ? 1 : -1))
+  return json({ ok: true, kayitlar }, 200, origin, env)
 }
 
 // ============================================================

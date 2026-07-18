@@ -95,6 +95,14 @@ export async function planlamaLoopV2Calistir(nsYolu, projeId, executor, {
   // Üst aşamaların GÜNCEL sürüm içeriklerini state'in cikti_pointer'larından topla.
   function baglamlarKur() {
     const b = {}
+    // KANONIK FİKİR KAYNAĞI (materyalize anında yazılan intake.md) — HER koşumda diskten TAZE
+    // okunur (operatör sonradan elle düzeltirse bir sonraki koşumda otomatik yansır). Tüm
+    // aşama prompt'larına (promptUret/promptUretBolum, tools/canliExecutor.mjs) enjekte edilir —
+    // ozet (registry.json, 140-karakter kırpılmış) YALNIZ portföy-görüntüleme içindir, prompt
+    // inşasında ARTIK KULLANILMAZ (bkz meta-kanal 2026-07-18 kök-neden raporu: kırpma + hiç-
+    // okunmayan intake.md, düzeltmelerin pipeline'a hiç ulaşmamasının kök nedeniydi).
+    const intake = icerikOku(join(nsYolu, 'intake.md'))
+    if (intake != null) b.intake = intake
     for (const p of GERCEK_ASAMALAR) {
       const ps = state.asamalar[p]
       const icerik = icerikOku(ps?.cikti_pointer)

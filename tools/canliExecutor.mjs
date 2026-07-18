@@ -93,8 +93,21 @@ export function yanitlarMetni(tuketim) {
           : `Bu araştırma aşamasının GERÇEKTEN doğruladığı bir kaynaksa [dogrulandi:${kaynakAnahtari}] etiketiyle kullan — bu KISA ANAHTARI AYNEN kullan, yukarıdaki uzun kaynak metnini KÖŞELİ PARANTEZ İÇİNE YAZMA (tag param'ı kısa/kontrollü bir anahtar olmalı, tam cümle/URL DEĞİL); değilse (operatörün kendi kararıysa) [operator-beyan:...] kullan.`
         satirlar.push(`- VERİ: «${konu}» → değer: ${e.deger}${kaynakStr}. ${rehber}`)
       }
-      else if (e.karar === 'tahmin') satirlar.push(`- TAHMİN (operatör-onaylı): «${konu}» → operatör tahmini onayladı. [tahmin-doğrulanacak:operatör-onaylı] etiketiyle kullan.`)
-      else if (e.karar === 'dusur') satirlar.push(`- DÜŞÜR: «${konu}» → bu iddiayı ÇIKAR, bu aşamada KULLANMA.`)
+      else if (e.karar === 'tahmin') {
+        // 2026-07-18 P1/P2 düzeltmesi: eskiden `deger` burada HİÇ okunmuyordu — operatör bir
+        // iddiayı düzeltmek için tahmin+deger kullandığında düzeltme modele hiç ulaşmıyor,
+        // model ORİJİNAL (yanlış) iddiayı "operatör onayladı" diyerek AYNEN koruyordu (bkz
+        // meta-kanal 2026-07-18 kök-neden raporu, sokak-fotografciligi kalibrasyon koşumu).
+        // `deger` VARSA bu artık saf bir "tahmini onayla" DEĞİL — operatörün kendi belirlediği
+        // bir DEĞİŞTİRME'dir; etiket de buna göre operator-beyan'a yönlendirilir (tag içeriği
+        // soru-ANAHTARINI değil, cevabın GERÇEK içeriğini yansıtsın diye).
+        if (e.deger) {
+          satirlar.push(`- TAHMİN→DÜZELTME (operatör-onaylı): eski iddia «${konu}» → OPERATÖR BUNU ŞUNUNLA DEĞİŞTİRDİ: «${e.deger}». Belgede YALNIZ bu yeni değeri kullan; eski iddiayı AYNEN YAZMA/TEKRARLAMA/KORUMA. Bu artık operatörün kendi belirlediği bir beyandır (ampirik bir tahmin onayı DEĞİL) — [operator-beyan:${e.anahtar}] etiketiyle kullan, [tahmin-doğrulanacak:...] KULLANMA.`)
+        } else {
+          satirlar.push(`- TAHMİN (operatör-onaylı): «${konu}» → operatör tahmini OLDUĞU GİBİ (değiştirmeden) onayladı. [tahmin-doğrulanacak:operatör-onaylı] etiketiyle kullan.`)
+        }
+      }
+      else if (e.karar === 'dusur') satirlar.push(`- DÜŞÜR: «${konu}» → bu iddiayı ÇIKAR, bu aşamada KULLANMA.${e.deger ? ` (operatör notu: ${e.deger})` : ''}`)
     }
     else if (s.tip === 'FREE-TEXT') satirlar.push(`- BAĞLAM: ${e.metin}`)
   }
@@ -102,15 +115,36 @@ export function yanitlarMetni(tuketim) {
   return `\n\nOPERATÖR YANITLARI (önceki aşamada verildi — BAĞLAYICI girdi; bu aşamada uygula):\n${satirlar.join('\n')}\n`
 }
 
-function promptUret(asama, proje, baglamlar) {
+// Kanonik fikir kaynağı (intake.md — materyalize anında yazılır, HER koşumda diskten TAZE
+// okunur, bkz planlamaLoopV2.mjs:baglamlarKur). TÜM aşama prompt'larına BAĞLAYICI bağlam olarak
+// eklenir — kısa "aciklama" (registry.json ozet, 140-karakter kırpılmış) yalnız BAŞLIK/portföy
+// içindir, artık tek fikir-kaynağı DEĞİL. Operatör intake.md'yi materyalize-sonrası elle
+// düzeltirse bir sonraki koşum bunu otomatik görür (bkz meta-kanal 2026-07-18 kök-neden raporu).
+function kanonikFikirBlogu(baglamlar) {
+  if (!baglamlar?.intake) return ''
+  return `
+ORİJİNAL FİKİR / MATERYALİZE GİRDİSİ (BAĞLAYICI kaynak — tam metin, kırpılmamış; operatör
+sonradan düzeltebilir, HER koşumda güncel hali okunur):
+---
+${baglamlar.intake}
+---
+Bu metinle ÇELİŞEN hiçbir varsayım ÜRETME (ör. farklı ülke/şehir/hukuk-sistemi/dil/pazar) —
+burada AÇIKÇA belirtilen konum/kısıt/bağlam neyse ONA göre yaz; burada belirtilmeyen
+ayrıntılarda serbestsin.
+`
+}
+
+export function promptUret(asama, proje, baglamlar) {
   const { ad, aciklama } = proje
   const projeBaslik = `PROJE: ${ad} — ${aciklama}`
+  const fikirBlogu = kanonikFikirBlogu(baglamlar)
 
   switch (asama) {
     case 'genesis': return `\
 Genesis aşaması — tohumdan aday-seti üret ve seti eleştir. Türkçe yaz.
 
 ${projeBaslik}
+${fikirBlogu}
 
 İŞLEV: Bu aşamada mevcut şirketleri analiz etmiyoruz. Tohumdan FARKLI YAKLAŞIMLARLA 5-6 aday fikir/biçim üretip bu aday setini iki farklı mercekle eleştiriyoruz.
 
@@ -189,7 +223,7 @@ ZORUNLU KURALLAR:
 Premise aşaması — ürün premise belgesi üret. Türkçe yaz.
 
 ${projeBaslik}
-
+${fikirBlogu}
 GENESİS KRİTİĞİ (tamamlanan önceki aşama):
 ---
 ${baglamlar.genesis}
@@ -227,7 +261,7 @@ ZORUNLU KURALLAR:
 Araştırma aşaması — pazar ve rekabet araştırması belgesi üret. Türkçe yaz.
 
 ${projeBaslik}
-
+${fikirBlogu}
 BAĞLAM — önceki aşamalar:
 <genesis>
 ${baglamlar.genesis}
@@ -244,7 +278,7 @@ GÖREV: Beş başlık altında araştırma belgesi üret. Her başlıkta bulgula
 
 ## 1. Pazar Büyüklüğü ve Trend
 
-[Türkiye abonelik kutusu pazarı, bahçe/bitki e-ticareti trendi, büyüme oranları. 4-6 cümle.]
+[Bu projenin pazarı: büyüklük, büyüme trendi. Yukarıdaki ORİJİNAL FİKİR'de belirtilen coğrafya/kategoriye göre yaz. 4-6 cümle.]
 
 ## 2. Rakip Ekosistemi
 
@@ -252,15 +286,15 @@ GÖREV: Beş başlık altında araştırma belgesi üret. Her başlıkta bulgula
 
 ## 3. Hedef Kitle Araştırması
 
-[Şehirli balkon sahibi yetişkin — segment büyüklüğü, davranış, satın alma motivasyonu. 4-6 cümle.]
+[Premise'te tanımlanan hedef kitle üzerine araştırma — segment büyüklüğü, davranış, satın alma motivasyonu. 4-6 cümle.]
 
 ## 4. Fiyatlama Kıyaslaması
 
-[Abonelik kutularında kıyaslama. Müşteri ödeme istekliliği (WTP) tahminleri. 4-6 cümle.]
+[Bu kategoride kıyaslanabilir fiyatlama örnekleri. Müşteri ödeme istekliliği (WTP) tahminleri. 4-6 cümle.]
 
 ## 5. Tedarik ve Operasyonel Maliyet Tahmini
 
-[Bitki tedariki, lojistik, ambalaj maliyeti tahminleri. 4-6 cümle.]
+[Bu ürün/hizmet için tedarik, lojistik/operasyon, maliyet tahminleri. 4-6 cümle.]
 
 ${SAYI_KURALI}
 
@@ -270,7 +304,7 @@ Belgenin başına veya sonuna yorum/açıklama EKLEME. Sadece belge içeriği.`
 Strateji aşaması — ürün ve iş modeli strateji belgesi üret. Türkçe yaz.
 
 ${projeBaslik}
-
+${fikirBlogu}
 BAĞLAM — araştırma aşaması bulguları:
 <arastirma>
 ${baglamlar.arastirma}
@@ -311,7 +345,7 @@ Belgenin başına veya sonuna yorum/açıklama EKLEME. Sadece belge içeriği.`
 Master-plan aşaması — yürütme planı belgesi üret. Türkçe yaz.
 
 ${projeBaslik}
-
+${fikirBlogu}
 BAĞLAM — strateji aşaması:
 <strateji>
 ${baglamlar.strateji}
@@ -444,6 +478,7 @@ const TIER_ZORUNLU_NOTLARI = {
 export function promptUretBolum(bolumId, proje, baglamlar, bolumTanim) {
   const { ad, aciklama } = proje
   const projeBaslik = `PROJE: ${ad} — ${aciklama}`
+  const fikirBlogu = kanonikFikirBlogu(baglamlar)
   const baglamBlogu = bolumBaglamBlogu(bolumTanim, baglamlar)
 
   // Kilitli-kararlar dijesti — YALNIZ üç sentez bölümünde (bolumBaglamlarKur bunu yalnız o üçü
@@ -486,7 +521,7 @@ Belgenin başına veya sonuna yorum/açıklama EKLEME. Sadece belge içeriği.`
 ${bolumTanim.hedefAciklama} Türkçe yaz.
 
 ${projeBaslik}
-
+${fikirBlogu}
 BAĞLAM — tüm diğer bölümler:
 ${baglamBlogu}
 ${kilitliBlok}
@@ -503,7 +538,7 @@ Belgenin başına veya sonuna yorum/açıklama EKLEME. Sadece belge içeriği.`
 ${bolumTanim.etiket} bölümü — master-plan'ın bir alt-bölümü. Türkçe yaz.
 
 ${projeBaslik}
-
+${fikirBlogu}
 BAĞLAM:
 ${baglamBlogu || '(bu bölüm için özel üst bağlam yok — proje geneline dayan)'}
 ${kilitliBlok}
@@ -529,6 +564,10 @@ export function canliExecutorOlustur(nsYolu, projeConfig, opts = {}) {
     const yol = join(nsYolu, dosya)
     if (existsSync(yol)) baglamlar[asama] = readFileSync(yol, 'utf8')
   }
+  // Kanonik fikir kaynağı (bkz planlamaLoopV2.mjs:baglamlarKur — asıl güncel kaynak orası;
+  // bu yalnız opts.baglamlar hiç verilmeden çağrılan yollar için önyükleme fallback'i).
+  const intakeYol = join(nsYolu, 'intake.md')
+  if (existsSync(intakeYol)) baglamlar.intake = readFileSync(intakeYol, 'utf8')
 
   const ist = { cagrilar: 0, toplamMaliyet: 0, asamaMaliyetleri: {} }
 

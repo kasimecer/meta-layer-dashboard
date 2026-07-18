@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { submitIntakeQueue } from '../lib/writePath.js'
+import SubmitFailureBanner from './SubmitFailureBanner.jsx'
 
 // Taslak -> Worker kuyruğu (POST /intake-queue) -> yerel izleyici -> materyalize (kayıt +
 // proje dosyaları). Pipeline'ı (genesis→master-plan) BAŞLATMAZ — bu insan tarafından ayrı
@@ -49,17 +50,11 @@ export default function MateryalizeButton({ taslak }) {
         (kayıt + proje dosyaları). Planlama pipeline'ı (genesis→master-plan) otomatik başlamaz —
         terminalden elle başlatılır. İzleyici kapalıyken anlık sonuç YOK.
       </div>
-      {(durum === 'hata' || durum === 'mock') && (
-        <div style={{
-          marginTop: 8, padding: '8px 12px',
-          background: durum === 'mock' ? '#fffbeb' : '#fef2f2',
-          border: `1px solid ${durum === 'mock' ? '#fde68a' : '#fecaca'}`,
-          borderRadius: 8, fontSize: 12, color: durum === 'mock' ? '#92400e' : '#dc2626', lineHeight: 1.5,
-        }}>
-          {durum === 'mock' ? '⚠ ' : '✗ '}{detay}
-          {durum === 'hata' && ' — elle materyalize etmek için aşağıdaki komutu kullanabilirsin.'}
-        </div>
-      )}
+      <SubmitFailureBanner
+        durum={durum}
+        detay={`${detay}${durum === 'hata' ? ' — elle materyalize etmek için: node scripts/intake-materialize.mjs <taslak.json>' : ''}`}
+        onRetry={tikla}
+      />
     </div>
   )
 }

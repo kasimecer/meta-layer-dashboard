@@ -68,6 +68,11 @@ export function aktifBolumBilgisi(state) {
 function bolumBaglamlarKur(nsYolu, state, mp, bolumId) {
   const tanim = BOLUM_TANIMLARI[bolumId]
   const b = {}
+  // Kanonik fikir kaynağı — planlamaLoopV2.mjs:baglamlarKur ile AYNI mantık, bölüm-seviyesi
+  // prompt'lar (promptUretBolum → kanonikFikirBlogu) için AYRI bir dict kullandığından burada
+  // da TAZE okunmalı (bkz canliExecutor.mjs).
+  const intakeYol = join(nsYolu, 'intake.md')
+  if (existsSync(intakeYol)) b.intake = readFileSync(intakeYol, 'utf8')
   const eklenen = new Set()
   const ekle = (id, icerik) => { if (icerik != null && !eklenen.has(id)) { b[id] = icerik; eklenen.add(id) } }
   for (const anahtar of tanim.ustBaglamAnahtarlari) {

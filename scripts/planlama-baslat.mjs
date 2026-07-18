@@ -191,6 +191,18 @@ function raporYaz(id, sonuc) {
       console.log(`  Yapısal kapı  : GEÇTİ`)
       console.log(`  Çıktı (sürüm ${s.surum}): ${gorPath(s.cikti_pointer)}`)
       console.log(`  Sıradaki aşama: ${sonraki}`)
+      // "tüketildi" (yukarıdaki yapısal kapı) ≠ "uygulandı" — bu, onayı KAÇIRILAMAZ hale
+      // getirmek için burada, kapıdan HEMEN sonra, ayrı ve göze çarpan biçimde basılır (bkz
+      // duzeltmeTutarliligiKontrolEt / P2, 2026-07-18 kök-neden raporu). BLOKLAMAZ — onay
+      // öncesi operatörün DİKKATİNE sunulur.
+      if (s.duzeltme_uyarilari?.length) {
+        console.log(`\n  ⚠⚠ DÜZELTME UYARISI — ${s.duzeltme_uyarilari.length} olası uygulanmamış operatör-düzeltmesi:`)
+        for (const u of s.duzeltme_uyarilari) {
+          console.log(`     • [${u.anahtar}] eski iddia hâlâ metinde: "${u.eskiIddiaOzeti}"`)
+        }
+        console.log(`     Bu, "tüketildi" (yanıt executor'a geçirildi) ile "uygulandı" (belgeye yansıdı)`)
+        console.log(`     AYRI şeyler olduğu için var — belgeyi ONAYLAMADAN ÖNCE inceleyin.`)
+      }
       // Convenience: blocker YOK (aksi halde durdu='sorular-acik' olurdu) ama onemli/opsiyonel
       // açık kalmış olabilir — engellemez (ilerleyebilirsiniz), ama sessizce birikmesin diye
       // burada YÜZEYE ÇIKARILIR (bkz görev: "advancing with open onemli/opsiyonel LISTS them").
@@ -213,6 +225,13 @@ function raporYaz(id, sonuc) {
       const yanitYol = join(nsYoluOf(id), yanitDosyaAdi(a, ss))
       const blokerSayisi = sonuc.acikSorular.filter(q => q.tier === 'blocker').length
       console.log(`◧ AÇIK SORULAR — ${a}  (proje: ${id})  [${sonuc.acikSorular.length} açık, ${blokerSayisi} blocker — İLERLEMEYİ DURDURAN yalnız bunlar]`)
+      {
+        const sUyari = birimStateOf(state, a)?.duzeltme_uyarilari
+        if (sUyari?.length) {
+          console.log(`\n  ⚠⚠ DÜZELTME UYARISI — ${sUyari.length} olası uygulanmamış operatör-düzeltmesi:`)
+          for (const u of sUyari) console.log(`     • [${u.anahtar}] eski iddia hâlâ metinde: "${u.eskiIddiaOzeti}"`)
+        }
+      }
       if (sonuc.butunlukHatasi) {
         console.log(`  ⚠ Yanıt artefaktı BOZUK: ${sonuc.butunlukHatasi}`)
         console.log(`    → Sorular yeniden yayınlandı; geçerli bir yanıt dosyası yazana dek İLERLENMEZ.`)

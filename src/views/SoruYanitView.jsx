@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { submitSoruYanit } from '../lib/writePath.js'
+import SubmitFailureBanner from '../components/SubmitFailureBanner.jsx'
 
 // #/sorular/<id> — planlama pipeline'ının açık sorularını gösterip yanıtlar. Operatör-seviyesi
 // (ProjectView'den drill-down, #/proje/<id> ile aynı ruh — jargon-saklama YOK). Dört soru tipi:
@@ -280,11 +281,11 @@ export default function SoruYanitView({ projeId }) {
                   {durum === 'gonderiliyor' ? 'Gönderiliyor…' : `Gönder (${hazirSayisi}/${data.acik_sorular.length} hazır)`}
                 </button>
 
-                {(durum === 'hata' || durum === 'mock') && (
-                  <div style={{ marginTop: 10, padding: '9px 13px', background: durum === 'mock' ? '#fffbeb' : '#fef2f2', border: `1px solid ${durum === 'mock' ? '#fde68a' : '#fecaca'}`, borderRadius: 8, fontSize: 12.5, color: durum === 'mock' ? '#92400e' : '#b91c1c', lineHeight: 1.5 }}>
-                    {durum === 'mock' ? '⚠ ' : '✗ '}{detay} — tekrar dene; girdiğin yanıtlar korundu.
-                  </div>
-                )}
+                <SubmitFailureBanner
+                  durum={durum}
+                  detay={`${detay} Girdiğin yanıtlar korundu, kaybolmadı.`}
+                  onRetry={gonder}
+                />
               </>
             )
           )}

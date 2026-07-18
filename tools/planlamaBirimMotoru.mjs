@@ -201,6 +201,37 @@ export function birimAcikDurum(nsYolu, birimler, birimId) {
  * @param {(info:{as,birimId,sureStr,maliyetStr,paket,statePersistFn,log})=>object} [ctx.onSonBirimTamamlandi]
  *        — sira'nın SON elemanı geçtiğinde çağrılır. Verilmezse normal onay-bekliyor akışı sürer.
  */
+// "Tüketildi" (bir yanıt paketi executor'a GEÇİRİLDİ) ile "uygulandı" (o yanıtın içeriği
+// üretilen belgeye GERÇEKTEN yansıdı) AYRI şeylerdir — 2026-07-18 kök-neden raporu (sokak-
+// fotografciligi kalibrasyon koşumu): operatör bir iddiayı deger ile düzelttiğinde eski,
+// yanlış iddia metni yeni belgede AYNEN kalabiliyordu, "operatör-onaylı" etiketiyle birlikte.
+// Bu fonksiyon MEKANİK bir güvenlik-ağıdır (model uyumunu GARANTİ ETMEZ): bir yanıt bir iddiayı
+// deger ile değiştirdiyse, eski iddia metninin yeni içerikte hâlâ VERBATIM geçip geçmediğini
+// kontrol eder. Yanlış-negatif mümkündür (eski metin parafraze/kısaltılmış olabilir, o zaman
+// bu kontrol sessiz kalır); yanlış-pozitif riski düşüktür (eski metin bulunduysa gerçekten
+// oradadır) — bu yüzden BLOKLAMAZ, yalnız UYARIR (bkz operatör talebi: "flags it").
+export function duzeltmeTutarliligiKontrolEt(icerik, tuketim) {
+  const sorunlar = []
+  if (!icerik || !tuketim?.kayitlar?.length || !tuketim?.paket?.sorular) return sorunlar
+  const soruHarita = new Map(tuketim.paket.sorular.map(s => [s.anahtar, s]))
+  for (const e of tuketim.kayitlar) {
+    if (!(e.karar === 'tahmin' || e.karar === 'veri') || !e.deger) continue
+    const s = soruHarita.get(e.anahtar)
+    if (!s) continue
+    const eskiIddia = String(s.iddia ?? s.metin ?? '').trim()
+    // Çok kısa eski-iddia metni (ör. tek kelime) yanlış-pozitif riski taşır — atla.
+    if (eskiIddia.length < 12) continue
+    if (icerik.includes(eskiIddia)) {
+      sorunlar.push({
+        anahtar: e.anahtar,
+        eskiIddiaOzeti: eskiIddia.length > 140 ? `${eskiIddia.slice(0, 140)}…` : eskiIddia,
+        uyari: 'Operatör bu iddiayı değiştirdi (deger verildi) ama üretilen içerikte ESKİ iddia metni hâlâ aynen geçiyor — düzeltme uygulanmamış olabilir.',
+      })
+    }
+  }
+  return sorunlar
+}
+
 export async function birimKostur(birimId, ctx) {
   const {
     sira, birimler, nsYolu, projeId, dosyaAdiFn, kapiFn, executorFn, soruUretici, baglamlar,
@@ -256,6 +287,13 @@ export async function birimKostur(birimId, ctx) {
 
   as.kapi_sonuc = 'gecti'
   as.blok_nedeni = null
+
+  // "tüketildi" ≠ "uygulandı" — ayrı bayrak (bkz duzeltmeTutarliligiKontrolEt üstündeki not).
+  // Boş dizi = temiz/sorun-yok; girdiler kapıyı BLOKLAMAZ, yalnız görünür kılar.
+  as.duzeltme_uyarilari = duzeltmeTutarliligiKontrolEt(sonuc.icerik, tuketim)
+  if (as.duzeltme_uyarilari.length) {
+    log(`⚠ DÜZELTME UYARISI ${birimId}: ${as.duzeltme_uyarilari.length} olası uygulanmamış düzeltme (eski iddia metni hâlâ mevcut) — bkz state.asamalar.${birimId}.duzeltme_uyarilari`)
+  }
 
   const paket = birimSorulariUretVeYaz(nsYolu, soruUretici, birimId, yeniSurum, sonuc.icerik, projeId)
   as.sorular_surum = paket ? yeniSurum : null

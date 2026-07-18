@@ -8,6 +8,13 @@ name = "meta-layer-write"
 main = "worker.js"
 compatibility_date = "2025-09-23"
 
+# 2026-07-18 (C — kalıcı hata izi): GitHub-as-datastore'dan BİLEREK BAĞIMSIZ bir depo — GitHub'a
+# yazım başarısız olsa BİLE (ör. GH erişilemez) bu iz hâlâ tutulabilir. Yalnız BAŞARISIZ (4xx/5xx)
+# isteklerin teşhis kaydı için (worker.js:logFailure/handleFailures) — kalıcı iş verisi TAŞIMAZ.
+[[kv_namespaces]]
+binding = "META_LOG"
+id = "4d1b0935fdc3491e9b30d16ad4c775f5"
+
 [vars]
 GH_OWNER = "kasimecer"
 GH_REPO = "meta-layer-dashboard"

@@ -20,13 +20,17 @@
     "planlama-soru-test": "node scripts/planlama-soru-test-runner.mjs",
     "planlama-bolum-test": "node scripts/planlama-bolum-test-runner.mjs",
     "planlama-tier-test": "node scripts/planlama-tier-test-runner.mjs",
+    "planlama-fikir-duzeltme-test": "node scripts/planlama-fikir-duzeltme-test-runner.mjs",
     "planlama-elestiri-test": "node scripts/planlama-elestiri-test-runner.mjs",
     "planlama-kart-test": "node scripts/planlama-kart-turetici-test-runner.mjs",
     "planlama-soru-demo": "node scripts/planlama-soru-demo.mjs",
     "soru-yanit-watch": "node scripts/soru-yanit-queue-watch.mjs",
     "soru-yanit-queue-test": "node scripts/soru-yanit-queue-test.mjs",
     "soru-yanit-demo-setup": "node scripts/soru-yanit-demo-setup.mjs",
-    "soru-yanit-demo-temizle": "node scripts/soru-yanit-demo-temizle.mjs"
+    "soru-yanit-demo-temizle": "node scripts/soru-yanit-demo-temizle.mjs",
+    "worker-intake-queue-test": "node scripts/worker-intake-queue-test.mjs",
+    "worker-soru-yanit-queue-test": "node scripts/worker-soru-yanit-queue-test.mjs",
+    "worker-failure-log-test": "node scripts/worker-failure-log-test.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
