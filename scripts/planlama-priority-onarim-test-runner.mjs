@@ -16,7 +16,7 @@ import { ciplakSayiVarMi } from '../tools/planlamaKapilari.mjs'
 import { VERI_ISTEK_SECENEKLERI, dataRequestAdaylari } from '../tools/planlamaSorular.mjs'
 import { kelimeSiniriKirp } from '../src/lib/metinKirp.js'
 import { projeKaydiUret } from '../src/lib/intakeBuilder.js'
-import { hazirDurumuHesapla, atlanabilirMi, icEtiketleriTemizle, kartBasligiUret } from '../src/lib/soruYanitMantik.js'
+import { hazirDurumuHesapla, atlanabilirMi, icEtiketleriTemizle } from '../src/lib/soruYanitMantik.js'
 
 let gecti = 0, kaldi = 0
 function ok(ad, kosul, ekBilgi = '') {
@@ -166,7 +166,7 @@ bolum('Priority 4c — atlanabilirMi: blocker kart atlanamaz, diğerleri atlanab
   ok('APPROVAL → atlanamaz (tier ne olursa olsun, zaten formdan yanıtlanmıyor)', atlanabilirMi({ tip: 'APPROVAL', tier: 'blocker' }) === false)
 }
 
-// ══ Kart-okunabilirlik turu (2026-07-18) — icEtiketleriTemizle + kartBasligiUret ═══════════════
+// ══ Kart-okunabilirlik turu (2026-07-18) — icEtiketleriTemizle ═════════════════════════════════
 bolum('icEtiketleriTemizle: iç/belge etiketleri operatöre görünmez')
 {
   ok('tam etiket temizleniyor', icEtiketleriTemizle('Oran %10 [tahmin-doğrulanacak:kaynak-x] civarındadır.') === 'Oran %10 civarındadır.')
@@ -176,27 +176,6 @@ bolum('icEtiketleriTemizle: iç/belge etiketleri operatöre görünmez')
   ok('birden fazla etiket TEK cümlede temizleniyor', !icEtiketleriTemizle('9 [tahmin-doğrulanacak:x] milyon, payı %30 [tahmin-doğrulanacak:y].').includes('['))
   ok('etiketsiz metin DEĞİŞMİYOR (fazla kırpma/bozma yok)', icEtiketleriTemizle('Sıradan bir cümle, hiç etiket yok.') === 'Sıradan bir cümle, hiç etiket yok.')
   ok('boş/eksik girdi çökmüyor', icEtiketleriTemizle(undefined) === '')
-}
-
-bolum('kartBasligiUret: her DATA-REQUEST kart AYIRT EDİCİ, etiketsiz, iddiadan türeyen bir başlık taşır')
-{
-  const s1 = { tip: 'DATA-REQUEST', anahtar: 'veri:a', iddia: 'Göteborg ziyaretçilerinin %55 civarı İsveç dışından gelmektedir ve bu segment daha yüksek harcama eğilimi taşır.' }
-  const s2 = { tip: 'DATA-REQUEST', anahtar: 'veri:b', iddia: 'Ekipman temin maliyeti sıfırdır çünkü operatör hazır ekipmanla başlamaktadır [operator-beyan:veri:b].' }
-  const b1 = kartBasligiUret(s1), b2 = kartBasligiUret(s2)
-  ok('İKİ FARKLI iddia İKİ FARKLI başlık üretir (23-özdeş-kart canlı-vakası)', b1 !== b2)
-  ok('başlık iddianın KENDİSİNDEN türüyor (sabit jenerik metin DEĞİL)', b1.startsWith('Göteborg ziyaretçilerinin'))
-  ok('başlıkta iç etiket YOK', !b1.includes('[') && !b2.includes('['))
-  ok('başlık "bir bakışta" okunabilir uzunlukta (≤91 karakter — kelime-sınırı + "…")', b1.length <= 91)
-
-  // Savunma: iddia YOKSA (eski/bozuk veri) yine de anahtar üzerinden AYIRT EDİCİ kalır — sabit
-  // jenerik metne ASLA geri düşmez.
-  const s3 = { tip: 'DATA-REQUEST', anahtar: 'veri:c', iddia: null }
-  const s4 = { tip: 'DATA-REQUEST', anahtar: 'veri:d', iddia: null }
-  ok('iddia yokken bile İKİ FARKLI kart İKİ FARKLI başlık üretir (anahtar üzerinden)', kartBasligiUret(s3) !== kartBasligiUret(s4))
-
-  // CHOICE/FREE-TEXT/APPROVAL etkilenmez — soru.metin AYNEN döner (regresyon).
-  const sChoice = { tip: 'CHOICE', metin: 'Hangisi?' }
-  ok('CHOICE etkilenmedi (soru.metin aynen döner)', kartBasligiUret(sChoice) === 'Hangisi?')
 }
 
 // ══ İkinci kart-okunabilirlik turu (2026-07-18) — noktalı-virgülle bağlı İKİ tag TEK cümlede ══

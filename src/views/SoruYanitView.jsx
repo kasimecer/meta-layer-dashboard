@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { submitSoruYanit } from '../lib/writePath.js'
 import SubmitFailureBanner from '../components/SubmitFailureBanner.jsx'
-import { hazirMi, yanitKaydiUret, hazirDurumuHesapla, atlanabilirMi, icEtiketleriTemizle, kartBasligiUret } from '../lib/soruYanitMantik.js'
+import { hazirMi, yanitKaydiUret, hazirDurumuHesapla, atlanabilirMi, icEtiketleriTemizle } from '../lib/soruYanitMantik.js'
 
 // #/sorular/<id> — planlama pipeline'ının açık sorularını gösterip yanıtlar. Operatör-seviyesi
 // (ProjectView'den drill-down, #/proje/<id> ile aynı ruh — jargon-saklama YOK). Dört soru tipi:
@@ -145,14 +145,14 @@ function FreeTextGirdisi({ soru, deger, onDegistir }) {
   )
 }
 
-// 2026-07-18 (kart-okunabilirlik turu — canlı-vaka: 23 kartın HEPSİ özdeş sabit başlık
-// taşıyordu, telefonda kaydırırken ayırt edilemiyordu). Başlık artık İDDİANIN KENDİSİNDEN
-// türetilen KISA, AYIRT EDİCİ bir özet (kartBasligiUret — src/lib/soruYanitMantik.js, etiket-
-// temizlenmiş + kelime-sınırı farkında kısaltılmış). İddia kutusu (IddiaKutusu) artık `salt`
-// (ertelenen) kartlarda da gösterilir — eskiden yalnız etkileşimli kartlarda render ediliyordu,
-// ertelenen 13 kart iddiayı HİÇ göstermiyordu.
+// 2026-07-18 (öz-yeterlilik turu, 3. bulgu) — DATA-REQUEST kartlarında başlık İDDİANIN KENDİSİNİN
+// ilk ~90 karakteriydi — hemen altındaki İddiaKutusu (IddiaKutusu) aynı metni TEKRAR gösteriyordu,
+// operatör aynı sözcükleri iki kez okuyordu, başlık bilgi eklemiyordu. DATA-REQUEST'te KALDIRILDI:
+// rozet + iddia kutusu + denenen-kaynak satırı yeterli, kartlar zaten iddianın kendi AÇILIŞ
+// metninden ayırt edilebilir. CHOICE/FREE-TEXT/APPROVAL'da soru.metin BURADA KALIR — o tiplerde
+// "claim kutusu" YOK, soru.metin kartın TEK yerde göründüğü asıl soru metnidir (kaldırılırsa
+// operatör NE sorulduğunu hiç göremez) — bu yüzden kaldırma yalnız DATA-REQUEST'e uygulanır.
 function SoruKart({ soru, deger, onDegistir, salt }) {
-  const baslikMetni = kartBasligiUret(soru)
   return (
     <div style={{
       background: '#fff', border: '1px solid #e4e4e7', borderRadius: 10, padding: '14px 16px', marginBottom: 10,
@@ -161,7 +161,9 @@ function SoruKart({ soru, deger, onDegistir, salt }) {
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
         <TipRozeti tip={soru.tip} />
         <TierRozeti tier={soru.tier} />
-        <span style={{ fontSize: 13.5, color: '#18181b', fontWeight: 600, lineHeight: 1.45 }}>{baslikMetni}</span>
+        {soru.tip !== 'DATA-REQUEST' && (
+          <span style={{ fontSize: 13.5, color: '#18181b', fontWeight: 600, lineHeight: 1.45 }}>{soru.metin}</span>
+        )}
       </div>
 
       {soru.tip === 'APPROVAL' && (

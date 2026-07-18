@@ -3,8 +3,6 @@
 // PUR mantık burada, düz .js'de yaşar — hem tarayıcı hem Node (hermetik test) import edebilir.
 // 2026-07-18 (Priority 4d) — "hazır" sayacının payda hesabı burada, tek yerde.
 
-import { kelimeSiniriKirp } from './metinKirp.js'
-
 // 2026-07-18 (kart-okunabilirlik turu) — dataRequestAdaylari'nin çıkardığı `iddia` metni, tag'in
 // bulunduğu belge cümlesinden geldiği için İÇİNDE HÂLÂ o tag'i taşır (ör. "...dijital albüm
 // seçeneğine [tahmin-doğrulanacak:operatör-onaylı] yükseltilebilir") — bu, BELGE için doğru
@@ -25,21 +23,6 @@ export function icEtiketleriTemizle(metin) {
     .replace(/\s{2,}/g, ' ')
     .replace(/\s+([.,;:!?])/g, '$1')
     .trim()
-}
-
-// 2026-07-18 (kart-okunabilirlik turu) — DATA-REQUEST kartlarının HEPSİ aynı sabit başlığı
-// ("Kaynaklanamayan iddia — aşağıda...") taşıyordu; tekrar YOK ama ayırt edilemez de OLMUŞTU
-// (23 kart telefonda kaydırılırken hepsi aynı görünüyordu). Bu, İDDİANIN KENDİSİNDEN (etiket
-// temizlenmiş, kelime-sınırı farkında kısaltılmış) KISA, AYIRT EDİCİ bir başlık üretir — bir
-// bakışta hangi iddianın söz konusu olduğunu anlatır.
-const KART_BASLIK_UZUNLUGU = 90
-export function kartBasligiUret(soru) {
-  if (soru.tip !== 'DATA-REQUEST') return soru.metin
-  const temizIddia = icEtiketleriTemizle(soru.iddia)
-  if (temizIddia) return kelimeSiniriKirp(temizIddia, KART_BASLIK_UZUNLUGU)
-  // Savunma: iddia hiç yoksa (eski/bozuk veri) anahtar en azından AYIRT EDİCİ kalır — sabit
-  // jenerik metne asla geri DÜŞMEZ (bkz canlı-vaka: 23 özdeş kart).
-  return `Kaynaklanamayan iddia (${soru.anahtar})`
 }
 
 export function hazirMi(soru, deger) {
