@@ -100,6 +100,25 @@ bolum('Priority 2a/2b — kelimeSiniriKirp: kelime ortasında ASLA kesmez')
   ok('registry ozet KELİME ORTASINDA bitmiyor ("50-100 s" gibi bir kesim YOK)', !/\d+ [a-zçğıöşü]$/i.test(kayit.ozet))
 }
 
+// ══ Priority 2a — dataRequestAdaylari BÜTÜNLEŞİK testi: >240 karaktere UZAMIŞ TEK cümle ════════
+bolum('Priority 2a — dataRequestAdaylari: 240 karakterden uzun tek cümle ARTIK kırpılmadan geçiyor')
+{
+  // 2026-07-18 canlı-vaka: premise.md'deki gerçek cümle 304 karakterdi, eski davranış onu
+  // "...dijital albüm s" diye 240'ta kelimenin ortasında kesiyordu. Burada AYNI sınıf bir
+  // cümleyi (>240, <600 — normal-yol GÜVENLİK-TAVANINI aşmıyor) üretip dataRequestAdaylari
+  // ÜZERİNDEN (yalnız kelimeSiniriKirp'i izole DEĞİL, GERÇEK bütünleşik yolu) doğruluyoruz.
+  const uzunCumle =
+    'Bu proje sabit lokasyon, hazır ekipman ve QR kodu üzerinden saniyeler içinde dijital ' +
+    'teslim üçgenine dayanan bir anlık hatıra servisidir; temel model müşteri tercihine göre ' +
+    'aynı seansta birden fazla poz içeren bir yükseltme seçeneğine [tahmin-doğrulanacak:kaynak-x] ' +
+    'sahiptir ve bu KELİME buraya sınırın ötesinde biter.'
+  const adaylar = dataRequestAdaylari(uzunCumle)
+  ok('tam olarak 1 aday üretildi', adaylar.length === 1)
+  ok('kaynak metin 240 karakterden UZUN (test anlamlı)', uzunCumle.length > 240)
+  ok('iddia KIRPILMADI — cümlenin SON kelimesi ("biter.") TAM olarak orada', adaylar[0]?.iddia.trim().endsWith('biter.'))
+  ok('iddia "…" ile bitmiyor (kırpma tetiklenmedi, normal yol 600 güvenlik-tavanının altında kaldı)', !adaylar[0]?.iddia.includes('…'))
+}
+
 // ══ Priority 4d — hazirDurumuHesapla: zorunlu-tamlık toplam'dan AYRI ═══════════════════════════
 bolum('Priority 4d — hazirDurumuHesapla: blocker tamlığı, opsiyonel/önemliden bağımsız hesaplanır')
 {
