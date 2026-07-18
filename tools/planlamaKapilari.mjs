@@ -3,7 +3,11 @@
 
 // Yardımcı: metin içinde kaynak-etiketsiz çıplak sayı/figür var mı kontrol et.
 // Çıplak sayı = ünite taşıyan rakam (%, milyon, ₺ vb.) veya ondalıklı/4+ haneli sayı.
-const SAYI_DESENI = /\b\d[\d.,]*\s*(?:%|milyon|milyar|bin|₺|kr|ay|gün|saat|hafta)|\b\d{4,}\b|\b\d+[.,]\d+\b/
+// 2026-07-18 (Task 2) — eskiden yalnız RAKAM-ÖNCE-yüzde ("10%") yakalanıyordu; YÜZDE-ÖNCE-rakam
+// ("%10" — Türkçe'de yaygın biçim, GERÇEK üretilen belgelerde görülüyor, ör. "%55 civarı") HİÇ
+// yakalanmıyordu — gate'in en başından beri bu biçimdeki TÜM çıplak yüzdeleri görmediği anlamına
+// gelir. `%\s*\d[\d.,]*` alternatifi bunu ekliyor.
+const SAYI_DESENI = /\b\d[\d.,]*\s*(?:%|milyon|milyar|bin|₺|kr|ay|gün|saat|hafta)|%\s*\d[\d.,]*|\b\d{4,}\b|\b\d+[.,]\d+\b/
 // operator-beyan 2026-07-18'de eklendi: tools/canliExecutor.mjs:yanitlarMetni artık operatör-
 // onaylı (kaynaksız/deger'siz) cevapları BU etikete yönlendiriyor (bkz Priority 1b/1c raporu) —
 // eskiden bu etiket burada TANINMIYORDU, yalnız AYNI birimde BAŞKA geçerli bir etiket varsa

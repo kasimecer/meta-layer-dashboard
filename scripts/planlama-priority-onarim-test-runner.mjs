@@ -57,6 +57,17 @@ bolum('Priority 1b — ciplakSayiVarMi: operator-beyan kabul edilir, kapsam CÜM
   ok('tablo ayraç satırı (|---|---|) hâlâ atlanıyor (regresyon)', !ciplakSayiVarMi('|---|---|---|'))
 }
 
+// ══ Task 2 — SAYI_DESENI: Türkçe "%N" (yüzde-önce) biçimi artık yakalanıyor ════════════════════
+bolum('Task 2 — SAYI_DESENI: "%10" (yüzde-önce, Türkçe yaygın biçim) artık ÇIPLAK sayı sayılıyor')
+{
+  ok('"%55 civarı" (etiketsiz) → ÇIPLAK sayı olarak YAKALANIR', ciplakSayiVarMi('Ziyaretçilerin %55 civarı yabancıdır.'))
+  ok('"%55 [tahmin-doğrulanacak:x] civarı" (etiketli) → geçer (regresyon)', !ciplakSayiVarMi('Ziyaretçilerin %55 [tahmin-doğrulanacak:x] civarı yabancıdır.'))
+  ok('"55%" (rakam-önce, eski davranış) hâlâ yakalanıyor (regresyon)', ciplakSayiVarMi('Büyüme 55% civarındadır.'))
+  ok('gerçek arastirma.md cümlesi (canlı-vaka, "%55") artık YAKALANIYOR',
+    ciplakSayiVarMi('Göteborg ziyaretçilerinin %55 civarı İsveç dışından gelmektedir ve yabancı ziyaretçiler daha yüksek harcar.'))
+  ok('etiketsiz normal metin (sayı yok) hâlâ temiz (yanlış-pozitif YOK)', !ciplakSayiVarMi('Bu cümlede hiç sayı yok.'))
+}
+
 // ══ Priority 1a — UI seçenek metni artık koşulsuz "doğrulanmış" demiyor ═══════════════════════
 bolum('Priority 1a — "Veriyi gir" seçeneği koşulsuz "doğrulanmış" demiyor')
 {
