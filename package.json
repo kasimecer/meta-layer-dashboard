@@ -26,6 +26,7 @@
     "planlama-elestiri-test": "node scripts/planlama-elestiri-test-runner.mjs",
     "planlama-cevap-yerini-alma-test": "node scripts/planlama-cevap-yerini-alma-test.mjs",
     "planlama-soru-kimligi-test": "node scripts/planlama-soru-kimligi-test.mjs",
+    "registry-durum-faz-test": "node scripts/registry-durum-faz-test.mjs",
     "planlama-kart-test": "node scripts/planlama-kart-turetici-test-runner.mjs",
     "planlama-soru-demo": "node scripts/planlama-soru-demo.mjs",
     "soru-yanit-watch": "node scripts/soru-yanit-queue-watch.mjs",

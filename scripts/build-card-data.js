@@ -6,6 +6,7 @@ import { stateYukle, bayatAsamalar } from '../tools/planlamaDurumMakinesiV2.mjs'
 import { sorulariDogrula, VERI_KARARLARI } from '../tools/planlamaSorular.mjs'
 import { acikSoruDurum } from '../tools/planlamaDurumOzeti.mjs'
 import { projeKartlariniTuret, projeDokumanlariniTuret, dosyaHref } from '../tools/planlamaKartTuretici.mjs'
+import { pipelineDurumFazHesapla } from '../src/lib/registry.js'
 
 // ── Karar-fasilitasyon eklentileri ──────────────────────────────────────────
 // sentez-kartlar/<karar_id>.json → partner-görünür kartlar (render-hazır v1).
@@ -105,12 +106,24 @@ const registryPath = join(projelerDir, 'registry.json')
 if (existsSync(registryPath)) {
   const reg = okJSON(registryPath)
   // light-enrich: signal.json olan projede zaman_son_aktivite'yi tarihten türet (canlı)
+  // + 2026-07-19 (Görev 2): durum/faz artık BURADA, GERÇEK pipeline durumundan (planlama-
+  // durum.json) türetiliyor — kanonik registry.json'da bu alanlar taşınıyor olsa BİLE (eski
+  // projeler, write-once yazılmış) burada TAMAMEN YOK SAYILIP ÜZERİNE YAZILIR (spread SONRASI
+  // durum/faz set edilir) — "stored kopyasız" ilkesi budur: build ÇIKTISI hiçbir zaman stored
+  // değeri YANSITMAZ, yalnız GERÇEK durumu. Pipeline state dosyası (planlama-durum.json) HİÇ
+  // yoksa `stateYukle` SESSİZCE sentetik bir "taze genesis" state SENTEZLER (bkz o fonksiyonun
+  // kendi notu) — BU dürüst-bilinmiyor ayrımını BOZAR, bu yüzden `existsSync` kontrolü BURADA,
+  // `stateYukle`ÖNCESİNDE yapılır; dosya yoksa `pipelineDurumFazHesapla(null)` çağrılır.
   const projeler = (reg.projeler ?? []).map(p => {
-    const sp = join(projelerDir, p.id, 'signal.json')
+    const pdir = join(projelerDir, p.id)
+    const durumDosyasiVarMi = existsSync(join(pdir, 'planlama-durum.json'))
+    const { durum, faz } = pipelineDurumFazHesapla(durumDosyasiVarMi ? stateYukle(pdir, p.id) : null)
+    let sonuc = { ...p, durum, faz }
+    const sp = join(pdir, 'signal.json')
     if (existsSync(sp)) {
-      try { const s = okJSON(sp); if (s.tarih) return { ...p, zaman_son_aktivite: s.tarih } } catch { /* noop */ }
+      try { const s = okJSON(sp); if (s.tarih) sonuc = { ...sonuc, zaman_son_aktivite: s.tarih } } catch { /* noop */ }
     }
-    return p
+    return sonuc
   })
   writeFileSync(join(outDir, 'registry.json'), JSON.stringify({ projeler }, null, 2), 'utf8')
   console.log(`registry.json yazıldı (${projeler.length} proje)`)

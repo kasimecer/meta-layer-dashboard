@@ -46,8 +46,12 @@ export function projeKaydiUret({ id, kip, ad, icerik }) {
   return {
     id,
     ad: (ad || 'Yeni Proje').trim(),
-    durum: 'fikir',
-    faz: 'planlama',
+    // 2026-07-19 (Görev 2) — `durum`/`faz` ARTIK BURADA YAZILMAZ. Eskiden write-once, hiç
+    // güncellenmeyen bir "fikir"/"planlama" sabiti buradaydı (bkz Görev 3 bulgusu — bu, master-
+    // plan tamamlanmış projelerin bile SONSUZA DEK "fikir" görünmesine sebep oluyordu, çünkü
+    // registry.json'a yazan TEK yer BURASIYDI ve bir daha asla çağrılmıyordu). Artık BUILD
+    // ANINDA gerçek pipeline durumundan türetiliyor (bkz src/lib/registry.js:
+    // pipelineDurumFazHesapla + scripts/build-card-data.js) — burada YOKLUKLARI KASITLI.
     rol: 'solo',
     status: 'aktif',
     efor: '?',
