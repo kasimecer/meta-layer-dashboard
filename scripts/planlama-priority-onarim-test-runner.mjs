@@ -11,6 +11,7 @@
 //
 // Koşum: node scripts/planlama-priority-onarim-test-runner.mjs
 
+import { readFileSync, existsSync } from 'fs'
 import { ciplakSayiVarMi } from '../tools/planlamaKapilari.mjs'
 import { VERI_ISTEK_SECENEKLERI, dataRequestAdaylari } from '../tools/planlamaSorular.mjs'
 import { kelimeSiniriKirp } from '../src/lib/metinKirp.js'
@@ -208,13 +209,64 @@ bolum('dataRequestAdaylari: noktalı-virgülle bağlı 2 tag artık AYNI (bileş
   const satir = 'QR kodlu dijital teslim altyapısı için aylık 100–500 [tahmin-doğrulanacak:QR-bulut-depolama-fiyatları] SEK aralığında bir SaaS veya barındırma çözümü yeterlidir; mevcut hazır platformlar (Pixieset veya benzeri) bu işlevi aylık 50–200 [tahmin-doğrulanacak:fotoğraf-teslimat-platform-fiyatları] SEK\'ten karşılayabilmektedir.'
   const adaylar = dataRequestAdaylari(satir)
   ok('İKİ AYRI aday üretildi (katlama mantığı etkilenmedi — anahtar kaynak\'tan türer)', adaylar.length === 2)
-  ok('İki adayın iddia metni ARTIK FARKLI (birbirinin cümlesini TAŞIMIYOR)', adaylar[0].iddia !== adaylar[1].iddia)
-  ok('1. aday KENDİ tag\'ini içeriyor, DİĞERİNİ içermiyor', adaylar[0].iddia.includes('QR-bulut-depolama') && !adaylar[0].iddia.includes('fotoğraf-teslimat-platform'))
-  ok('2. aday KENDİ tag\'ini içeriyor, DİĞERİNİ içermiyor', adaylar[1].iddia.includes('fotoğraf-teslimat-platform') && !adaylar[1].iddia.includes('QR-bulut-depolama'))
+  ok('İki adayın iddia metni ARTIK FARKLI (birbirinin cümlesini bütünüyle TAŞIMIYOR)', adaylar[0].iddia !== adaylar[1].iddia)
+  ok('1. aday KENDİ tag\'ini içeriyor, DİĞERİNİ içermiyor (kendi cümlesi gönderim-ifadesiyle açılmıyor)', adaylar[0].iddia.includes('QR-bulut-depolama') && !adaylar[0].iddia.includes('fotoğraf-teslimat-platform'))
+  // 2026-07-18 (öz-yeterlilik turu): 2. tag'in KENDİ cümlesi ("mevcut hazır platformlar...")
+  // "mevcut" ile açılan bir gönderim ifadesidir — öz-yeterlilik genişletmesi bu yüzden 1. tag'in
+  // cümlesini de KASITLI olarak dahil eder (aksi halde operatör "hangi işlevi?" sorusunu
+  // yanıtlayamazdı). Bu, önceki turun "diğerini içermiyor" beklentisinin YERİNE geçer — okunabilirlik
+  // önceliklidir, ayrıştırma DEĞİL (bkz görev: "claim text... starts with a dangling reference").
+  ok('2. aday KENDİ tag\'ini içeriyor', adaylar[1].iddia.includes('fotoğraf-teslimat-platform'))
+  ok('2. aday, cümlesi gönderim-ifadesiyle açıldığı için ÖNCEKİ cümleyi (ve 1. tag\'i) de kasıtlı olarak taşıyor (öz-yeterlilik)', adaylar[1].iddia.includes('QR-bulut-depolama'))
 
   // Regresyon: TEK tag'li, noktalı-virgülsüz normal bir cümle hâlâ doğru çalışıyor.
   const tekTag = dataRequestAdaylari('Basit bir iddia burada 42 [tahmin-doğrulanacak:kaynak-x] birim civarındadır.')
   ok('regresyon: noktalı-virgülsüz tek-tag cümle etkilenmedi', tekTag.length === 1 && tekTag[0].iddia.includes('42'))
+}
+
+// ══ Öz-yeterlilik turu (2026-07-18) — iddia metni gönderim-ifadesiyle açılmıyor ═══════════════
+bolum('dataRequestAdaylari: tag\'in cümlesi gönderim-ifadesiyle ("bu...", "mevcut...") açılıyorsa önceki cümle de dahil edilir')
+{
+  // Canlı-vaka #1 (goteborg/arastirma.md, satır 9, birebir): "bu boşluk..." öncülsüz kalıyordu —
+  // operatör ekranda "hangi boşluk?" sorusuna yanıt bulamıyordu.
+  const s1 = 'Norstan yanındaki kalp sembolü önünde aynı hizmeti sunan sabit bir rakip operatörün varlığına dair bilgi bulunmamakta; bu boşluk lokasyon-hizmet eşleşmesi açısından doğal bir ilk-giren avantajı tanımaktadır [tahmin-doğrulanacak:saha-gözlemi] [tier:blocker].'
+  const a1 = dataRequestAdaylari(s1)
+  ok('canlı-vaka #1: "bu boşluk" artık ÖNCÜLÜYLE birlikte geliyor', a1[0].iddia.startsWith('Norstan yanındaki'))
+  ok('canlı-vaka #1: kendi tag\'ini de içeriyor', a1[0].iddia.includes('ilk-giren avantajı'))
+
+  // Canlı-vaka #2 (satır 21, birebir): gönderim kelimesi cümlenin BAŞINDA değil, 4. sözcükte
+  // ("ikinci el piyasasında BU ekipman...") — ilk-kelime testi bunu KAÇIRIRDI.
+  const s2 = 'Canlı örnek ekranı için bir tablet veya küçük monitör gereklidir; ikinci el piyasasında bu ekipman 500–1.500 [tahmin-doğrulanacak:ikinci-el-tablet-fiyatları-İsveç] SEK aralığında temin edilebilir.'
+  const a2 = dataRequestAdaylari(s2)
+  ok('canlı-vaka #2: gönderim kelimesi cümle İÇİNDE (4. sözcük) olsa bile yakalanıyor', a2[0].iddia.startsWith('Canlı örnek ekranı'))
+
+  // Regresyon: gönderim-ifadesi YOK — iddia kendi cümlesiyle sınırlı KALMALI (gereksiz genişleme yok).
+  const s3 = 'Göteborg yıllık 9 [tahmin-doğrulanacak:x] milyon geceleme kaydeder. Ayrı ve bağımsız ikinci bir olgu burada 42 [tahmin-doğrulanacak:y] birimdir.'
+  const a3 = dataRequestAdaylari(s3)
+  ok('regresyon: gönderim-ifadesi yoksa genişleme YOK (1. aday)', a3[0].iddia === 'Göteborg yıllık 9 [tahmin-doğrulanacak:x] milyon geceleme kaydeder.')
+  ok('regresyon: gönderim-ifadesi yoksa genişleme YOK (2. aday, "ikinci" kelimesi gönderim SAYILMAZ)', a3[1].iddia.startsWith('Ayrı ve bağımsız'))
+
+  // Güvenlik sınırı: paragraf başındaysa (önceki cümle yok) çökmez / sonsuz döngüye girmez.
+  const s4 = 'Bu oran daha önce hiç belirtilmemiş bir şeye [tahmin-doğrulanacak:z] atıfta bulunur.'
+  const a4 = dataRequestAdaylari(s4)
+  ok('güvenlik: paragraf başında gönderim-ifadesi varsa (öncül yok) çökmüyor, mevcut cümleyle kalıyor', a4[0].iddia.startsWith('Bu oran'))
+
+  // GERÇEK goteborg verisiyle toplu doğrulama: TÜM DATA-REQUEST adaylarının hiçbiri artık
+  // gönderim-ifadesiyle AÇILMIYOR (ölçülen, tahmin edilmeyen sayı).
+  const META = '/Users/kasimecer/Library/CloudStorage/GoogleDrive-kasimecer@gmail.com/My Drive/meta-layer'
+  const arastirmaYolu = `${META}/projeler/goteborg-hjarta-fotograf-2026-07-18/arastirma.md`
+  if (existsSync(arastirmaYolu)) {
+    const icerikGercek = readFileSync(arastirmaYolu, 'utf8')
+    const gercekAdaylar = dataRequestAdaylari(icerikGercek)
+    const GONDERIM_KELIME_DESENI = /^(bu|bunun|bunlar\w*|bunları|böyle|onun|ona|ondan|aynı|ilgili|mevcut|yukarıdaki|belirtilen|anılan|söz konusu)$/i
+    const gonderimliSayisi = gercekAdaylar.filter(a => {
+      const ilkKelimeler = String(a.iddia).trim().split(/\s+/).slice(0, 5).map(k => k.replace(/^[^\p{L}]+|[^\p{L}]+$/gu, ''))
+      return ilkKelimeler.some(k => GONDERIM_KELIME_DESENI.test(k))
+    }).length
+    ok(`GERÇEK VERİ: goteborg'un ${gercekAdaylar.length} DATA-REQUEST adayının HİÇBİRİ gönderim-ifadesiyle açılmıyor (ölçülen: ${gonderimliSayisi})`, gonderimliSayisi === 0, `${gercekAdaylar.length} aday tarandı`)
+  } else {
+    ok('GERÇEK VERİ testi atlandı (goteborg arastirma.md bulunamadı — Drive bağlı değil)', true)
+  }
 }
 
 console.log(`\nSONUÇ: ${gecti} geçti, ${kaldi} kaldı`)
