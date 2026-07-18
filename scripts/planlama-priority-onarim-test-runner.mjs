@@ -198,5 +198,24 @@ bolum('kartBasligiUret: her DATA-REQUEST kart AYIRT EDİCİ, etiketsiz, iddiadan
   ok('CHOICE etkilenmedi (soru.metin aynen döner)', kartBasligiUret(sChoice) === 'Hangisi?')
 }
 
+// ══ İkinci kart-okunabilirlik turu (2026-07-18) — noktalı-virgülle bağlı İKİ tag TEK cümlede ══
+bolum('dataRequestAdaylari: noktalı-virgülle bağlı 2 tag artık AYNI (bileşik) iddiayı PAYLAŞMIYOR')
+{
+  // Canlı-vaka (goteborg-hjarta-fotograf-2026-07-18/arastirma.md, aynen): önceden bilinen, o
+  // turda BİLEREK ertelenen bir kusur (bkz bellek "soru-üretici iddia kırpma bug") — iki AYRI
+  // tag noktalı-virgülle birleşmiş bir cümleyi PAYLAŞIYORDU, ikisi de TÜM bileşik cümleyi
+  // (diğer tag'in metni dahil) iddia olarak taşıyordu.
+  const satir = 'QR kodlu dijital teslim altyapısı için aylık 100–500 [tahmin-doğrulanacak:QR-bulut-depolama-fiyatları] SEK aralığında bir SaaS veya barındırma çözümü yeterlidir; mevcut hazır platformlar (Pixieset veya benzeri) bu işlevi aylık 50–200 [tahmin-doğrulanacak:fotoğraf-teslimat-platform-fiyatları] SEK\'ten karşılayabilmektedir.'
+  const adaylar = dataRequestAdaylari(satir)
+  ok('İKİ AYRI aday üretildi (katlama mantığı etkilenmedi — anahtar kaynak\'tan türer)', adaylar.length === 2)
+  ok('İki adayın iddia metni ARTIK FARKLI (birbirinin cümlesini TAŞIMIYOR)', adaylar[0].iddia !== adaylar[1].iddia)
+  ok('1. aday KENDİ tag\'ini içeriyor, DİĞERİNİ içermiyor', adaylar[0].iddia.includes('QR-bulut-depolama') && !adaylar[0].iddia.includes('fotoğraf-teslimat-platform'))
+  ok('2. aday KENDİ tag\'ini içeriyor, DİĞERİNİ içermiyor', adaylar[1].iddia.includes('fotoğraf-teslimat-platform') && !adaylar[1].iddia.includes('QR-bulut-depolama'))
+
+  // Regresyon: TEK tag'li, noktalı-virgülsüz normal bir cümle hâlâ doğru çalışıyor.
+  const tekTag = dataRequestAdaylari('Basit bir iddia burada 42 [tahmin-doğrulanacak:kaynak-x] birim civarındadır.')
+  ok('regresyon: noktalı-virgülsüz tek-tag cümle etkilenmedi', tekTag.length === 1 && tekTag[0].iddia.includes('42'))
+}
+
 console.log(`\nSONUÇ: ${gecti} geçti, ${kaldi} kaldı`)
 process.exit(kaldi === 0 ? 0 : 1)
