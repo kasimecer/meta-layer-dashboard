@@ -2,9 +2,13 @@ import { useEffect, useState } from 'react'
 import { sirala } from '../lib/registry.js'
 import { DurumBadge, StatusBadge, EtiketBadge, TaslakBadge } from '../components/Badges.jsx'
 import { taslaklariOku } from '../lib/intakeBuilder.js'
+import { portfoyOzetiKirp } from '../lib/metinKirp.js'
 
 // #/portfoy — operatör (E) ana ekranı: tüm projeler tek yerde.
 // localStorage taslakları da gösterir (✏ taslak rozeti ile).
+// 2026-07-18 (öz-yazma turu) — kısaltma artık YAZMA anında değil BURADA (render) uygulanır; bkz
+// src/lib/metinKirp.js:portfoyOzetiKirp (saf mantık, hermetik test edilebilir — bu dosya JSX
+// taşıdığı için düz node ile import edilemez).
 
 function ProjeSatiri({ p }) {
   return (
@@ -30,7 +34,7 @@ function ProjeSatiri({ p }) {
           <EtiketBadge label="değer:" value={p.deger} />
         </div>
       )}
-      <p style={{ fontSize: 12.5, color: '#52525b', lineHeight: 1.5, margin: 0 }}>{p.ozet}</p>
+      <p style={{ fontSize: 12.5, color: '#52525b', lineHeight: 1.5, margin: 0 }}>{portfoyOzetiKirp(p.ozet)}</p>
     </div>
   )
 }

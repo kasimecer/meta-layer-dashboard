@@ -3,7 +3,6 @@
 // Saf JS (React bağımlılığı yok); node ve tarayıcıda çalışır.
 
 import { kartDogrula } from './stateMachine.js'
-import { kelimeSiniriKirp } from './metinKirp.js'
 
 // Proje lifecycle'daki faz sınırı: planlama (fikir → plan) | build (build-onayı →)
 const PLANLAMA_DURUMLARI = new Set(['fikir', 'araştırma', 'premise', 'plan'])
@@ -31,14 +30,18 @@ export function idOner(ad, icerik) {
 // ── Proje kaydı ──────────────────────────────────────────────────────────────
 
 export function projeKaydiUret({ id, kip, ad, icerik }) {
-  // 2026-07-18 (Priority 2b) — eskiden koşulsuz `.slice(0,140)`, kelime sınırı FARKINDALIĞI
-  // yok (canlı-vaka: "...Ücret 50-100 s" — "SEK" kelimesinin ortasında kesilmişti). Bu alan
-  // yalnız portföy-görüntüleme İÇİN kısa bir önizlemedir (pipeline artık bunu OKUMUYOR, bkz
-  // 2026-07-18 A/B/C onarımı — kanonik fikir kaynağı intake.md'dir) — ama görüntülendiği için
-  // hâlâ kelime ortasında kesilmemeli.
+  // 2026-07-18 (öz-yazma turu) — eskiden burada bir uzunluk kapağı vardı (önce koşulsuz
+  // `.slice(0,140)`, sonra kelime-sınırı-farkında ama YİNE 140'a kırpan `kelimeSiniriKirp`).
+  // Kapak yazma-anında uygulandığı ve bu yazıcı YALNIZ proje yaratılırken bir kez çalışıp bir
+  // daha asla o satıra dönmediği için (bkz tools/intakeMateryalizeEt.mjs — INSERT-ONLY), her
+  // kapak kaybı KALICIYDI: kaynak metin daha sonra tam haliyle mevcut olsa bile stored değer bir
+  // daha asla tamamlanmadı (canlı-vaka: iki satır kelime-ortası kesilip hiç onarılmadı).
+  // Kırpma artık BURADA YAPILMAZ — TAM kaynak metin saklanır; kısaltma GÖRÜNTÜLEME katmanına
+  // taşındı (bkz src/lib/metinKirp.js:portfoyOzetiKirp + PortfolioView kart render'ı) çünkü orada
+  // GERİ ALINABİLİR (stored değer bozulmaz, yalnız o an nasıl gösterildiği değişir).
   const ozet = kip === 'fikir-var'
-    ? kelimeSiniriKirp(icerik.fikirMetni || '', 140)
-    : kelimeSiniriKirp([icerik.ilgiAlani, icerik.kisit, icerik.varlik].filter(Boolean).join(' · '), 140)
+    ? (icerik.fikirMetni || '').trim()
+    : [icerik.ilgiAlani, icerik.kisit, icerik.varlik].filter(Boolean).join(' · ').trim()
 
   return {
     id,

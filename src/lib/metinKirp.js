@@ -19,3 +19,16 @@ export function kelimeSiniriKirp(metin, maxUzunluk) {
   const sonBosluk = kesim.lastIndexOf(' ')
   return (sonBosluk > 0 ? kesim.slice(0, sonBosluk) : kesim).trimEnd() + '…'
 }
+
+// 2026-07-18 (öz-yazma turu) — Portföy kartındaki `ozet` GÖRÜNTÜLEME kırpması. Eskiden bu kapak
+// YAZMA anında (intakeBuilder.js:projeKaydiUret) uygulanıyordu — kalıcı bilgi kaybı (yazıcı bir
+// proje için YALNIZ bir kez, yaratılırken çalışır, o satıra bir daha asla dönmez; bkz
+// tools/intakeMateryalizeEt.mjs INSERT-ONLY deseni). Artık registry.json'da TAM kaynak metin
+// saklanıyor — kısaltma yalnız BURADA, her render'da GERİ ALINABİLİR biçimde uygulanıyor: stored
+// değer hiç bozulmuz. Çok-paragraflı bir `ozet` (ör. intake formunda birden çok satır girilmişse)
+// tek-satır bir portföy önizlemesi için önce boşluk/satır-sonlarına indirgenir, SONRA kırpılır.
+export const PORTFOY_OZET_UZUNLUGU = 140
+export function portfoyOzetiKirp(ozet) {
+  const tekSatir = String(ozet ?? '').replace(/\s+/g, ' ').trim()
+  return kelimeSiniriKirp(tekSatir, PORTFOY_OZET_UZUNLUGU)
+}
