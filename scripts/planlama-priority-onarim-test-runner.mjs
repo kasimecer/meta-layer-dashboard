@@ -112,6 +112,39 @@ bolum('Priority 2a/2b — kelimeSiniriKirp: kelime ortasında ASLA kesmez')
   ok('registry ozet KELİME ORTASINDA bitmiyor ("50-100 s" gibi bir kesim YOK)', !/\d+ [a-zçğıöşü]$/i.test(kayit.ozet))
 }
 
+// ══ Görev 6 (2026-07-18) — TAM kapak-sınırında mühendislikli girdi: öncesi/sonrası kanıtı ═══════
+bolum('projeKaydiUret: 140. karakterin TAM ORTASINDAN geçen bir kelimeyle mühendislikli girdi')
+{
+  // Girdi KASITLI mühendislik: ilk 125 karakter "kelime " tekrarları (son gerçek boşluk index
+  // 124'te) + 1 boşluk + 40 karakterlik TEK, bölünmez bir kelime (index 126-165). Ham
+  // `.slice(0,140)` bu girdide index 140'ı — o tek-kelimenin TAM ORTASINDA — keser (index
+  // 126-165 arası boşluksuz). Bu, "kapağa rastgele yakın" değil, kapağın KENDİSİNİ kelime-
+  // ortasında kesecek şekilde İNŞA edilmiş bir girdi.
+  const oncul = 'kelime '.repeat(18).trimEnd() // 125 karakter, son boşluk index 124
+  const bolunmezKelime = 'x'.repeat(40)
+  const girdi = oncul + ' ' + bolunmezKelime // toplam 166 karakter
+  ok('mühendislik ön-koşulu: girdi[139] VE girdi[140] AYNI bölünmez kelimenin İÇİNDE (boşluk değil)',
+    girdi[139] === 'x' && girdi[140] === 'x')
+
+  // "ÖNCESİ" — bcd7cc2 (2026-07-18 18:25) öncesi kod `.slice(0,140)` idi (git show ile doğrulanan,
+  // burada literal sabit olarak gömülü — canlı git deposuna bağımlı bir test istemiyoruz).
+  const oncekiKodununCiktisi = girdi.slice(0, 140)
+  ok('ÖNCESİ (ham .slice(0,140)): TAM 140 karakter VE kelime ortasında bitiyor (hasar parmak izi)',
+    oncekiKodununCiktisi.length === 140 && oncekiKodununCiktisi.endsWith('x') && !oncekiKodununCiktisi.endsWith('…'))
+
+  // "SONRASI" — GERÇEK, güncel projeKaydiUret (yeniden yazılmadı) AYNI mühendislikli girdiyle.
+  const kayit = projeKaydiUret({ id: 'gorev6-kapak-kaniti', kip: 'fikir-var', icerik: { fikirMetni: girdi } })
+  ok('SONRASI (gerçek projeKaydiUret): 140 karakterden KISA (kelime sınırına geri çekildi)', kayit.ozet.length < 140)
+  ok('SONRASI: "…" ile bitiyor (kırpma görünür işaretli)', kayit.ozet.endsWith('…'))
+  ok('SONRASI: bölünmez kelimeden TEK KARAKTER bile taşımıyor (tamamen dışarıda bırakıldı)', !kayit.ozet.includes('x'))
+  ok('SONRASI: son gerçek sözcük ("kelime") TAM biçimde korunmuş, kırpılmamış', kayit.ozet.slice(0, -1).endsWith('kelime'))
+
+  // Canlı-vaka çapraz-doğrulama: bu AYNI mühendislik deseni, Drive'daki GERÇEK hasarlı satırların
+  // (i-svec-te-reklam-ajansi-2026-07-04: "...Odak ürün-merke", nevresim-sabitleyici-2026-07-01:
+  // "...sürekli kayıyor, nevresim") TAM 140-karakter/ellipsis-yok parmak izini yeniden üretir —
+  // yani bu iki satırın ESKİ koddan geldiği, veriden çıkarım değil, KOD DAVRANIŞINDAN kanıtlanmış.
+}
+
 // ══ Priority 2a — dataRequestAdaylari BÜTÜNLEŞİK testi: >240 karaktere UZAMIŞ TEK cümle ════════
 bolum('Priority 2a — dataRequestAdaylari: 240 karakterden uzun tek cümle ARTIK kırpılmadan geçiyor')
 {
