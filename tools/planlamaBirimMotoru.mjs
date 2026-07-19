@@ -11,9 +11,12 @@ import { join } from 'path'
 import {
   sorulariOku, yanitButunluk, yanitlariHamOku, acikSorular,
   sorulariYaz, enSonYanitliOncekiSurum, oncekiYanitlariOku,
-  tumAcikAdaylar, slug,
+  tumAcikAdaylar, slug, soruDosyaAdi,
 } from './planlamaSorular.mjs'
 import { operatorBeyaniMi } from './canliExecutor.mjs'
+import {
+  uretimKaydiOlustur, paketiUretimKaydiIleTamamlaVeTasi, tasimaDefteriYaz, kodSurumuBilgisiOku,
+} from './planlamaUretimKaydi.mjs'
 
 // Üst (bir önceki) birim; sıradaki ilk eleman için null (kökün üstü yok).
 export function birimUst(sira, birim) {
@@ -125,14 +128,87 @@ export function birimUstYanitTuket(nsYolu, birimler, ust) {
   return { ust, surum: ss, kayitlar: but.yanitlar, paket }
 }
 
-// Birim çıktısından sorular paketini üret + sürümlü yaz (MODELSİZ). surum≥2 ise bir önceki
-// YANITI-OLAN sürümün yanıtları ön-dolgu olarak iliştirilir (öneri; asla oto-tüketilmez).
+// Birim çıktısından sorular paketini üret + sürümlü yaz + ÜRETİM-KAYDI/TAŞIMA-DEFTERİ
+// mekanizmasından (tools/planlamaUretimKaydi.mjs) GEÇİR. surum≥2 ise bir önceki YANITI-OLAN
+// sürümün yanıtları ayrıca ön-dolgu olarak iliştirilir (öneri; asla oto-tüketilmez) — bu ESKİ,
+// DEĞİŞMEYEN bir özellik (kaynakSurum "en son yanıtlı öncül"ü arar, atlanan ara sürümleri geçer).
+//
+// 2026-07-20 (üretim-kaydı kalıcı bağlama) — ÖNCEDEN bu fonksiyon sorular.json'u DOĞRUDAN
+// yazardı, öncül paketin İÇERİĞİNİ hiç okumadan (bkz planlamaUretimKaydi.mjs üstü SORUN notu) —
+// her yeniden-üretim öncüldeki hiçbir kaydı okumadan üzerine yazıyordu, bir extraction kuralı
+// değişirse öncüldeki bir kayıt YENİ sette SESSİZCE kaybolabiliyordu. Bu fonksiyon
+// birimKostur/elestiriPasi-kurtarma/planlamaBolumLoop-kurtarma+layer2/planlamaLoopV2-kurtarma
+// YOLLARININ TAMAMININ paylaştığı TEK soru-paketi yazıcısıdır (bkz grep: `sorulariYaz(` yalnız
+// BURADA çağrılır production kodunda) — burada bir kez sağlamlaştırmak HEPSİNE otomatik yansır,
+// ayrı bir "ikinci kapı" YOK.
+//
+// TAŞIMA-DEFTERİ DAİMA TAM ÖNCÜL (surum-1) paketine karşı hesaplanır — ön-dolgu'nun "en son
+// yanıtlı öncül"ü ARAMASINDAN BAĞIMSIZ: uretim_kaydi.onceki'nin anlamı "bu paketin DOĞRUDAN
+// yerini aldığı paket" olduğu için (mekanizmanın kendi sözleşmesi), araya sıçramak (sanctioned-
+// regen script'in tek-seferlik v2→v4 sıçraması gibi) BURADA YAPILMAZ — her hop kendi defterini
+// üretir, hiçbir hop atlanmaz.
+//
+// surum≥2 iken öncül (surum-1) paketi diskte YOKSA (yapısal anomali — ör. bu birim için
+// soruUretici önceki turda null'dı, hiç paket yazılmadı) SESSİZCE surum=1 gibi davranıp
+// mekanizmayı atlamak YERİNE sert hata fırlatılır — görevin "sessiz bypass YASAK, ateşlenemeyen
+// kontrol sert-hataya dönüşür" ilkesi (bkz tools/planlamaUretimKaydi.mjs test-runner'ındaki AYNI
+// disiplin).
 export function birimSorulariUretVeYaz(nsYolu, soruUretici, birimId, surum, icerik, projeId) {
   if (!soruUretici) return null
   const kaynakSurum = surum >= 2 ? enSonYanitliOncekiSurum(nsYolu, birimId, surum - 1) : null
-  const oncekiYanitlar = kaynakSurum ? oncekiYanitlariOku(nsYolu, birimId, kaynakSurum) : null
-  const paket = soruUretici(birimId, icerik, { projeId, surum, oncekiYanitlar })
+  const onDolguYanitlar = kaynakSurum ? oncekiYanitlariOku(nsYolu, birimId, kaynakSurum) : null
+  const hamPaket = soruUretici(birimId, icerik, { projeId, surum, oncekiYanitlar: onDolguYanitlar })
+
+  const { kodSurumu, kodKirli } = kodSurumuBilgisiOku()
+
+  if (surum < 2) {
+    // İlk üretim — taşınacak bir öncül YOK (tazelik-kontrolü için yine de damgalanır).
+    const paket = {
+      ...hamPaket,
+      uretim_kaydi: uretimKaydiOlustur({ kodSurumu, kodKirli, paketSema: hamPaket.sema, onceki: null }),
+    }
+    sorulariYaz(nsYolu, paket)
+    return paket
+  }
+
+  const oncekiSurum = surum - 1
+  const oncekiPaket = sorulariOku(nsYolu, birimId, oncekiSurum)
+  if (!oncekiPaket) {
+    throw new Error(
+      `birimSorulariUretVeYaz: "${birimId}" v${surum} üretiliyor ama öncül v${oncekiSurum} soru paketi ` +
+      `bulunamadı — üretim-kaydı/taşıma-defteri mekanizması dayanaksız kalırdı, HİÇBİR ŞEY YAZILMADI ` +
+      `(içerik-kör sessiz-üretim yasak; bu yapısal bir anomali — araştırılmalı, örn. bu birim için ` +
+      `soruUretici önceki turda null mıydı)`
+    )
+  }
+  const oncekiYanitHam = yanitlariHamOku(nsYolu, birimId, oncekiSurum)
+  if (oncekiYanitHam.durum === 'bozuk') {
+    throw new Error(
+      `birimSorulariUretVeYaz: "${birimId}" öncül (v${oncekiSurum}) yanıt dosyası bozuk (${oncekiYanitHam.neden}) ` +
+      `— taşıma sınıflandırması operatör kararlarını sessizce sıfır sayardı, HİÇBİR ŞEY YAZILMADI`
+    )
+  }
+  const oncekiYanitlar = oncekiYanitHam.durum === 'var' ? (oncekiYanitHam.ham?.yanitlar ?? []) : []
+
+  const { paket, defter, siniflandirma } = paketiUretimKaydiIleTamamlaVeTasi({
+    nsYolu, projeId, asama: birimId,
+    oncekiDosyaAdi: soruDosyaAdi(birimId, oncekiSurum), oncekiSurum,
+    oncekiPaket, oncekiYanitlar,
+    yeniPaket: hamPaket, kodSurumu, kodKirli,
+  })
+
+  const oncekiToplam = oncekiPaket.sorular.length + (oncekiPaket.ertelenen?.length ?? 0)
+  const siniflandirmaToplam =
+    siniflandirma.carried.length + siniflandirma.carried_with_text_drift.length + siniflandirma.unmatched_stamped.length
+  if (siniflandirmaToplam !== oncekiToplam) {
+    throw new Error(
+      `birimSorulariUretVeYaz: "${birimId}" v${surum} taşıma sınıflandırması tutarsız (öncül ${oncekiToplam} ` +
+      `kayıt ≠ sınıflandırma toplamı ${siniflandirmaToplam}) — sessiz kayıp riski, HİÇBİR ŞEY YAZILMADI`
+    )
+  }
+
   sorulariYaz(nsYolu, paket)
+  tasimaDefteriYaz(nsYolu, defter)
   return paket
 }
 

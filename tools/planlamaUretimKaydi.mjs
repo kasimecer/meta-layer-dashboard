@@ -24,9 +24,24 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { join, dirname } from 'path'
+import { execFileSync } from 'child_process'
 
 export const URETIM_KAYDI_SEMA = 1
 export const TASIMA_DEFTERI_SEMA = 1
+
+// Bu dosyanın bulunduğu repo kökü (tools/ tam bir alt-dizin) — kodSurumuBilgisiOku'nun
+// varsayılan cwd'si. scripts/planlama-provenans-ek-sanctioned-regen.mjs'deki AYNI hesaplama
+// (orada scripts/'den, burada tools/'dan — ikisi de repo köküne BİR seviye).
+const REPO_KOKU = new URL('..', import.meta.url).pathname
+
+// Üretim-kaydının kod_surumu/kod_kirli alanları İÇİN tek kaynak — HER production-yazan çağıran
+// (birimSorulariUretVeYaz) AYNI git sorgusunu tekrar İCAT ETMESİN diye burada. Modelsiz, saf git
+// çağrısı; hiçbir dosyaya yazmaz (SÖZLEŞME'yi ihlal etmez).
+export function kodSurumuBilgisiOku(repoKoku = REPO_KOKU) {
+  const kodSurumu = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoKoku, encoding: 'utf8' }).trim()
+  const kirliCikti = execFileSync('git', ['status', '--porcelain'], { cwd: repoKoku, encoding: 'utf8' }).trim()
+  return { kodSurumu, kodKirli: kirliCikti.length > 0 }
+}
 
 // ── (a) Üretim kaydı ────────────────────────────────────────────────────────────────────────
 // TEK obje — generator sürümü (kod_surumu + paket_sema) + öncül referansı (onceki) BİRLİKTE.
