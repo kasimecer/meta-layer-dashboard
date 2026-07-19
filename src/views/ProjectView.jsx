@@ -110,6 +110,7 @@ export default function ProjectView({ projeId = 'mustafa' }) {
   const [operator, setOperator] = useState(null)
   const [taslak, setTaslak] = useState(null)
   const [sorular, setSorular] = useState(null)     // planlama soru-yanıt anlık-görüntüsü (best-effort)
+  const [tasima, setTasima] = useState(null)       // taşıma-defteri özetleri (best-effort, çoğu projede yok)
 
   // GERÇEK/materyalize veri (registry veya cards-<id>.json) HER ZAMAN localStorage taslağının
   // ÖNÜNE geçer — aksi hâlde bir proje materyalize edildikten SONRA bile, aynı tarayıcıda kalan
@@ -118,7 +119,7 @@ export default function ProjectView({ projeId = 'mustafa' }) {
   // Gerçek veri bulununca kalan taslak varsa BAYATTIR → kendiliğinden temizlenir (taslakSil).
   useEffect(() => {
     let iptal = false
-    setProje(undefined); setKartlar(null); setOperator(null); setTaslak(null); setSorular(null)
+    setProje(undefined); setKartlar(null); setOperator(null); setTaslak(null); setSorular(null); setTasima(null)
 
     async function yukle() {
       let registryProje = null
@@ -159,6 +160,12 @@ export default function ProjectView({ projeId = 'mustafa' }) {
       // Soru-yanıt anlık-görüntüsü — best-effort, registry-bağımsız (bkz build-card-data.js §4).
       fetch(`./sorular-${projeId}.json`).then(r => r.ok ? r.json() : null)
         .then(s => { if (!iptal) setSorular(s) }).catch(() => {})
+
+      // Taşıma-defteri özetleri — best-effort; dosya YOKSA (proje için hiç sanctioned regen
+      // koşulmadıysa) fetch 404 döner, tasima null kalır, panelde hiçbir şey render edilmez
+      // (bkz tools/planlamaUretimKaydi.mjs, docs/OPERATOR_ARTIFACT_SURVEY.md).
+      fetch(`./tasima-${projeId}.json`).then(r => r.ok ? r.json() : null)
+        .then(t => { if (!iptal) setTasima(t) }).catch(() => {})
     }
     yukle()
     return () => { iptal = true }
@@ -283,6 +290,34 @@ export default function ProjectView({ projeId = 'mustafa' }) {
             </a>
           </div>
         )}
+        {/* Taşıma-defteri — bir soru paketi tools/planlamaUretimKaydi.mjs mekanizmasıyla yeniden
+            üretildiğinde, öncül paketteki HER kaydın (carried / carried_with_text_drift /
+            unmatched_stamped) nereye düştüğünü gösterir — sessizce kaybolan operatör kararı
+            olmadığının kanıtı (bkz docs/OPERATOR_ARTIFACT_SURVEY.md §2, §4). Çoğu projede bu
+            dosya hiç YOK — o durumda bu bölüm hiç render edilmez. */}
+        {tasima?.defterler?.length > 0 && tasima.defterler.map(d => (
+          <div key={d.dosya} style={{ marginTop: 8, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 12px', fontSize: 12.5, color: '#166534' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span>🧾</span>
+              <span>
+                <strong>taşıma-defteri:</strong> {d.asama} v{d.onceki?.surum} → v{d.surum}
+                {' '}(öncül: <code style={{ fontFamily: 'ui-monospace, monospace' }}>{d.onceki?.dosya}</code>)
+              </span>
+            </div>
+            <div style={{ marginTop: 6, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+              <span>✓ taşındı: <strong>{d.ozet.carried}</strong></span>
+              <span>⚠ metin-driftli taşındı: <strong>{d.ozet.carried_with_text_drift}</strong></span>
+              <span>✗ eşleşmedi (damgalı): <strong>{d.ozet.unmatched_stamped}</strong></span>
+              <span style={{ color: '#71717a' }}>toplam: {d.ozet.toplam}</span>
+            </div>
+            <div style={{ marginTop: 4, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+              <span>karar taşındı: <strong>{d.ozet.karar_tasindi}</strong></span>
+              <span style={{ color: d.ozet.karar_yetim_kaldi > 0 ? '#b91c1c' : '#166534', fontWeight: d.ozet.karar_yetim_kaldi > 0 ? 700 : 400 }}>
+                karar yetim kaldı: {d.ozet.karar_yetim_kaldi}{d.ozet.karar_yetim_kaldi > 0 ? ' ⚠' : ''}
+              </span>
+            </div>
+          </div>
+        ))}
         {operator?.son_ilerleme && (
           <p style={{ fontSize: 12.5, color: '#52525b', lineHeight: 1.55, marginTop: 10 }}>{operator.son_ilerleme}</p>
         )}

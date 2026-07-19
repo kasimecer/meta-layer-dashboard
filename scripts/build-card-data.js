@@ -460,6 +460,30 @@ if (existsSync(projelerDir)) {
 
       writeFileSync(join(outDir, `sorular-${id}.json`), JSON.stringify(anlikGoruntu, null, 2), 'utf8')
       sorularYazilanSayisi++
+
+      // TAŞIMA DEFTERLERİ — tools/planlamaUretimKaydi.mjs mekanizmasının çıktısı (bkz docs/
+      // OPERATOR_ARTIFACT_SURVEY.md). Bir proje dizininde `<asama>-tasima-defteri-v<N>.json`
+      // deseniyle eşleşen dosya(lar) VARSA, operatörün "carried / carried_with_text_drift /
+      // unmatched_stamped" durumunu ve düzeltilmiş aday sayılarını görebilmesi için özetlerini
+      // public/tasima-<id>.json'a yazar. YOKSA (mevcut projelerin BÜYÜK ÇOĞUNLUĞU) dosya hiç
+      // YAZILMAZ — panelde sessizce hiçbir şey görünmez, boş bir bölüm İCAT EDİLMEZ.
+      try {
+        const tasimaDosyalari = readdirSync(nsYolu)
+          .filter(f => /^(.+)-tasima-defteri-v(\d+)\.json$/.test(f))
+          .sort()
+        if (tasimaDosyalari.length) {
+          const defterler = tasimaDosyalari.map(f => {
+            const d = JSON.parse(readFileSync(join(nsYolu, f), 'utf8'))
+            return {
+              dosya: f, asama: d.asama, surum: d.surum, onceki: d.onceki,
+              olusturma: d.olusturma, ozet: d.ozet,
+            }
+          })
+          writeFileSync(join(outDir, `tasima-${id}.json`), JSON.stringify({ proje_id: id, defterler }, null, 2), 'utf8')
+        }
+      } catch (e) {
+        console.warn(`tasima-${id}.json üretilemedi (proje atlandı, diğerleri etkilenmedi):`, e.message)
+      }
     } catch (e) {
       console.warn(`sorular-${id}.json üretilemedi (proje atlandı, diğerleri etkilenmedi):`, e.message)
     }
