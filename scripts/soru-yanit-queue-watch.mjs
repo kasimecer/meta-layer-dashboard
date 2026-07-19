@@ -32,7 +32,7 @@ import { META_DATA_ROOT } from './config.js'
 import {
   sorulariOku, sorulariDogrula, yanitKaydet, atlaYaz, yanitlandiMi,
 } from '../tools/planlamaSorular.mjs'
-import { stateYukle } from '../tools/planlamaDurumMakinesiV2.mjs'
+import { stateYukle, birimStateOf } from '../tools/planlamaDurumMakinesiV2.mjs'
 
 const REPO_ROOT = resolve(new URL('.', import.meta.url).pathname, '..')
 const KUYRUK_DIR = join(REPO_ROOT, 'soru-yanit-kuyruk')
@@ -81,22 +81,17 @@ export function gonderimiIsle(gonderim, { log = () => {}, projelerRoot = META_DA
     return { sonuc: 'reddedildi', neden: `proje state okunamadı: ${e.message}` }
   }
 
-  // "asama" İKİ ŞEYDEN biri olabilir: (a) üst-seviye bir aşama (genesis/premise/arastirma/
-  // strateji/master-plan) — state.asamalar[asama]'da doğrudan yaşar, YA DA (b) master-plan
-  // bölüm-yürüyüşü AKTİFKEN bir BÖLÜM id'si (ör. "ozet-yonetici") — bu durumda kendi soru
-  // katmanı state.asamalar['master-plan'].bolumler[asama]'da yaşar (bkz
-  // tools/planlamaBolumLoop.mjs aktifBolumBilgisi ile AYNI ayrım). 2026-07-17 DÜZELTME: bu
-  // dal eskiden HİÇ YOKTU — dashboard artık bölüm-seviyesi açık soruları doğru gösterdiği
-  // (P1 fix) için SoruYanitView bölüm id'sini `asama` alanına koyup gönderiyor, ama bu fonksiyon
-  // yalnız üst-seviye state.asamalar[asama]'ya bakıyordu → GERÇEK bir operatör gönderimi
-  // "aktif soru turu yok" ile reddedilirdi (canlı-gözlemlenen vaka — Worker'ın 400'ünden SONRA
-  // bile, Worker düzeltilse dahi burada İKİNCİ bir ret oluşurdu). sorulariOku/yanitKaydet/atlaYaz
-  // ZATEN `asama` parametresini yalnız dosya-adı öneki olarak kullanıyor (bkz
-  // tools/planlamaSorular.mjs soruDosyaAdi) — bölüm id'leri için de AYNEN doğru dosyalara işaret
-  // eder, o fonksiyonlarda HİÇBİR değişiklik gerekmedi.
-  const ustBirim = state.asamalar?.[asama]
-  const bolumBirim = state.asamalar?.['master-plan']?.bolumler?.[asama]
-  const birimState = ustBirim ?? bolumBirim
+  // "asama" ÜÇ ŞEYDEN biri olabilir: (a) üst-seviye bir aşama (genesis/premise/arastirma/
+  // strateji/master-plan), (b) master-plan bölüm-yürüyüşü AKTİFKEN bir BÖLÜM id'si (ör.
+  // "ozet-yonetici"), YA DA (c) elestiri/Kritik Pasaj — kendi state.elestiri alanını taşır,
+  // GERCEK_ASAMALAR/bölümlerin DIŞINDA (bkz tools/elestiriPasi.mjs). Üçü de tools/
+  // planlamaDurumMakinesiV2.mjs:birimStateOf ile TEK bir yerden çözülür — CLI (scripts/
+  // planlama-baslat.mjs) da AYNI fonksiyonu kullanır, burada AYRI bir özel-durum YOK (2026-07-19
+  // düzeltme: elestiri dalı burada hiç yoktu, gönderim "aktif soru turu yok" ile reddediliyordu —
+  // bkz kanal). sorulariOku/yanitKaydet/atlaYaz ZATEN `asama` parametresini yalnız dosya-adı
+  // öneki olarak kullanıyor (bkz tools/planlamaSorular.mjs soruDosyaAdi) — elestiri için de AYNEN
+  // doğru dosyalara işaret eder, o fonksiyonlarda hiçbir değişiklik gerekmedi.
+  const birimState = birimStateOf(state, asama)
 
   // GERÇEK GÜNCEL sürüm — gönderimdeki surum'a ASLA güvenilmez, yalnız KARŞILAŞTIRMA için kullanılır.
   const guncelSurum = birimState?.sorular_surum

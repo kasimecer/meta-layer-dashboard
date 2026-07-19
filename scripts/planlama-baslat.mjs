@@ -19,7 +19,7 @@ import { join, relative } from 'path'
 import { META_DATA_ROOT } from './config.js'
 import { planlamaBaslat, planlamaGeri, planlamaBolumeGeri } from '../tools/planlamaBaslat.mjs'
 import {
-  ASAMA_SIRASI, GERCEK_ASAMALAR, stateYukle, bayatAsamalar, bayatMi, ustAsama,
+  ASAMA_SIRASI, GERCEK_ASAMALAR, stateYukle, bayatAsamalar, bayatMi, ustAsama, birimStateOf,
 } from '../tools/planlamaDurumMakinesiV2.mjs'
 import {
   atlaYaz, yanitDosyaAdi, sorulariOku, yanitlariHamOku, yanitButunluk,
@@ -29,15 +29,9 @@ import { acikSoruDurum } from '../tools/planlamaDurumOzeti.mjs'
 import { BOLUM_SIRASI } from '../tools/planlamaBolumTanimlari.mjs'
 import { aktifBolumBilgisi } from '../tools/planlamaBolumLoop.mjs'
 
-// Bir birim-id'nin (aşama VEYA master-plan bölümü VEYA elestiri/Kritik Pasaj) state-nesnesini +
-// üstünü çözer — sonuc.bekleyenOnay/bayatAsama artık ÜÇ granülerlikten biri olabilir. elestiri
-// BİLEREK GERCEK_ASAMALAR/BOLUM_SIRASI'nın DIŞINDadır (bkz tools/elestiriPasi.mjs) — kendi
-// state.elestiri alanını taşır, bu yüzden ayrıca kontrol edilmesi gerekir (aksi halde undefined
-// döner ve çağıran s.surum gibi bir alana erişince patlar).
-function birimStateOf(state, id) {
-  if (id === 'elestiri') return state.elestiri
-  return GERCEK_ASAMALAR.includes(id) ? state.asamalar[id] : state.asamalar['master-plan']?.bolumler?.[id]
-}
+// birimStateOf artık tools/planlamaDurumMakinesiV2.mjs'de (paylaşılan — gonderimiIsle de AYNI
+// fonksiyonu kullanır, iki ayrı özel-durum YOK). Yalnız "üst adı" burada kalır (yalnız bu CLI'ın
+// mesaj/geri-dönüş metinleri için, submission yolunun ihtiyacı yok).
 function birimUstAdi(id) {
   if (id === 'elestiri') return 'master-plan'
   if (GERCEK_ASAMALAR.includes(id)) return ustAsama(id)

@@ -146,3 +146,16 @@ export function bayatAsamalar(state) {
 export function geriAsamaya(state, hedef) {
   return birimGeriDon(GERCEK_ASAMALAR, state.asamalar, state, 'aktif_asama', hedef, 'tamamlandi')
 }
+
+// Bir birim-id'nin (aşama VEYA master-plan bölümü VEYA elestiri/Kritik Pasaj) state-nesnesini
+// çözer — GERÇEK_ASAMALAR/bölümler/elestiri arasındaki TEK ayrım noktası. elestiri BİLEREK
+// GERCEK_ASAMALAR'ın DIŞINDadır (kendi state.elestiri alanını taşır, bkz boslukState/
+// normalizeState) — bu yüzden ayrıca kontrol edilir; aksi halde state.asamalar['elestiri']
+// undefined döner ve çağıran s.sorular_surum gibi bir alana erişince patlar. HER çağıran
+// (CLI planlama-baslat.mjs, soru-yanit-queue-watch.mjs'in gonderimiIsle'ı, ...) BU TEK
+// fonksiyonu kullanır — elestiri gibi "sıradan koleksiyonun dışında yaşayan" bir sonraki birim
+// eklendiğinde tek bir yer güncellenir, her çağıran kendi özel-durumunu TEKRARLAMAZ.
+export function birimStateOf(state, id) {
+  if (id === 'elestiri') return state.elestiri
+  return GERCEK_ASAMALAR.includes(id) ? state.asamalar[id] : state.asamalar['master-plan']?.bolumler?.[id]
+}
