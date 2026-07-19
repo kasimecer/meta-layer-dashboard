@@ -29,6 +29,7 @@
     "registry-durum-faz-test": "node scripts/registry-durum-faz-test.mjs",
     "planlama-kart-test": "node scripts/planlama-kart-turetici-test-runner.mjs",
     "planlama-tamamlandi-korluk-test": "node scripts/planlama-tamamlandi-korluk-test-runner.mjs",
+    "planlama-uretim-kaydi-test": "node scripts/planlama-uretim-kaydi-test-runner.mjs",
     "planlama-soru-demo": "node scripts/planlama-soru-demo.mjs",
     "soru-yanit-watch": "node scripts/soru-yanit-queue-watch.mjs",
     "soru-yanit-queue-test": "node scripts/soru-yanit-queue-test.mjs",
