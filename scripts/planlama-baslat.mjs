@@ -88,7 +88,7 @@ function durumOzetiCikar(id) {
   if (state.aktif_asama === 'tamamlandi') {
     // 5-aşama + bölüm-yürüyüşü bitti — ama Kritik Pasaj (elestiri) AYRI, kendi durumunu taşıyan
     // bir birim (bkz tools/elestiriPasi.mjs); "tamamlandı" tek başına yanıltıcı olurdu.
-    const es = state.elestiri
+    const es = birimStateOf(state, 'elestiri')
     if (es?.durum === 'donduruldu') {
       return { etiket: 'BLOKE (kritik pasaj)', detay: es.blok_nedeni ?? '(neden bilinmiyor)' }
     }
@@ -102,8 +102,8 @@ function durumOzetiCikar(id) {
   }
 
   const A = state.aktif_asama
-  const As = state.asamalar[A]
-  const gectiSayisi = GERCEK_ASAMALAR.filter(a => state.asamalar?.[a]?.durum === 'gecti').length
+  const As = birimStateOf(state, A)
+  const gectiSayisi = GERCEK_ASAMALAR.filter(a => birimStateOf(state, a)?.durum === 'gecti').length
 
   if (As?.durum === 'donduruldu') {
     return { etiket: 'BLOKE', detay: `${A} — ${As.blok_nedeni ?? '(neden bilinmiyor)'}${bayatEk}` }
@@ -158,7 +158,7 @@ function raporYaz(id, sonuc) {
     case 'tamamlandi': {
       console.log(`✓ Planlama pipeline TAMAMLANDI — ${id}`)
       for (const a of GERCEK_ASAMALAR) {
-        const s = state.asamalar[a]
+        const s = birimStateOf(state, a)
         console.log(`    ${a.padEnd(12)} sürüm ${s.surum}  → ${gorPath(s.cikti_pointer)}`)
       }
       const bayatlar = bayatAsamalar(state)
@@ -166,7 +166,7 @@ function raporYaz(id, sonuc) {
       break
     }
     case 'elestiri-tamamlandi': {
-      const es = state.elestiri
+      const es = birimStateOf(state, 'elestiri')
       console.log(`✓ KRİTİK PASAJ TAMAMLANDI — ${id}`)
       console.log(`    elestiri     sürüm ${es.surum}  → ${gorPath(es.cikti_pointer)}`)
       console.log(`  E kararı (go/no-go/pivot) kaydedildi — bkz ${gorPath(join(nsYoluOf(id), yanitDosyaAdi('elestiri', es.sorular_surum ?? 1)))}`)
@@ -287,7 +287,7 @@ function raporYaz(id, sonuc) {
       // kapısı reddetti (aktifBolumBilgisi onu bulur), (b) Layer-2 (tüm-plan) kontrolü
       // başarısız (konteynerin kendi blok_nedeni'nde durur, hiçbir bölüm bireysel bloke
       // DEĞİLDİR), (c) sıradan bir aşama bloke (eski davranış, state.aktif_asama zaten doğru).
-      const mp = state.asamalar['master-plan']
+      const mp = birimStateOf(state, 'master-plan')
       const bilgi = aktifBolumBilgisi(state)
       let a, blokNedeni, ciktiPointer
       if (state.aktif_asama === 'master-plan' && mp?.blok_nedeni && mp.blok_nedeni.startsWith('Layer-2')) {
@@ -296,12 +296,12 @@ function raporYaz(id, sonuc) {
         ciktiPointer = null
       } else if (bilgi) {
         a = bilgi.bolumId
-        blokNedeni = bilgi.bolumler[bilgi.bolumId]?.blok_nedeni
-        ciktiPointer = bilgi.bolumler[bilgi.bolumId]?.cikti_pointer
+        blokNedeni = birimStateOf(state, bilgi.bolumId)?.blok_nedeni
+        ciktiPointer = birimStateOf(state, bilgi.bolumId)?.cikti_pointer
       } else {
         a = state.aktif_asama
-        blokNedeni = state.asamalar[a]?.blok_nedeni
-        ciktiPointer = state.asamalar[a]?.cikti_pointer
+        blokNedeni = birimStateOf(state, a)?.blok_nedeni
+        ciktiPointer = birimStateOf(state, a)?.cikti_pointer
       }
       console.log(`✗ BLOKE — ${a}  (proje: ${id})`)
       console.log(`  blok_nedeni: ${blokNedeni ?? '(yok)'}`)
@@ -355,7 +355,7 @@ function geriYap(id, hedef) {
     console.error('  (Hiçbir dosya/state değiştirilmedi.)')
     process.exit(1)
   }
-  const s = bolumHedefMi ? state.asamalar['master-plan'].bolumler[hedef] : state.asamalar[hedef]
+  const s = birimStateOf(state, hedef)
   const birimEtiket = bolumHedefMi ? `master-plan bölümü "${hedef}"` : hedef
   console.log(`↩ GERİ DÖNÜLDÜ — ${birimEtiket} yeniden açıldı  (proje: ${id})`)
   console.log(`  Mevcut çıktı KORUNDU (sürüm ${s.surum}): ${gorPath(s.cikti_pointer)}`)

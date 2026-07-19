@@ -23,7 +23,7 @@
 
 import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { bosAsama, statePersist, asamaDosyaAdi, ilerlet, GERCEK_ASAMALAR } from './planlamaDurumMakinesiV2.mjs'
+import { bosAsama, statePersist, asamaDosyaAdi, ilerlet, GERCEK_ASAMALAR, birimStateOf } from './planlamaDurumMakinesiV2.mjs'
 import { birimIlerlet, birimGeriDon, birimBayatMi, birimKostur, birimAcikDurum, birimSorulariUretVeYaz, birimUst } from './planlamaBirimMotoru.mjs'
 import { BOLUM_SIRASI, BOLUM_TANIMLARI, TUM_BOLUMLER_ISARETI } from './planlamaBolumTanimlari.mjs'
 import { bolumKapidanGecerMi } from './planlamaBolumKapilari.mjs'
@@ -55,9 +55,12 @@ function bolumleriHazirla(mp) {
 }
 
 // Bölüm-yürüyüşü hâlâ AKTİF mi (outer 'kosuyor' aşamasında, section-seviyesi soru-durumu
-// geçerli) — planlamaDurumOzeti.mjs'nin acikSoruDurum sarmalayıcısı bunu kullanır.
+// geçerli) — planlamaDurumOzeti.mjs'nin acikSoruDurum sarmalayıcısı bunu kullanır. READ-ONLY
+// (yalnız bu tek fonksiyon dokunuldu; dosyanın geri kalanı — walk/gate motoru — DEĞİŞMEDİ):
+// `state.asamalar[MP]` yerine artık birimStateOf(state, MP) — aynı nesne referansı, bkz docs/
+// PIPELINE_UNIT_STATE_CONSUMERS.md satır 23.
 export function aktifBolumBilgisi(state) {
-  const mp = state.asamalar[MP]
+  const mp = birimStateOf(state, MP)
   if (!mp || !mp.bolumler || !mp.aktif_bolum) return null
   if (mp.durum === 'onay-bekliyor' || mp.durum === 'gecti') return null // walk bitti; outer'ın kendi sorusu geçerli
   return { bolumId: mp.aktif_bolum, bolumler: mp.bolumler }

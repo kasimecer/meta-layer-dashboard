@@ -251,6 +251,38 @@ export default function ProjectView({ projeId = 'mustafa' }) {
             )}
           </div>
         )}
+        {/* 5-aşama + bölüm-yürüyüşü BİTTİ (tamamlandi) AMA Kritik Pasaj (elestiri) hâlâ bekleyen bir
+            kararsa (ör. go/no-go/pivot) — 2026-07-19 kör-nokta düzeltmesi (bkz tools/
+            planlamaDurumOzeti.mjs:acikSoruDurum). ÖNCEKİ blok (yukarıda, !sorular.tamamlandi) BİLEREK
+            DEĞİŞTİRİLMEDİ — bu tamamen AYRI, EK bir durak: "pipeline bitti" ARTIK "operatörün göreceği
+            hiçbir şey kalmadı" ANLAMINA GELMEZ. */}
+        {sorular && sorular.tamamlandi && sorular.acik_sorular?.length > 0 && (
+          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: '#9a3412' }}>
+            <span>⚑</span>
+            <span>
+              <strong>Kritik Pasaj — E kararı bekliyor:</strong> <strong>{sorular.acik_sorular.length} açık soru</strong>
+              {sorular.durum_etiketi && <> · durum: {sorular.durum_etiketi}</>}
+            </span>
+            <a href={`#/sorular/${projeId}`} style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: '#9a3412', textDecoration: 'none' }}>
+              Yanıtla →
+            </a>
+          </div>
+        )}
+        {/* Leftover: proje boyunca (aktif olmayan birimler dahil) ertelenmiş, hâlâ açık adaylar —
+            walk/deferral tasarımı DEĞİŞMEDİ, yalnız görünürlük eklendi (bkz tools/
+            planlamaDurumOzeti.mjs:projeLeftoverOzetiCikar). Detay #/sorular/<id>'de. */}
+        {sorular && sorular.leftover_by_unit?.length > 0 && (
+          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, color: '#52525b' }}>
+            <span>🗂</span>
+            <span>
+              <strong>{sorular.leftover_by_unit.reduce((n, u) => n + u.sayi, 0)} ertelenen aday</strong> hâlâ açık
+              ({sorular.leftover_by_unit.length} birimde: {sorular.leftover_by_unit.map(u => u.birimId).join(', ')})
+            </span>
+            <a href={`#/sorular/${projeId}`} style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: '#52525b', textDecoration: 'none' }}>
+              Detay →
+            </a>
+          </div>
+        )}
         {operator?.son_ilerleme && (
           <p style={{ fontSize: 12.5, color: '#52525b', lineHeight: 1.55, marginTop: 10 }}>{operator.son_ilerleme}</p>
         )}

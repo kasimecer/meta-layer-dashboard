@@ -15,7 +15,7 @@
 import { existsSync, statSync, readFileSync } from 'fs'
 import { basename } from 'path'
 import { sorulariOku, yanitlariHamOku, tumAdaylar, yanitlandiMi } from './planlamaSorular.mjs'
-import { GERCEK_ASAMALAR } from './planlamaDurumMakinesiV2.mjs'
+import { GERCEK_ASAMALAR, birimStateOf } from './planlamaDurumMakinesiV2.mjs'
 
 export const ASAMA_ETIKET = {
   genesis: 'Genesis',
@@ -116,14 +116,18 @@ export function kararKartiUret(projeId, nsYolu, asama, asamaState) {
 
 // Master-plan bölüm-yürüyüşü SÜRERKEN olası bir "karar:" sorusu aktif BÖLÜMÜN kendi soru
 // paketinde olur — outer'ın (asamaState'in kendi) sorular_surum'u yalnız walk bitince (nihai
-// onay sorusu) dolar; bkz tools/planlamaDurumOzeti.mjs acikSoruDurum/aktifBolumBilgisi (AYNI üç
-// alanı — aktif_bolum/bolumler/durum — AYNI koşulla okur). O fonksiyon burada import EDİLMEDİ:
-// tam `state` gerektirir, burada yalnız asamaState (=mp) var — döngüsel-import riski almadan
-// aynı üç alanı doğrudan okumak yeterli (bkz meta-kanal.md 2026-07-16 16:35 recon kaydı).
-function masterPlanKararBirimi(asama, asamaState) {
+// onay sorusu) dolar; bkz tools/planlamaDurumOzeti.mjs acikSoruDurum/aktifBolumBilgisi (AYNI
+// aktif_bolum/bolumler alanlarını AYNI koşulla okur). O fonksiyon (aktifBolumBilgisi) burada
+// HÂLÂ import EDİLMEZ — planlamaBolumLoop.mjs'ten gelir ve döngüsel-import riski taşırdı (bkz
+// meta-kanal.md 2026-07-16 16:35 recon kaydı). Ama bölüm-id'sinin state-nesnesini çözmek artık
+// `mp.bolumler[mp.aktif_bolum]` ile KENDİ kopyasını almıyor — birimStateOf zaten aynı modülden
+// (planlamaDurumMakinesiV2.mjs) GERCEK_ASAMALAR ile birlikte import ediliyor, yeni bir modül-
+// kenarı EKLEMEDEN (döngü riski YOK) tek çözücüye bağlanır (bkz docs/
+// PIPELINE_UNIT_STATE_CONSUMERS.md satır 26 — "görev: route it through the shared resolver").
+function masterPlanKararBirimi(state, asama, asamaState) {
   const mp = asamaState
   if (mp?.bolumler && mp.aktif_bolum && mp.durum !== 'onay-bekliyor' && mp.durum !== 'gecti') {
-    return { asama: mp.aktif_bolum, asamaState: mp.bolumler[mp.aktif_bolum] }
+    return { asama: mp.aktif_bolum, asamaState: birimStateOf(state, mp.aktif_bolum) }
   }
   return { asama, asamaState }
 }
@@ -132,19 +136,21 @@ function masterPlanKararBirimi(asama, asamaState) {
 // strateji→master-plan), her aşamanın ardından (varsa) o aşamanın karar-kartı; sonda elestiri
 // (ASAMA_SIRASI'nın bilerek DIŞINDA — bkz planlamaDurumMakinesiV2.mjs) + kendi karar-kartı.
 // `state` çağıran tarafından zaten yüklenmiş olmalı (stateYukle) — burada YENİDEN okunmaz.
+// Birim-state artık birimStateOf ÜZERİNDEN çözülür (aynı nesne referansı — davranış DEĞİŞMEDİ).
 export function projeKartlariniTuret(nsYolu, projeId, state) {
   const kartlar = []
   for (const asama of GERCEK_ASAMALAR) {
-    const asamaState = state.asamalar?.[asama]
+    const asamaState = birimStateOf(state, asama)
     const ak = asamaKartiUret(projeId, asama, asamaState)
     if (ak) kartlar.push(ak)
-    const karaBirim = asama === 'master-plan' ? masterPlanKararBirimi(asama, asamaState) : { asama, asamaState }
+    const karaBirim = asama === 'master-plan' ? masterPlanKararBirimi(state, asama, asamaState) : { asama, asamaState }
     const kk = kararKartiUret(projeId, nsYolu, karaBirim.asama, karaBirim.asamaState)
     if (kk) kartlar.push(kk)
   }
-  const ea = asamaKartiUret(projeId, 'elestiri', state.elestiri)
+  const es = birimStateOf(state, 'elestiri')
+  const ea = asamaKartiUret(projeId, 'elestiri', es)
   if (ea) kartlar.push(ea)
-  const ek = kararKartiUret(projeId, nsYolu, 'elestiri', state.elestiri)
+  const ek = kararKartiUret(projeId, nsYolu, 'elestiri', es)
   if (ek) kartlar.push(ek)
   return { proje_id: projeId, kartlar }
 }
@@ -164,7 +170,7 @@ export function projeDokumanlariniTuret(nsYolu, projeId, state) {
     dokumanlar.push({ ad: basename(cikti_pointer), asama, href, icerik: dosyaIcerigiOku(cikti_pointer) })
   }
   for (const asama of GERCEK_ASAMALAR) {
-    const s = state.asamalar?.[asama]
+    const s = birimStateOf(state, asama)
     if (s?.durum !== 'gecti') continue
     ekle(asama, s.cikti_pointer)
     if (asama === 'master-plan' && s.bolumler) {
@@ -173,6 +179,7 @@ export function projeDokumanlariniTuret(nsYolu, projeId, state) {
       }
     }
   }
-  if (state.elestiri?.durum === 'gecti') ekle('elestiri', state.elestiri.cikti_pointer)
+  const es = birimStateOf(state, 'elestiri')
+  if (es?.durum === 'gecti') ekle('elestiri', es.cikti_pointer)
   return dokumanlar
 }

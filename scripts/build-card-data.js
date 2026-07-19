@@ -2,9 +2,9 @@ import { readFileSync, writeFileSync, readdirSync, existsSync, rmSync } from 'fs
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { META_DATA_ROOT } from './config.js'
-import { stateYukle, bayatAsamalar } from '../tools/planlamaDurumMakinesiV2.mjs'
+import { stateYukle, bayatAsamalar, birimStateOf } from '../tools/planlamaDurumMakinesiV2.mjs'
 import { sorulariDogrula, VERI_KARARLARI } from '../tools/planlamaSorular.mjs'
-import { acikSoruDurum } from '../tools/planlamaDurumOzeti.mjs'
+import { acikSoruDurum, projeLeftoverOzetiCikar } from '../tools/planlamaDurumOzeti.mjs'
 import { projeKartlariniTuret, projeDokumanlariniTuret, dosyaHref } from '../tools/planlamaKartTuretici.mjs'
 import { pipelineDurumFazHesapla } from '../src/lib/registry.js'
 
@@ -394,48 +394,68 @@ if (existsSync(projelerDir)) {
         aktif_asama: state.aktif_asama,
         tamamlandi: state.aktif_asama === 'tamamlandi',
         bayat_asamalar: bayatlar,
-        durum_etiketi: null,          // aktif aşamanın durum'u ('onay-bekliyor'|'donduruldu'|...)
+        durum_etiketi: null,          // aktif birimin (veya, tamamlandiysa, elestiri'nin) durum'u
         soru_turu: 'yok',             // 'yok' | 'gecerli' | 'defekt' — snapshot render edilebilir mi
         yanit_butunluk: null,         // acikSoruDurum().butunluk — 'gecerli'|'yok'|'bozuk'|null
         asama: null, surum: null, soru_imza: null,
         bolum: null,                  // master-plan bölüm-yürüyüşü sürüyorsa bölüm id'si, aksi null
         acik_sorular: [], ertelenen_sorular: [], atlanan_sorular: [],
+        // Proje boyunca (aktif olmayan birimler dahil) hâlâ açık kalmış ertelenen adaylar — bkz
+        // tools/planlamaDurumOzeti.mjs:projeLeftoverOzetiCikar. Boş dizi = gerçekten leftover yok.
+        leftover_by_unit: [],
         reddedilen_gonderimler: reddedilenGonderimleriOku(id),
       }
 
-      if (state.aktif_asama !== 'tamamlandi') {
-        const A = state.aktif_asama
-        const As = state.asamalar[A]
-        anlikGoruntu.durum_etiketi = As?.durum ?? null
-        // acikSoruDurum(nsYolu, state) KENDİSİ bölüm-farkında (bkz tools/planlamaDurumOzeti.mjs):
-        // A==='master-plan' VE bölüm-yürüyüşü SÜRÜYORSA (walk bitmemiş — aktifBolumBilgisi≠null)
-        // aktif BÖLÜMÜN kendi soru paketine delege eder; aksi halde (diğer 4 aşama, VEYA
-        // master-plan'ın walk'ı bitmiş nihai-onay anı) eskisiyle BİREBİR AYNI üst-seviye
-        // As.sorular_surum'u okur. Önceki kod burada ÖNCE üst-seviye ss'yi manuel okuyup sıfırsa
-        // acikSoruDurum'u HİÇ ÇAĞIRMIYORDU — tam da master-plan bölüm-yürüyüşü sırasında ss her
-        // zaman null olduğu için bölüm sorularını hiç göremiyordu (bkz meta-kanal.md 2026-07-16
-        // 16:35 recon kaydı). Artık acikSoruDurum HER ZAMAN çağrılır, paket de ONUN döndürdüğü
-        // (zaten doğru birime çözülmüş) paket'ten alınır — diğer 4 aşama için davranış DEĞİŞMEDİ
-        // (acikSoruDurumJenerik aynı As.sorular_surum'u aynı şekilde okur).
-        try {
-          const asd = acikSoruDurum(nsYolu, state)
-          if (asd) {
-            const paket = asd.paket
-            sorulariDogrula(paket) // defekt paket (ör. önerisiz CHOICE) ASLA normal render edilmez
-            anlikGoruntu.soru_turu = 'gecerli'
-            anlikGoruntu.yanit_butunluk = asd.butunluk ?? null
-            anlikGoruntu.asama = asd.asama       // aşama id'si VEYA (master-plan ise) bölüm id'si
-            anlikGoruntu.bolum = asd.bolum ?? null // YENİ: hangi master-plan bölümü (null=aşama-seviyesi) — saf ekleme
-            anlikGoruntu.surum = paket.surum
-            anlikGoruntu.soru_imza = paket.imza
-            anlikGoruntu.acik_sorular = (asd.acik ?? []).map(soruyuTarayiciyaUyarla)
-            anlikGoruntu.ertelenen_sorular = (paket.ertelenen ?? []).map(soruyuTarayiciyaUyarla)
-            anlikGoruntu.atlanan_sorular = asd.atlanan ?? []
-          }
-        } catch (e) {
-          anlikGoruntu.soru_turu = 'defekt'
-          anlikGoruntu.defekt_nedeni = e.message
+      // durum_etiketi — birim-state artık birimStateOf ÜZERİNDEN okunur (bkz docs/
+      // PIPELINE_UNIT_STATE_CONSUMERS.md satır 30). aktif_asama==='tamamlandi' iken artık null'da
+      // BIRAKILMAZ: GERCEK_ASAMALAR'ın dışında yaşayan elestiri (Kritik Pasaj) biriminin GÜNCEL
+      // durum'una düşer — elestiri hiç tetiklenmemişse (birimStateOf 'bekliyor' veya obje yoksa)
+      // yine null (dürüst-boş; sahte bir durum İCAT EDİLMEZ).
+      anlikGoruntu.durum_etiketi = state.aktif_asama === 'tamamlandi'
+        ? (birimStateOf(state, 'elestiri')?.durum ?? null)
+        : (birimStateOf(state, state.aktif_asama)?.durum ?? null)
+
+      // AÇIK SORULAR — acikSoruDurum(nsYolu, state) KENDİSİ bölüm-farkında VE (2026-07-19 görevi:
+      // "close the tamamlandi blind spot") artık tamamlandi-farkındadır: A==='master-plan' VE
+      // bölüm-yürüyüşü SÜRÜYORSA (walk bitmemiş — aktifBolumBilgisi≠null) aktif BÖLÜMÜN kendi
+      // soru paketine delege eder; A==='tamamlandi' VE elestiri hâlâ operatör kararı bekliyorsa
+      // (onay-bekliyor/donduruldu) elestiri'nin paketine delege eder; aksi halde (diğer 4 aşama,
+      // master-plan'ın walk'ı bitmiş nihai-onay anı, VEYA elestiri hiç başlamamış/zaten kapanmış)
+      // doğru birime çözülmüş paketi (veya dürüst null'u) döner. Eskiden burada
+      // `if (state.aktif_asama !== 'tamamlandi')` koşulu VARDI — bu koşul KALDIRILDI: elestiri'nin
+      // gerçek açık sorusunu (ör. go/no-go/pivot E kararı) hiç GÖRMÜYORDU, "no open questions"
+      // yanlış-negatifine sebep oluyordu (bkz docs/PIPELINE_UNIT_STATE_CONSUMERS.md "Bugs found
+      // while mapping"). Diğer 4 aşama + bölüm-yürüyüşü davranışı BİREBİR KORUNUR (acikSoruDurum
+      // kendisi zaten aynı A/bölüm ayrımını yapıyordu, yalnız çağrı koşulu genişledi).
+      try {
+        const asd = acikSoruDurum(nsYolu, state)
+        if (asd) {
+          const paket = asd.paket
+          sorulariDogrula(paket) // defekt paket (ör. önerisiz CHOICE) ASLA normal render edilmez
+          anlikGoruntu.soru_turu = 'gecerli'
+          anlikGoruntu.yanit_butunluk = asd.butunluk ?? null
+          anlikGoruntu.asama = asd.asama       // aşama/elestiri id'si VEYA (master-plan ise) bölüm id'si
+          anlikGoruntu.bolum = asd.bolum ?? null // master-plan bölüm-yürüyüşü sürüyorsa bölüm id'si
+          anlikGoruntu.surum = paket.surum
+          anlikGoruntu.soru_imza = paket.imza
+          anlikGoruntu.acik_sorular = (asd.acik ?? []).map(soruyuTarayiciyaUyarla)
+          anlikGoruntu.ertelenen_sorular = (paket.ertelenen ?? []).map(soruyuTarayiciyaUyarla)
+          anlikGoruntu.atlanan_sorular = asd.atlanan ?? []
         }
+      } catch (e) {
+        anlikGoruntu.soru_turu = 'defekt'
+        anlikGoruntu.defekt_nedeni = e.message
+      }
+
+      // LEFTOVER — bkz görev: "candidates deferred during the walk are invisible on the panel
+      // even though they are resolvable from state" + "the walk/deferral design is intentional
+      // and must NOT change — only visibility of the leftovers is missing". Ayrı try/catch:
+      // bozuk bir birimin paketi bu özetin tamamını ÇÖKERTMEZ, o proje için leftover_by_unit
+      // boş kalır ama açık-soru anlık-görüntüsü (yukarıda zaten yazıldı) etkilenmez.
+      try {
+        anlikGoruntu.leftover_by_unit = projeLeftoverOzetiCikar(nsYolu, state)
+      } catch (e) {
+        anlikGoruntu.leftover_hatasi = e.message
       }
 
       writeFileSync(join(outDir, `sorular-${id}.json`), JSON.stringify(anlikGoruntu, null, 2), 'utf8')

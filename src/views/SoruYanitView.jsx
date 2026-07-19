@@ -238,7 +238,16 @@ export default function SoruYanitView({ projeId }) {
         Planlama soruları — {projeId}
       </h2>
       <div style={{ fontSize: 12.5, color: '#71717a', marginBottom: 6 }}>
-        {data.tamamlandi ? 'pipeline tamamlandı' : `aktif aşama: ${data.aktif_asama ?? '—'}`}
+        {/* 2026-07-19 kör-nokta düzeltmesi: "pipeline tamamlandı" ARTIK "hiçbir şey bekliyor
+            değil" ANLAMINA GELMİYOR — 5-aşama+bölüm-yürüyüşü bitse de Kritik Pasaj (elestiri)
+            hâlâ bir E kararı bekliyor olabilir (bkz tools/planlamaDurumOzeti.mjs:acikSoruDurum).
+            data.soru_turu==='gecerli' burada tam da bunu gösterir (acik_sorular boş olsa bile,
+            ör. yalnız APPROVAL kaldıysa) — yanıltıcı "tamamlandı" metni yalnız GERÇEKTEN hiçbir
+            açık paket yokken gösterilir. */}
+        {data.tamamlandi && data.soru_turu !== 'gecerli' && 'pipeline tamamlandı'}
+        {data.tamamlandi && data.soru_turu === 'gecerli' &&
+          `Kritik Pasaj — ${data.durum_etiketi ?? 'karar bekliyor'}${data.asama && data.asama !== 'elestiri' ? ` (${data.asama})` : ''}`}
+        {!data.tamamlandi && `aktif aşama: ${data.aktif_asama ?? '—'}`}
       </div>
       <div style={{ fontSize: 11, color: '#a1a1aa', marginBottom: 18, lineHeight: 1.5 }}>
         Bu görünüm son <code style={{ fontFamily: 'ui-monospace, monospace' }}>npm run build-data</code> anlık-görüntüsüne
@@ -326,6 +335,47 @@ export default function SoruYanitView({ projeId }) {
           )}
         </>
       )}
+
+      <LeftoverOzet birimler={data.leftover_by_unit} />
+    </div>
+  )
+}
+
+// Proje boyunca (aktif olmayan birimler dahil) hâlâ AÇIK kalmış ertelenen adaylar — READ-ONLY,
+// walk/deferral tasarımına dokunmaz (bkz tools/planlamaDurumOzeti.mjs:projeLeftoverOzetiCikar +
+// görev: "candidates deferred during the walk are invisible on the panel even though they are
+// resolvable from state"). data.soru_turu'dan BAĞIMSIZ gösterilir — aktif birimin şu anda açık
+// sorusu olmasa bile GEÇMİŞ birimlerin leftover'ı hâlâ görünür olmalı.
+function LeftoverOzet({ birimler }) {
+  if (!birimler || birimler.length === 0) return null
+  const toplam = birimler.reduce((n, u) => n + u.sayi, 0)
+  return (
+    <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid #e4e4e7' }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 }}>
+        Leftover — proje boyunca ertelenen, hâlâ açık adaylar ({toplam})
+      </div>
+      <div style={{ fontSize: 11.5, color: '#a1a1aa', marginBottom: 10, lineHeight: 1.5 }}>
+        Bu birimler artık aktif değil (üretim-anında ana sete sığmadıkları için ertelendiler) —
+        bloklamazlar, ama kapanmadılar. Salt-okunur; buradan yanıtlanmaz.
+      </div>
+      {birimler.map(u => (
+        <details key={u.birimId} style={{ marginBottom: 8, border: '1px solid #e4e4e7', borderRadius: 8, background: '#fafafa' }}>
+          <summary style={{ cursor: 'pointer', padding: '8px 12px', fontSize: 12.5, fontWeight: 600, color: '#3f3f46' }}>
+            {u.birimId} — {u.sayi} açık aday
+          </summary>
+          <div style={{ padding: '0 12px 10px' }}>
+            {u.adaylar.map(a => (
+              <div key={a.anahtar} style={{ fontSize: 12, color: '#52525b', padding: '6px 0', borderTop: '1px solid #eee' }}>
+                <span style={{
+                  fontSize: 9.5, fontWeight: 700, letterSpacing: 0.3, textTransform: 'uppercase',
+                  color: a.tier === 'blocker' ? '#b91c1c' : '#a16207', marginRight: 6,
+                }}>{a.tip}{a.tier === 'blocker' ? ' · BLOCKER' : ''}</span>
+                {a.metin}
+              </div>
+            ))}
+          </div>
+        </details>
+      ))}
     </div>
   )
 }
