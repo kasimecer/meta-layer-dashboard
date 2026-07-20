@@ -1,0 +1,28 @@
+{
+  "id": "youtuber-agenthorses-sve-2026-07-20",
+  "projeKaydi": {
+    "id": "youtuber-agenthorses-sve-2026-07-20",
+    "ad": "YouTuber - AgentHorses - Sverige",
+    "rol": "solo",
+    "status": "aktif",
+    "efor": "?",
+    "deger": "?",
+    "zaman_son_aktivite": "2026-07-20",
+    "ozet": "isvecte Youtober - icerikler/basliklar: LLM, Agents, Claude Code, with 3rd part apps, how to, comparison, latest news, example projects, (Turkiyedeki Erhan Meydan benzeri, isvecte ve isvece uyarlanmis, tabi Erhan meydan yutube tecrubesi yok, zamanla)"
+  },
+  "cardsJson": {
+    "kartlar": [
+      {
+        "id": "youtuber-agenthorses-sve-2026-07-20-k01",
+        "tip": "girdi-talebi",
+        "durum": "cevap-bekliyor",
+        "ozet": "Bir cümleyle netleştir: hedef kitle + çözülen sorun",
+        "detay": "**Başlangıç fikri:**\n\nisvecte Youtober - icerikler/basliklar: LLM, Agents, Claude Code, with 3rd part apps, how to, comparison, latest news, example projects, (Turkiyedeki Erhan Meydan benzeri, isvecte ve isvece uyarlanmis, tabi Erhan meydan yutube tecrubesi yok, zamanla) \n\n*Sonraki adım: premise kapısı için fikri netleştir.*",
+        "partner_cevap": null,
+        "olusturma": "2026-07-20T08:31:29.577Z",
+        "guncelleme": "2026-07-20T08:31:29.577Z"
+      }
+    ]
+  },
+  "intakeMd": "# Intake — YouTuber - AgentHorses - Sverige\n**ID:** youtuber-agenthorses-sve-2026-07-20\n**Giriş kipi:** fikir-var\n**Tarih:** 2026-07-20\n\n## Fikir\n\nisvecte Youtober - icerikler/basliklar: LLM, Agents, Claude Code, with 3rd part apps, how to, comparison, latest news, example projects, (Turkiyedeki Erhan Meydan benzeri, isvecte ve isvece uyarlanmis, tabi Erhan meydan yutube tecrubesi yok, zamanla) "
+}
