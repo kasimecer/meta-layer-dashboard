@@ -1,0 +1,28 @@
+{
+  "id": "kurdish-language-school-2026-08-02",
+  "projeKaydi": {
+    "id": "kurdish-language-school-2026-08-02",
+    "ad": "Kurdish Language School",
+    "rol": "solo",
+    "status": "aktif",
+    "efor": "?",
+    "deger": "?",
+    "zaman_son_aktivite": "2026-08-02",
+    "ozet": "Danimarka merkezli yerel sınıf içi ve online ( iskandinavya / EU öncelikli ) Kürtçe dil okulu"
+  },
+  "cardsJson": {
+    "kartlar": [
+      {
+        "id": "kurdish-language-school-2026-08-02-k01",
+        "tip": "girdi-talebi",
+        "durum": "cevap-bekliyor",
+        "ozet": "Bir cümleyle netleştir: hedef kitle + çözülen sorun",
+        "detay": "**Başlangıç fikri:**\n\nDanimarka merkezli yerel sınıf içi ve online ( iskandinavya / EU öncelikli ) Kürtçe dil okulu\n\n*Sonraki adım: premise kapısı için fikri netleştir.*",
+        "partner_cevap": null,
+        "olusturma": "2026-08-02T17:28:09.562Z",
+        "guncelleme": "2026-08-02T17:28:09.562Z"
+      }
+    ]
+  },
+  "intakeMd": "# Intake — Kurdish Language School\n**ID:** kurdish-language-school-2026-08-02\n**Giriş kipi:** fikir-var\n**Tarih:** 2026-08-02\n\n## Fikir\n\nDanimarka merkezli yerel sınıf içi ve online ( iskandinavya / EU öncelikli ) Kürtçe dil okulu"
+}
