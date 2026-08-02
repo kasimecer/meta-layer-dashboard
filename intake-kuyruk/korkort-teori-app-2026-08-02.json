@@ -1,0 +1,28 @@
+{
+  "id": "korkort-teori-app-2026-08-02",
+  "projeKaydi": {
+    "id": "korkort-teori-app-2026-08-02",
+    "ad": "Körkort Teori App",
+    "rol": "solo",
+    "status": "aktif",
+    "efor": "?",
+    "deger": "?",
+    "zaman_son_aktivite": "2026-08-02",
+    "ozet": "İsveç’te Ehliyet teori sınavına hazırlık app"
+  },
+  "cardsJson": {
+    "kartlar": [
+      {
+        "id": "korkort-teori-app-2026-08-02-k01",
+        "tip": "girdi-talebi",
+        "durum": "cevap-bekliyor",
+        "ozet": "Bir cümleyle netleştir: hedef kitle + çözülen sorun",
+        "detay": "**Başlangıç fikri:**\n\nİsveç’te Ehliyet teori sınavına hazırlık app\n\n*Sonraki adım: premise kapısı için fikri netleştir.*",
+        "partner_cevap": null,
+        "olusturma": "2026-08-02T17:25:25.640Z",
+        "guncelleme": "2026-08-02T17:25:25.640Z"
+      }
+    ]
+  },
+  "intakeMd": "# Intake — Körkort Teori App\n**ID:** korkort-teori-app-2026-08-02\n**Giriş kipi:** fikir-var\n**Tarih:** 2026-08-02\n\n## Fikir\n\nİsveç’te Ehliyet teori sınavına hazırlık app"
+}
